@@ -4,6 +4,15 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
+export type DialogSize = "sm" | "md" | "lg" | "xl";
+
+const SIZE_CLASS: Record<DialogSize, string> = {
+  sm: "max-w-sm",
+  md: "max-w-md",
+  lg: "max-w-2xl",
+  xl: "max-w-4xl",
+};
+
 interface DialogShellProps {
   open: boolean;
   onClose: () => void;
@@ -11,6 +20,7 @@ interface DialogShellProps {
   initialFocusRef?: React.RefObject<HTMLElement | null>;
   labelledBy: string;
   describedBy?: string;
+  size?: DialogSize;
 }
 
 const FOCUSABLE_SELECTOR = [
@@ -29,6 +39,7 @@ export function DialogShell({
   initialFocusRef,
   labelledBy,
   describedBy,
+  size = "md",
 }: DialogShellProps) {
   const [mounted, setMounted] = React.useState(false);
   const [visible, setVisible] = React.useState(false);
@@ -137,7 +148,9 @@ export function DialogShell({
         aria-describedby={describedBy}
         tabIndex={-1}
         className={cn(
-          "w-full max-w-md rounded-xl border bg-[var(--color-card)] text-[var(--color-card-foreground)] shadow-xl",
+          "w-full rounded-xl border bg-[var(--color-card)] text-[var(--color-card-foreground)] shadow-xl",
+          "max-h-[calc(100vh-2rem)] overflow-y-auto",
+          SIZE_CLASS[size],
           "transition-all duration-150 outline-none",
           visible ? "scale-100 opacity-100" : "scale-95 opacity-0",
         )}
