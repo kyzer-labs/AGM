@@ -26,13 +26,11 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Modal } from "@/components/ui/modal";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { friendlyError } from "@/lib/errors";
 
@@ -59,9 +57,10 @@ function Inner() {
 interface CandidateRow {
   _id: Id<"candidates">;
   fullName: string;
-  matric: string;
+  matric: string | null;
   bio: string | null;
   photoStorageId: Id<"_storage"> | null;
+  photoLinkUrl: string | null;
   photoUrl: string | null;
   positions: {
     positionId: Id<"positions">;
@@ -99,9 +98,8 @@ function Body({ election }: { election: Doc<"elections"> }) {
     return {
       candidateId: c._id,
       fullName: c.fullName,
-      matric: c.matric,
-      bio: c.bio,
       photoStorageId: c.photoStorageId,
+      photoLinkUrl: c.photoLinkUrl,
       photoUrl: c.photoUrl,
       assignments: initialAssignments,
     };
@@ -129,18 +127,27 @@ function Body({ election }: { election: Doc<"elections"> }) {
         const rows = result.data.flatMap((row) => {
           const fullName =
             row.fullName ?? row["Full Name"] ?? row.name ?? row.Name;
-          const matric = row.matric ?? row.matricNumber ?? row.Matric;
-          if (!fullName || !matric) return [];
+          const matric =
+            row.matric ?? row.matricNumber ?? row.Matric ?? undefined;
+          const photoUrl =
+            row.photoUrl ??
+            row.PhotoUrl ??
+            row["Photo URL"] ??
+            row.photo ??
+            row.Photo ??
+            undefined;
+          if (!fullName) return [];
           return [
             {
               fullName,
-              matric,
+              matric: matric || undefined,
               bio: row.bio ?? row.Bio ?? undefined,
               positions:
                 row.positions ??
                 row.Positions ??
                 row.eligiblePositions ??
                 undefined,
+              photoUrl: photoUrl || undefined,
             },
           ];
         });
@@ -148,7 +155,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
           setImporting(false);
           toast.error("No usable rows found in CSV.", {
             description:
-              "Required columns: fullName, matric. Optional: bio, positions.",
+              "Required column: fullName. Optional: matric, bio, positions, photoUrl.",
           });
           return;
         }
@@ -189,8 +196,8 @@ function Body({ election }: { election: Doc<"elections"> }) {
         <div className="flex flex-wrap items-center gap-2">
           {editable ? (
             <>
-              <Button onClick={() => setAdding((v) => !v)}>
-                <Plus className="h-4 w-4" /> {adding ? "Close" : "Add candidate"}
+              <Button onClick={() => setAdding(true)}>
+                <Plus className="h-4 w-4" /> Add candidate
               </Button>
               <label className="inline-flex">
                 <input
@@ -219,44 +226,37 @@ function Body({ election }: { election: Doc<"elections"> }) {
         />
       ) : null}
 
-      {adding && positions.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Add candidate</CardTitle>
-            <CardDescription>
-              You can add a photo, a short bio, and one or more eligible
-              positions in preference order.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <CandidateForm
-              electionId={election._id}
-              positions={positions}
-              onSaved={() => setAdding(false)}
-              onCancel={() => setAdding(false)}
-            />
-          </CardContent>
-        </Card>
-      ) : null}
+      <Modal
+        open={adding && positions.length > 0}
+        onClose={() => setAdding(false)}
+        title="Add candidate"
+        description="Enter the candidate's name, pick the positions they are contending for, and attach a photo (upload or paste a Drive/image link)."
+      >
+        <CandidateForm
+          electionId={election._id}
+          positions={positions}
+          onSaved={() => setAdding(false)}
+          onCancel={() => setAdding(false)}
+        />
+      </Modal>
 
-      {editingCandidate && positions.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Editing {editingCandidate.fullName}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <CandidateForm
-              electionId={election._id}
-              positions={positions}
-              initial={editingCandidate}
-              onSaved={() => setEditingId(null)}
-              onCancel={() => setEditingId(null)}
-            />
-          </CardContent>
-        </Card>
-      ) : null}
+      <Modal
+        open={editingCandidate !== null && positions.length > 0}
+        onClose={() => setEditingId(null)}
+        title={
+          editingCandidate ? `Edit ${editingCandidate.fullName}` : "Edit"
+        }
+      >
+        {editingCandidate ? (
+          <CandidateForm
+            electionId={election._id}
+            positions={positions}
+            initial={editingCandidate}
+            onSaved={() => setEditingId(null)}
+            onCancel={() => setEditingId(null)}
+          />
+        ) : null}
+      </Modal>
 
       {candidates.length === 0 ? (
         <EmptyState
@@ -335,9 +335,11 @@ function CandidateCard({
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <h3 className="truncate text-sm font-semibold">{c.fullName}</h3>
-              <p className="text-xs text-[var(--color-muted-foreground)]">
-                {c.matric}
-              </p>
+              {c.matric && !c.matric.startsWith("auto-") ? (
+                <p className="text-xs text-[var(--color-muted-foreground)]">
+                  {c.matric}
+                </p>
+              ) : null}
             </div>
             {editable ? (
               <div className="flex items-center">
@@ -360,11 +362,6 @@ function CandidateCard({
               </div>
             ) : null}
           </div>
-          {c.bio ? (
-            <p className="mt-1 line-clamp-2 text-xs text-[var(--color-muted-foreground)]">
-              {c.bio}
-            </p>
-          ) : null}
           {c.positions.length > 0 ? (
             <ol className="mt-2 flex flex-wrap items-center gap-1">
               {c.positions

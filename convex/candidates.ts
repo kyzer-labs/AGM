@@ -3,7 +3,13 @@ import { mutation, query } from "./_generated/server";
 import { requireAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
 import { getElectionOrThrow, requireSetupPhase } from "./lib/setup";
+import { isHttpUrl, normalisePhotoUrl } from "./lib/photoUrl";
 import type { Doc, Id } from "./_generated/dataModel";
+
+function generateAutoMatric(): string {
+  const random = Math.random().toString(36).slice(2, 10);
+  return `auto-${random}`;
+}
 
 export const list = query({
   args: { electionId: v.id("elections") },
@@ -35,15 +41,17 @@ export const list = query({
                 : null;
             }),
         );
-        const photoUrl = c.photoStorageId
+        const storageUrl = c.photoStorageId
           ? await ctx.storage.getUrl(c.photoStorageId)
           : null;
+        const photoUrl = storageUrl ?? c.photoUrl ?? null;
         return {
           _id: c._id,
           fullName: c.fullName,
-          matric: c.matric,
+          matric: c.matric ?? null,
           bio: c.bio ?? null,
           photoStorageId: c.photoStorageId ?? null,
+          photoLinkUrl: c.photoUrl ?? null,
           photoUrl,
           positions: positions.filter(
             (p): p is NonNullable<typeof p> => p !== null,
@@ -60,9 +68,10 @@ export const add = mutation({
   args: {
     electionId: v.id("elections"),
     fullName: v.string(),
-    matric: v.string(),
+    matric: v.optional(v.string()),
     bio: v.optional(v.string()),
     photoStorageId: v.optional(v.id("_storage")),
+    photoUrl: v.optional(v.string()),
     positionAssignments: v.optional(
       v.array(
         v.object({
@@ -77,16 +86,31 @@ export const add = mutation({
     await requireSetupPhase(ctx, args.electionId);
 
     const fullName = args.fullName.trim();
-    const matric = args.matric.trim();
     if (fullName.length < 2 || fullName.length > 120) {
       throw new Error("Full name must be between 2 and 120 characters.");
     }
-    if (matric.length < 6 || matric.length > 20) {
+
+    let matric: string | undefined = args.matric?.trim();
+    if (matric !== undefined && matric.length === 0) matric = undefined;
+    if (matric !== undefined && (matric.length < 6 || matric.length > 20)) {
       throw new Error("Matric number must be between 6 and 20 characters.");
     }
+    if (matric === undefined) matric = generateAutoMatric();
+
     const bio = args.bio?.trim();
     if (bio !== undefined && bio.length > 1000) {
       throw new Error("Bio must be at most 1000 characters.");
+    }
+
+    let photoUrl: string | undefined;
+    if (args.photoUrl !== undefined) {
+      const raw = args.photoUrl.trim();
+      if (raw.length > 0) {
+        if (!isHttpUrl(raw)) {
+          throw new Error("Photo link must start with http:// or https://.");
+        }
+        photoUrl = normalisePhotoUrl(raw);
+      }
     }
 
     const candidateId = await ctx.db.insert("candidates", {
@@ -95,6 +119,7 @@ export const add = mutation({
       matric,
       bio: bio || undefined,
       photoStorageId: args.photoStorageId,
+      photoUrl,
       createdAt: Date.now(),
     });
 
@@ -131,6 +156,7 @@ export const update = mutation({
     matric: v.optional(v.string()),
     bio: v.optional(v.string()),
     photoStorageId: v.optional(v.id("_storage")),
+    photoUrl: v.optional(v.string()),
     clearPhoto: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -144,6 +170,7 @@ export const update = mutation({
       matric?: string;
       bio?: string | undefined;
       photoStorageId?: Id<"_storage"> | undefined;
+      photoUrl?: string | undefined;
     } = {};
 
     if (args.fullName !== undefined) {
@@ -155,10 +182,14 @@ export const update = mutation({
     }
     if (args.matric !== undefined) {
       const v2 = args.matric.trim();
-      if (v2.length < 6 || v2.length > 20) {
-        throw new Error("Matric number must be between 6 and 20 characters.");
+      if (v2.length === 0) {
+        patch.matric = c.matric ?? generateAutoMatric();
+      } else {
+        if (v2.length < 6 || v2.length > 20) {
+          throw new Error("Matric number must be between 6 and 20 characters.");
+        }
+        patch.matric = v2;
       }
-      patch.matric = v2;
     }
     if (args.bio !== undefined) {
       const v2 = args.bio.trim();
@@ -172,11 +203,30 @@ export const update = mutation({
         await ctx.storage.delete(c.photoStorageId);
       }
       patch.photoStorageId = undefined;
-    } else if (args.photoStorageId !== undefined) {
-      if (c.photoStorageId && c.photoStorageId !== args.photoStorageId) {
-        await ctx.storage.delete(c.photoStorageId);
+      patch.photoUrl = undefined;
+    } else {
+      if (args.photoStorageId !== undefined) {
+        if (c.photoStorageId && c.photoStorageId !== args.photoStorageId) {
+          await ctx.storage.delete(c.photoStorageId);
+        }
+        patch.photoStorageId = args.photoStorageId;
+        patch.photoUrl = undefined;
       }
-      patch.photoStorageId = args.photoStorageId;
+      if (args.photoUrl !== undefined) {
+        const raw = args.photoUrl.trim();
+        if (raw.length === 0) {
+          patch.photoUrl = undefined;
+        } else {
+          if (!isHttpUrl(raw)) {
+            throw new Error("Photo link must start with http:// or https://.");
+          }
+          patch.photoUrl = normalisePhotoUrl(raw);
+          if (c.photoStorageId && patch.photoStorageId === undefined) {
+            await ctx.storage.delete(c.photoStorageId);
+            patch.photoStorageId = undefined;
+          }
+        }
+      }
     }
 
     await ctx.db.patch(c._id, patch);
@@ -213,7 +263,7 @@ export const remove = mutation({
       action: "candidate.removed",
       entityType: "candidates",
       entityId: c._id,
-      payload: { fullName: c.fullName, matric: c.matric },
+      payload: { fullName: c.fullName, matric: c.matric ?? "—" },
     });
   },
 });
@@ -283,9 +333,10 @@ export const generatePhotoUploadUrl = mutation({
 
 interface ImportRow {
   fullName: string;
-  matric: string;
+  matric?: string;
   bio?: string;
   positions?: string;
+  photoUrl?: string;
 }
 
 interface ImportSummary {
@@ -300,9 +351,10 @@ export const csvImport = mutation({
     rows: v.array(
       v.object({
         fullName: v.string(),
-        matric: v.string(),
+        matric: v.optional(v.string()),
         bio: v.optional(v.string()),
         positions: v.optional(v.string()),
+        photoUrl: v.optional(v.string()),
       }),
     ),
   },
@@ -322,7 +374,12 @@ export const csvImport = mutation({
       .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
       .collect();
     const existingMatrics = new Set(
-      existing.map((c) => c.matric.toLowerCase()),
+      existing
+        .map((c) => c.matric?.toLowerCase())
+        .filter((m): m is string => typeof m === "string"),
+    );
+    const existingNames = new Set(
+      existing.map((c) => c.fullName.trim().toLowerCase()),
     );
 
     const summary: ImportSummary = { inserted: 0, skipped: 0, errors: [] };
@@ -331,17 +388,50 @@ export const csvImport = mutation({
       const row = args.rows[i] as ImportRow;
       try {
         const fullName = row.fullName.trim();
-        const matric = row.matric.trim();
-        if (fullName.length < 2 || matric.length < 6) {
+        if (fullName.length < 2 || fullName.length > 120) {
           summary.errors.push({
             row: i + 2,
-            message: "Missing or invalid fullName or matric.",
+            message: "Missing or invalid fullName.",
           });
           continue;
         }
-        if (existingMatrics.has(matric.toLowerCase())) {
-          summary.skipped += 1;
-          continue;
+
+        const rawMatric = row.matric?.trim() ?? "";
+        let matric: string;
+        if (rawMatric.length === 0) {
+          if (existingNames.has(fullName.toLowerCase())) {
+            summary.skipped += 1;
+            continue;
+          }
+          matric = generateAutoMatric();
+        } else {
+          if (rawMatric.length < 6 || rawMatric.length > 20) {
+            summary.errors.push({
+              row: i + 2,
+              message: "Matric must be between 6 and 20 characters.",
+            });
+            continue;
+          }
+          if (existingMatrics.has(rawMatric.toLowerCase())) {
+            summary.skipped += 1;
+            continue;
+          }
+          matric = rawMatric;
+        }
+
+        let photoUrl: string | undefined;
+        if (row.photoUrl) {
+          const raw = row.photoUrl.trim();
+          if (raw.length > 0) {
+            if (!isHttpUrl(raw)) {
+              summary.errors.push({
+                row: i + 2,
+                message: "photoUrl must start with http:// or https://.",
+              });
+            } else {
+              photoUrl = normalisePhotoUrl(raw);
+            }
+          }
         }
 
         const candidateId = await ctx.db.insert("candidates", {
@@ -349,9 +439,11 @@ export const csvImport = mutation({
           fullName,
           matric,
           bio: row.bio?.trim() || undefined,
+          photoUrl,
           createdAt: Date.now(),
         });
         existingMatrics.add(matric.toLowerCase());
+        existingNames.add(fullName.toLowerCase());
 
         if (row.positions && row.positions.trim().length > 0) {
           const names = row.positions

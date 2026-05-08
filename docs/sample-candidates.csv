@@ -1,16 +1,7 @@
-fullName,matric,bio,positions
-LIM JIE SHEN,156001,Co-founded the freshman code clinic; mentored 30+ juniors during last semester's hackathon.,President; Vice President of Internal Affairs
-LIM PEI XUAN,156002,Led last year's industry-night logistics from sponsorship outreach to MC coordination.,President; Vice President of External Affairs
-TAN CHIN QIAN,156003,Captained the CSS competitive programming team for two consecutive semesters.,President; Vice President of Internal Affairs
-KYZER PHNEH,156004,Built the previous AGM's voting tooling end-to-end; obsessed with operational reliability.,Vice President of Internal Affairs
-AIDA DAFINAH BINTI NIZAM,156005,Negotiated MoUs with three external societies during her stint as Liaison Lead.,Vice President of External Affairs; Director of Community Engagement Department
-ELSON OOI YIN FENG,156006,Took the most thorough committee minutes anyone has ever read.,Director of Secretarial Department
-KOAY KE YING,156007,Calm under pressure; ran two emergency-response drills without losing a beat.,Director of Secretarial Department
-NURRUL SHAHIRATULNAZWA BINTI MOHD SAFIFEE,156008,Process-driven and systematic; wants to standardise CSS document templates.,Director of Secretarial Department
-AUNI AMIRA BINTI MD FAUZI,156009,Cleaned up the previous treasury's spreadsheet sprawl into a single dashboard.,Director of Financial Department
-CHONG HAN ZHENG,156010,Designs every poster CSS posts on Instagram. Strong eye for typography.,Director of Creative Department
-KEE CHUN SHANG,156011,Brought motion graphics to last year's promo reels — engagement up 3x.,Director of Creative Department
-CHEONG WEN XUAN,156012,Ran the freshman onboarding campaign that filled every introductory workshop seat.,Director of Growth Marketing Department
-MOHAMAD NAZRUL HAKIM BIN NOOR HAMZAH,156013,Data-driven marketer; built the Google Analytics + UTM pipeline CSS uses today.,Director of Growth Marketing Department
-DORIS YEE WAI LEE,156014,Hosts monthly "alumni teas" that have already produced two internship offers for juniors.,Director of Community Engagement Department
-CALVIN KHOO ZHEN CHEN,156015,Maintains the CSS internal repos and helped migrate the old Drupal site to Next.js.,Director of Technical Department
+fullName,positions,photoUrl,matric,bio
+LIM JIE SHEN,President; Vice President of Internal Affairs,,156001,
+LIM PEI XUAN,President; Vice President of External Affairs,,,
+TAN CHIN QIAN,President; Vice President of Internal Affairs,https://drive.google.com/file/d/0123456789ABCDEF/view?usp=sharing,,
+KYZER PHNEH,Vice President of Internal Affairs,,156004,
+AIDA DAFINAH BINTI NIZAM,Vice President of External Affairs; Director of Community Engagement Department,,,
+ELSON OOI YIN FENG,Director of Secretarial Department,,,

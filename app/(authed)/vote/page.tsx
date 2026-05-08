@@ -187,7 +187,7 @@ interface ActiveSession {
   candidates: {
     candidateId: Id<"candidates">;
     fullName: string;
-    matric: string;
+    matric: string | null;
     bio: string | null;
     photoUrl: string | null;
     fallbackOrder: number;
@@ -319,9 +319,11 @@ function Ballot({ session }: { session: ActiveSession }) {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium">{c.fullName}</div>
-                  <div className="truncate text-xs text-[var(--color-muted-foreground)]">
-                    {c.matric}
-                  </div>
+                  {c.matric && !c.matric.startsWith("auto-") ? (
+                    <div className="truncate text-xs text-[var(--color-muted-foreground)]">
+                      {c.matric}
+                    </div>
+                  ) : null}
                 </div>
                 {isSelected ? (
                   <CheckCircle2
@@ -344,10 +346,15 @@ function Ballot({ session }: { session: ActiveSession }) {
         {chosen ? (
           <span className="text-sm">
             Selected:{" "}
-            <strong>{chosen.fullName}</strong>{" "}
-            <span className="text-[var(--color-muted-foreground)]">
-              ({chosen.matric})
-            </span>
+            <strong>{chosen.fullName}</strong>
+            {chosen.matric && !chosen.matric.startsWith("auto-") ? (
+              <>
+                {" "}
+                <span className="text-[var(--color-muted-foreground)]">
+                  ({chosen.matric})
+                </span>
+              </>
+            ) : null}
           </span>
         ) : (
           <span className="text-sm text-[var(--color-muted-foreground)]">

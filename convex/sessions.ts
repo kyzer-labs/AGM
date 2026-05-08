@@ -102,14 +102,15 @@ export const getActiveSession = query({
         .map(async (l) => {
           const c = await ctx.db.get(l.candidateId);
           if (!c) return null;
+          const storageUrl = c.photoStorageId
+            ? await ctx.storage.getUrl(c.photoStorageId)
+            : null;
           return {
             candidateId: c._id,
             fullName: c.fullName,
-            matric: c.matric,
+            matric: c.matric ?? null,
             bio: c.bio ?? null,
-            photoUrl: c.photoStorageId
-              ? await ctx.storage.getUrl(c.photoStorageId)
-              : null,
+            photoUrl: storageUrl ?? c.photoUrl ?? null,
             fallbackOrder: l.fallbackOrder,
           };
         }),
@@ -151,7 +152,7 @@ export const previewCascade = query({
     const eligible: {
       candidateId: Id<"candidates">;
       fullName: string;
-      matric: string;
+      matric: string | null;
     }[] = [];
     const removed: { candidateId: Id<"candidates">; fullName: string }[] = [];
 
@@ -164,7 +165,7 @@ export const previewCascade = query({
         eligible.push({
           candidateId: c._id,
           fullName: c.fullName,
-          matric: c.matric,
+          matric: c.matric ?? null,
         });
       }
     }

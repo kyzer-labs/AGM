@@ -389,9 +389,11 @@ function ClassAggregateTable({
                   >
                     <td className="px-3 py-2">
                       <div className="font-medium">{row.fullName}</div>
-                      <div className="text-xs text-[var(--color-muted-foreground)]">
-                        {row.matric}
-                      </div>
+                      {row.matric && !row.matric.startsWith("auto-") ? (
+                        <div className="text-xs text-[var(--color-muted-foreground)]">
+                          {row.matric}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums">
                       {row.evaluatorCount}

@@ -558,7 +558,7 @@ export const adminAggregate = query({
       candidates: candidates.map((c) => ({
         candidateId: c._id,
         fullName: c.fullName,
-        matric: c.matric,
+        matric: c.matric ?? null,
         byClass: VOTER_CLASSES.map((cls) => {
           const agg = aggregator[cls].get(c._id);
           return {

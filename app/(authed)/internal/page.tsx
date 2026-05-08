@@ -467,11 +467,16 @@ function ActiveEvaluation({
                               {c.fullName}
                             </div>
                             <div className="truncate text-xs text-[var(--color-muted-foreground)]">
-                              {c.matric}
+                              {c.matric && !c.matric.startsWith("auto-") ? (
+                                <>{c.matric}</>
+                              ) : null}
+                              {c.matric &&
+                              !c.matric.startsWith("auto-") &&
+                              c.positions.length > 0
+                                ? " · "
+                                : null}
                               {c.positions.length > 0 ? (
                                 <>
-                                  {" "}
-                                  ·{" "}
                                   {c.positions
                                     .slice()
                                     .sort(

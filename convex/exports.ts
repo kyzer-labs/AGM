@@ -85,7 +85,7 @@ export const internalScores = query({
             ? new Date(ev.submittedAt).toISOString()
             : "",
           candidateName: c.fullName,
-          candidateMatric: c.matric,
+          candidateMatric: c.matric ?? "—",
           criterion: crit.name,
           score: s.score,
           maxScore: crit.maxScore,
@@ -208,7 +208,7 @@ export const internalScoresByClass = query({
           voterClass: VOTER_CLASS_LABEL[cls],
           voterClassWeight: w,
           candidateName: c.fullName,
-          candidateMatric: c.matric,
+          candidateMatric: c.matric ?? "—",
           evaluatorCount: evalCount,
           sumOfRubricTotals: sum,
           classGrandTotal: total,
@@ -275,7 +275,7 @@ export const publicCounts = query({
           tier: p.tier,
           order: p.order,
           candidateName: c.fullName,
-          candidateMatric: c.matric,
+          candidateMatric: c.matric ?? "—",
           votes: counts.get(l.candidateId) ?? 0,
         });
       }

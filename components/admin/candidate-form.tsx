@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { ArrowDown, ArrowUp, ImagePlus, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ImagePlus, Link as LinkIcon, X } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,7 +12,6 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
@@ -20,8 +19,15 @@ import { friendlyError } from "@/lib/errors";
 
 const candidateSchema = z.object({
   fullName: z.string().trim().min(2).max(120),
-  matric: z.string().trim().min(6).max(20),
-  bio: z.string().trim().max(1000).optional(),
+  photoUrl: z
+    .string()
+    .trim()
+    .max(500)
+    .optional()
+    .refine(
+      (v) => !v || /^https?:\/\//i.test(v),
+      "Photo link must start with http:// or https://",
+    ),
 });
 export type CandidateFormValues = z.infer<typeof candidateSchema>;
 
@@ -36,9 +42,8 @@ interface CandidateFormProps {
   initial?: {
     candidateId: Id<"candidates">;
     fullName: string;
-    matric: string;
-    bio: string | null;
     photoStorageId: Id<"_storage"> | null;
+    photoLinkUrl: string | null;
     photoUrl: string | null;
     assignments: PositionAssignment[];
   };
@@ -63,8 +68,7 @@ export function CandidateForm({
     resolver: zodResolver(candidateSchema),
     defaultValues: {
       fullName: initial?.fullName ?? "",
-      matric: initial?.matric ?? "",
-      bio: initial?.bio ?? "",
+      photoUrl: initial?.photoLinkUrl ?? "",
     },
   });
 
@@ -128,6 +132,7 @@ export function CandidateForm({
       }
       setPhotoStorageId(json.storageId);
       setPhotoPreview(URL.createObjectURL(file));
+      form.setValue("photoUrl", "");
     } catch (err) {
       const m = friendlyError(err, "Upload failed.");
       toast.error("Upload failed", { description: m });
@@ -158,26 +163,31 @@ export function CandidateForm({
   };
 
   const onSubmit = form.handleSubmit(async (values) => {
+    if (orderedPositionIds.length === 0) {
+      toast.error("Pick at least one contending position.");
+      return;
+    }
     setSubmitting(true);
     try {
       let candidateId = initial?.candidateId;
+      const photoUrlInput = values.photoUrl?.trim() ?? "";
+      const usingUpload = photoStorageId !== null;
+      const usingLink = !usingUpload && photoUrlInput.length > 0;
 
       if (isEdit && candidateId) {
         await updateCandidate({
           candidateId,
           fullName: values.fullName,
-          matric: values.matric,
-          bio: values.bio ?? "",
-          photoStorageId: photoStorageId ?? undefined,
-          clearPhoto: photoStorageId === null,
+          photoStorageId: usingUpload ? photoStorageId ?? undefined : undefined,
+          photoUrl: usingLink ? photoUrlInput : "",
+          clearPhoto: !usingUpload && !usingLink,
         });
       } else {
         candidateId = await addCandidate({
           electionId,
           fullName: values.fullName,
-          matric: values.matric,
-          bio: values.bio ?? undefined,
-          photoStorageId: photoStorageId ?? undefined,
+          photoStorageId: usingUpload ? photoStorageId ?? undefined : undefined,
+          photoUrl: usingLink ? photoUrlInput : undefined,
           positionAssignments: orderedPositionIds.map((positionId, i) => ({
             positionId,
             fallbackOrder: i,
@@ -246,7 +256,7 @@ export function CandidateForm({
             >
               {photoStorageId ? "Replace" : "Upload"}
             </Button>
-            {photoStorageId ? (
+            {photoStorageId || photoPreview ? (
               <Button
                 type="button"
                 size="sm"
@@ -257,6 +267,7 @@ export function CandidateForm({
                     URL.revokeObjectURL(photoPreview);
                   }
                   setPhotoPreview(null);
+                  form.setValue("photoUrl", "");
                 }}
               >
                 Remove
@@ -276,23 +287,42 @@ export function CandidateForm({
             ) : null}
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="cand-matric">Matric number</Label>
-            <Input id="cand-matric" {...form.register("matric")} />
-            {form.formState.errors.matric ? (
+            <Label htmlFor="cand-photo-url" className="flex items-center gap-1.5">
+              <LinkIcon className="h-3.5 w-3.5" aria-hidden /> Or paste a photo
+              link
+            </Label>
+            <Input
+              id="cand-photo-url"
+              type="url"
+              placeholder="https://drive.google.com/file/d/..."
+              {...form.register("photoUrl")}
+              onChange={(e) => {
+                form.setValue("photoUrl", e.target.value, {
+                  shouldValidate: true,
+                });
+                if (e.target.value && photoStorageId) {
+                  setPhotoStorageId(null);
+                }
+                if (!photoStorageId) {
+                  setPhotoPreview(e.target.value || null);
+                }
+              }}
+            />
+            <p className="text-[11px] text-[var(--color-muted-foreground)]">
+              Google Drive share links are auto-converted. Otherwise paste a
+              direct image URL.
+            </p>
+            {form.formState.errors.photoUrl ? (
               <p className="text-xs text-[var(--color-destructive)]">
-                {form.formState.errors.matric.message}
+                {form.formState.errors.photoUrl.message}
               </p>
             ) : null}
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="cand-bio">Short bio (optional)</Label>
-            <Textarea id="cand-bio" rows={3} {...form.register("bio")} />
           </div>
         </div>
       </div>
 
       <div className="grid gap-3">
-        <Label>Eligible positions (in order of preference)</Label>
+        <Label>Contending positions (in order of preference)</Label>
         <div className="rounded-md border p-3">
           <p className="mb-2 text-xs text-[var(--color-muted-foreground)]">
             Top of the list is the candidate&apos;s first choice. If they
@@ -369,7 +399,7 @@ export function CandidateForm({
         </div>
       </div>
 
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex items-center justify-end gap-2 border-t pt-4">
         {onCancel ? (
           <Button type="button" variant="ghost" onClick={onCancel}>
             Cancel

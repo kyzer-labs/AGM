@@ -459,9 +459,11 @@ function ResultCard({
                                 </span>
                               ) : null}
                             </div>
-                            <div className="text-xs text-[var(--color-muted-foreground)]">
-                              {b.matric}
-                            </div>
+                            {b.matric && !b.matric.startsWith("auto-") ? (
+                              <div className="text-xs text-[var(--color-muted-foreground)]">
+                                {b.matric}
+                              </div>
+                            ) : null}
                           </div>
                         </div>
                       </td>

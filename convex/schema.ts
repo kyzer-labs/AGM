@@ -90,8 +90,9 @@ export default defineSchema({
   candidates: defineTable({
     electionId: v.id("elections"),
     fullName: v.string(),
-    matric: v.string(),
+    matric: v.optional(v.string()),
     photoStorageId: v.optional(v.id("_storage")),
+    photoUrl: v.optional(v.string()),
     bio: v.optional(v.string()),
     createdAt: v.number(),
   }).index("by_election", ["electionId"]),

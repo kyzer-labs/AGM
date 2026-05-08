@@ -196,8 +196,10 @@ function ResultBlock({ row }: { row: PublicRow }) {
                 {winner.fullName}
               </div>
               <div className="text-xs text-[var(--color-muted-foreground)]">
-                {winner.matric} · final score{" "}
-                {(winner.finalScore * 100).toFixed(2)}%
+                {winner.matric && !winner.matric.startsWith("auto-")
+                  ? `${winner.matric} · `
+                  : ""}
+                final score {(winner.finalScore * 100).toFixed(2)}%
               </div>
             </div>
           </div>

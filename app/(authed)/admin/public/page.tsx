@@ -160,7 +160,7 @@ function SessionRowCard({
   electionId: Id<"elections">;
   candidateNameById: Map<Id<"candidates">, string>;
   phaseOk: boolean;
-  candidates: { _id: Id<"candidates">; fullName: string; matric: string }[];
+  candidates: { _id: Id<"candidates">; fullName: string; matric: string | null }[];
 }) {
   const dialog = useDialog();
   const [busy, setBusy] = useState(false);
