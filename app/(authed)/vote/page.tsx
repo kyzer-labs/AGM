@@ -29,7 +29,6 @@ import { cn } from "@/lib/utils";
 import { getConvexErrorMessage } from "@/lib/convex-error";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 
-
 export default function VotePage() {
   return (
     <AuthGate mode="profileComplete">
