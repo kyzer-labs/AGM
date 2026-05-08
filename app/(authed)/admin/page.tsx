@@ -116,20 +116,19 @@ function AdminPageInner() {
             title="Results & publishing"
             description="Preview combined 75/25 results, resolve ties, publish."
             href="/admin/results"
-            badge="Phase 6"
           />
           <Tile
             title="Exports"
-            description="CSV downloads + audit access."
+            description="CSV downloads + emergency audit lookup."
             href="/admin/exports"
-            badge="Phase 7"
           />
-          <Tile
-            title="Admins"
-            description="Super admins manage the admin allowlist."
-            href="/admin/admins"
-            badge="Phase 7"
-          />
+          {adminStatus?.role === "super" ? (
+            <Tile
+              title="Admins"
+              description="Super admins manage the admin allowlist."
+              href="/admin/admins"
+            />
+          ) : null}
         </section>
       ) : null}
     </main>

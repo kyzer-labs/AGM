@@ -16,19 +16,25 @@ internal Year-2 rubric evaluation before AGM day, live AGM-day public voting, an
 
 - Spec & user stories — [docs/AGM_USER_STORIES.md](docs/AGM_USER_STORIES.md)
 - **Setup guide (start here)** — [docs/SETUP.md](docs/SETUP.md)
+- **Operations runbook (during AGM)** — [docs/RUNBOOK.md](docs/RUNBOOK.md)
 
 ## Status
 
-Phase 0–2 of the implementation plan are scaffolded:
+All seven implementation phases are complete:
 
-- USM-domain-locked Microsoft sign-in via Firebase Auth.
-- Firebase ID token verified by Convex (`convex/auth.config.ts`).
-- `voters` profile flow with server-validated full name, matric, year of study.
-- `admins` allowlist with one-time super-admin bootstrap.
-- `auditLog` populated by every privileged mutation.
-- Landing page, dashboard, profile, admin console with bootstrap card.
-- Schema for elections, positions, candidates, whitelist, evaluations, scores,
-  votes, results — ready for Phases 3–6.
+| Phase | Surface |
+| --- | --- |
+| 0 | Bootstrap (Bun, Next.js, Tailwind, design tokens) |
+| 1 | Identity & profile (Microsoft OAuth, USM domain lock, voter profile) |
+| 2 | Admin allowlist + super-admin bootstrap |
+| 3 | Election cycle, positions, candidates (with photo upload), Year-2 whitelist (CSV import) |
+| 4 | Internal rubric evaluation (5 categories × N candidates), draft + submit, admin completion + aggregate dashboards |
+| 5 | Live AGM voting (per-position session machine, cascade rules, manual tie resolution) |
+| 6 | 75/25 results preview, super-admin recompute, public results page |
+| 7 | CSV exports, audit log download, super-admin emergency voter audit |
+
+Every privileged mutation is audited. UI is hand-rolled shadcn-style on
+Tailwind v4. The whole frontend is reactive via Convex's `useQuery`.
 
 ## Quickstart
 
