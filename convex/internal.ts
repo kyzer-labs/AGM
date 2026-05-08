@@ -185,9 +185,9 @@ export const saveScores = mutation({
       election._id,
       voter.email,
     );
-    if (!whitelisted) {
+    if (!whitelistEntry) {
       throw new ConvexError(
-        "You are not on the Year 2 internal whitelist for this election.",
+        "You are not on the internal whitelist for this election.",
       );
     }
 
@@ -200,14 +200,24 @@ export const saveScores = mutation({
     for (const s of args.scores) {
       const c = await ctx.db.get(s.candidateId);
       if (!c || c.electionId !== election._id) {
-        throw new ConvexError("Score references a candidate from another election.");
+        throw new ConvexError(
+          "Score references a candidate from another election.",
+        );
       }
-      for (const cat of RUBRIC_CATEGORIES) {
-        if (!validScore(s[cat])) {
-          throw new ConvexError(
-            `Score for "${cat}" must be an integer between 1 and 5.`,
-          );
-        }
+      const crit = criteriaById.get(s.criterionId);
+      if (!crit) {
+        throw new ConvexError(
+          "Score references a criterion that no longer exists.",
+        );
+      }
+      if (
+        !Number.isInteger(s.score) ||
+        s.score < 1 ||
+        s.score > crit.maxScore
+      ) {
+        throw new ConvexError(
+          `Score for "${crit.name}" must be an integer between 1 and ${crit.maxScore}.`,
+        );
       }
     }
 
@@ -274,9 +284,9 @@ export const submit = mutation({
       election._id,
       voter.email,
     );
-    if (!whitelisted) {
+    if (!whitelistEntry) {
       throw new ConvexError(
-        "You are not on the Year 2 internal whitelist for this election.",
+        "You are not on the internal whitelist for this election.",
       );
     }
 

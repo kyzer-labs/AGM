@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { isUsmStudentEmail } from "@/lib/utils";
 import { signInWithMicrosoft, signOutFirebase } from "@/lib/firebase";
-import { friendlyError } from "@/lib/errors";
+import { getConvexErrorMessage } from "@/lib/convex-error";
 
 export function SignInButton({
   size = "lg",
@@ -33,7 +33,7 @@ export function SignInButton({
       toast.success("Signed in");
     } catch (err) {
       const message =
-        friendlyError(err, "Sign-in failed. Please try again.");
+        getConvexErrorMessage(err, "Sign-in failed. Please try again.");
       if (!/popup-closed|cancelled/i.test(message)) {
         toast.error("Sign-in failed", { description: message });
       }

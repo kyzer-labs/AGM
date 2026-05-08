@@ -28,7 +28,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { getConvexErrorMessage } from "@/lib/convex-error";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
-import { friendlyError } from "@/lib/errors";
+
 
 export default function VotePage() {
   return (

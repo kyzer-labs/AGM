@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
@@ -40,7 +40,7 @@ export const add = mutation({
 
     const name = args.name.trim();
     if (name.length < 2 || name.length > 80) {
-      throw new Error("Criterion name must be between 2 and 80 characters.");
+      throw new ConvexError("Criterion name must be between 2 and 80 characters.");
     }
     if (
       !Number.isFinite(args.maxScore) ||
@@ -48,7 +48,7 @@ export const add = mutation({
       args.maxScore < 1 ||
       args.maxScore > 20
     ) {
-      throw new Error("Max score must be an integer between 1 and 20.");
+      throw new ConvexError("Max score must be an integer between 1 and 20.");
     }
 
     const existing = await ctx.db
@@ -56,7 +56,7 @@ export const add = mutation({
       .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
       .collect();
     if (existing.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
-      throw new Error("A criterion with that name already exists.");
+      throw new ConvexError("A criterion with that name already exists.");
     }
 
     const order = existing.length;
@@ -87,12 +87,12 @@ export const rename = mutation({
   handler: async (ctx, args) => {
     const { voter } = await requireAdmin(ctx);
     const c = await ctx.db.get(args.criterionId);
-    if (!c) throw new Error("Criterion not found.");
+    if (!c) throw new ConvexError("Criterion not found.");
     await requireSetupPhase(ctx, c.electionId);
 
     const name = args.name.trim();
     if (name.length < 2 || name.length > 80) {
-      throw new Error("Criterion name must be between 2 and 80 characters.");
+      throw new ConvexError("Criterion name must be between 2 and 80 characters.");
     }
 
     const others = await ctx.db
@@ -104,7 +104,7 @@ export const rename = mutation({
         (o) => o._id !== c._id && o.name.toLowerCase() === name.toLowerCase(),
       )
     ) {
-      throw new Error("Another criterion already has that name.");
+      throw new ConvexError("Another criterion already has that name.");
     }
 
     await ctx.db.patch(c._id, { name });
@@ -126,7 +126,7 @@ export const setMaxScore = mutation({
   handler: async (ctx, args) => {
     const { voter } = await requireAdmin(ctx);
     const c = await ctx.db.get(args.criterionId);
-    if (!c) throw new Error("Criterion not found.");
+    if (!c) throw new ConvexError("Criterion not found.");
     await requireSetupPhase(ctx, c.electionId);
 
     if (
@@ -135,7 +135,7 @@ export const setMaxScore = mutation({
       args.maxScore < 1 ||
       args.maxScore > 20
     ) {
-      throw new Error("Max score must be an integer between 1 and 20.");
+      throw new ConvexError("Max score must be an integer between 1 and 20.");
     }
 
     await ctx.db.patch(c._id, { maxScore: args.maxScore });
@@ -154,7 +154,7 @@ export const remove = mutation({
   handler: async (ctx, args) => {
     const { voter } = await requireAdmin(ctx);
     const c = await ctx.db.get(args.criterionId);
-    if (!c) throw new Error("Criterion not found.");
+    if (!c) throw new ConvexError("Criterion not found.");
     await requireSetupPhase(ctx, c.electionId);
 
     const dependentScores = await ctx.db
@@ -199,7 +199,7 @@ export const move = mutation({
   handler: async (ctx, args) => {
     const { voter } = await requireAdmin(ctx);
     const c = await ctx.db.get(args.criterionId);
-    if (!c) throw new Error("Criterion not found.");
+    if (!c) throw new ConvexError("Criterion not found.");
     await requireSetupPhase(ctx, c.electionId);
 
     const all = await ctx.db
@@ -237,7 +237,7 @@ export const seedDefaults = mutation({
       .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
       .collect();
     if (existing.length > 0) {
-      throw new Error("This election already has rubric criteria configured.");
+      throw new ConvexError("This election already has rubric criteria configured.");
     }
 
     const inserted: string[] = [];

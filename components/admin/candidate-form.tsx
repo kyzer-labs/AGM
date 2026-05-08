@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getConvexErrorMessage } from "@/lib/convex-error";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
-import { friendlyError } from "@/lib/errors";
+
 
 const candidateSchema = z.object({
   fullName: z.string().trim().min(2).max(120),

@@ -28,7 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
-import { friendlyError } from "@/lib/errors";
+
 
 const grantSchema = z.object({
   email: z
@@ -107,13 +107,25 @@ function Inner() {
     <main className="container-wide py-10 space-y-8">
       <AdminBreadcrumb items={[{ label: "Admins" }]} />
 
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Admin allowlist</h1>
-        <p className="text-sm text-[var(--color-muted-foreground)]">
-          Super admins manage who else can run the AGM. You can invite
-          someone before they sign in — their access will activate the
-          first time they sign in with their @student.usm.my account.
-        </p>
+      <header className="flex flex-wrap items-start gap-3">
+        <div className="flex-1">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Admin allowlist
+          </h1>
+          <p className="text-sm text-[var(--color-muted-foreground)]">
+            Super admins manage who else can run the AGM. You can invite
+            someone before they sign in — their access will activate the
+            first time they sign in with their @student.usm.my account.
+          </p>
+        </div>
+        <Button
+          onClick={() => {
+            form.reset({ email: "", role: "admin" });
+            setShowGrant(true);
+          }}
+        >
+          <UserPlus className="h-4 w-4" /> Grant admin
+        </Button>
       </header>
 
       <Modal
@@ -221,24 +233,31 @@ function Inner() {
                   <Button
                     size="icon"
                     variant="ghost"
-                    onClick={() => {
-                      if (
-                        !window.confirm(
-                          `Revoke ${a.role} access for ${a.email}?`,
-                        )
-                      )
-                        return;
-                      void revoke({ adminId: a._id }).then(
-                        () => toast.success("Revoked"),
-                        (err: unknown) => {
-                          toast.error("Revoke failed", {
-                            description: getConvexErrorMessage(
-                              err,
-                              "Revoke failed.",
-                            ),
-                          });
-                        },
-                      );
+                    onClick={async () => {
+                      const ok = await dialog.confirm({
+                        title: `Revoke ${a.role} access?`,
+                        description: (
+                          <>
+                            Remove access for <strong>{a.email}</strong>.
+                            They will lose admin privileges immediately.
+                            This is logged.
+                          </>
+                        ),
+                        confirmText: "Revoke access",
+                        variant: "destructive",
+                      });
+                      if (!ok) return;
+                      try {
+                        await revoke({ adminId: a._id });
+                        toast.success("Revoked");
+                      } catch (err) {
+                        toast.error("Revoke failed", {
+                          description: getConvexErrorMessage(
+                            err,
+                            "Revoke failed.",
+                          ),
+                        });
+                      }
                     }}
                     aria-label="Revoke"
                   >

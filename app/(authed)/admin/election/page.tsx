@@ -39,8 +39,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Modal } from "@/components/ui/modal";
 import { getConvexErrorMessage } from "@/lib/convex-error";
-import type { Id } from "@/convex/_generated/dataModel";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
 
 const PHASE_LABELS: Record<string, string> = {
   setup: "Setup",
@@ -94,7 +95,7 @@ function Inner() {
       form.reset({ name: "", year: new Date().getFullYear() });
       setShowCreate(false);
     } catch (err) {
-      const m = friendlyError(err, "Could not create.");
+      const m = getConvexErrorMessage(err, "Could not create.");
       toast.error("Create failed", { description: m });
     }
   });
@@ -107,17 +108,6 @@ function Inner() {
       </main>
     );
   }
-
-  const onCreate = form.handleSubmit(async (values) => {
-    try {
-      await createElection(values);
-      toast.success("Election created");
-      form.reset({ name: "", year: new Date().getFullYear() });
-    } catch (err) {
-      const m = getConvexErrorMessage(err, "Could not create.");
-      toast.error("Create failed", { description: m });
-    }
-  });
 
   return (
     <main className="container-wide py-10 space-y-8">
@@ -549,7 +539,7 @@ function WeightsPanel({ election }: { election: Doc<"elections"> }) {
       });
       toast.success("Weights saved");
     } catch (err) {
-      const m = friendlyError(err, "Save failed.");
+      const m = getConvexErrorMessage(err, "Save failed.");
       toast.error("Save failed", { description: m });
     }
   });
@@ -696,7 +686,7 @@ function ScheduledWindowPanel({ election }: { election: Doc<"elections"> }) {
       });
       toast.success("Schedule saved");
     } catch (err) {
-      const m = friendlyError(err, "Save failed.");
+      const m = getConvexErrorMessage(err, "Save failed.");
       toast.error("Save failed", { description: m });
     } finally {
       setBusy(false);
@@ -717,7 +707,7 @@ function ScheduledWindowPanel({ election }: { election: Doc<"elections"> }) {
       await clearScheduledWindow({ electionId: election._id });
       toast.success("Schedule cleared");
     } catch (err) {
-      const m = friendlyError(err, "Clear failed.");
+      const m = getConvexErrorMessage(err, "Clear failed.");
       toast.error("Clear failed", { description: m });
     } finally {
       setBusy(false);
@@ -829,7 +819,7 @@ function RubricCriteriaPanel({ election }: { election: Doc<"elections"> }) {
       setShowAdd(false);
       toast.success("Criterion added");
     } catch (err) {
-      const m = friendlyError(err, "Add failed.");
+      const m = getConvexErrorMessage(err, "Add failed.");
       toast.error("Add failed", { description: m });
     } finally {
       setBusy(false);
@@ -849,7 +839,7 @@ function RubricCriteriaPanel({ election }: { election: Doc<"elections"> }) {
       const count = await seedDefaults({ electionId: election._id });
       toast.success(`Seeded ${count} criteria`);
     } catch (err) {
-      const m = friendlyError(err, "Seed failed.");
+      const m = getConvexErrorMessage(err, "Seed failed.");
       toast.error("Seed failed", { description: m });
     } finally {
       setBusy(false);
@@ -880,7 +870,7 @@ function RubricCriteriaPanel({ election }: { election: Doc<"elections"> }) {
       await renameC({ criterionId, name: next.trim() });
       toast.success("Renamed");
     } catch (err) {
-      const m = friendlyError(err, "Rename failed.");
+      const m = getConvexErrorMessage(err, "Rename failed.");
       toast.error("Rename failed", { description: m });
     } finally {
       setBusy(false);
@@ -913,7 +903,7 @@ function RubricCriteriaPanel({ election }: { election: Doc<"elections"> }) {
       await setMaxScore({ criterionId, maxScore: value });
       toast.success("Max score updated");
     } catch (err) {
-      const m = friendlyError(err, "Update failed.");
+      const m = getConvexErrorMessage(err, "Update failed.");
       toast.error("Update failed", { description: m });
     } finally {
       setBusy(false);
@@ -941,7 +931,7 @@ function RubricCriteriaPanel({ election }: { election: Doc<"elections"> }) {
       await removeC({ criterionId });
       toast.success("Removed");
     } catch (err) {
-      const m = friendlyError(err, "Remove failed.");
+      const m = getConvexErrorMessage(err, "Remove failed.");
       toast.error("Remove failed", { description: m });
     } finally {
       setBusy(false);
@@ -956,7 +946,7 @@ function RubricCriteriaPanel({ election }: { election: Doc<"elections"> }) {
     try {
       await move({ criterionId, direction });
     } catch (err) {
-      const m = friendlyError(err, "Move failed.");
+      const m = getConvexErrorMessage(err, "Move failed.");
       toast.error("Move failed", { description: m });
     } finally {
       setBusy(false);

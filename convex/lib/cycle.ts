@@ -1,3 +1,4 @@
+import { ConvexError } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 
 export type VoterClass =
@@ -52,7 +53,7 @@ export function validateWeights(weights: CycleWeights): void {
   ];
   for (const [name, value] of entries) {
     if (!Number.isFinite(value) || value < 0 || value > 100) {
-      throw new Error(`${name} weight must be between 0 and 100.`);
+      throw new ConvexError(`${name} weight must be between 0 and 100.`);
     }
   }
   const sum =
@@ -61,7 +62,7 @@ export function validateWeights(weights: CycleWeights): void {
     weights.year2Committee +
     weights.public;
   if (Math.abs(sum - 100) > 0.001) {
-    throw new Error(
+    throw new ConvexError(
       `Weights must sum to exactly 100% (got ${sum.toFixed(2)}%).`,
     );
   }

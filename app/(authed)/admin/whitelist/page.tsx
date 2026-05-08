@@ -25,9 +25,10 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Modal } from "@/components/ui/modal";
 import { getConvexErrorMessage } from "@/lib/convex-error";
 import type { Doc } from "@/convex/_generated/dataModel";
-import { friendlyError } from "@/lib/errors";
+
 
 type VoterClass = "topCommittee" | "headExecutive" | "year2Committee";
 
@@ -460,7 +461,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
                           toast.success("Class updated");
                         } catch (err) {
                           const m =
-                            friendlyError(err, "Update failed.");
+                            getConvexErrorMessage(err, "Update failed.");
                           toast.error("Update failed", { description: m });
                         }
                       }}
@@ -481,19 +482,30 @@ function Body({ election }: { election: Doc<"elections"> }) {
                     <Button
                       size="icon"
                       variant="ghost"
-                      onClick={() => {
-                        if (!window.confirm(`Remove ${row.email}?`)) return;
-                        void remove({ entryId: row._id }).then(
-                          () => toast.success("Removed"),
-                          (err: unknown) => {
-                            toast.error("Remove failed", {
-                              description: getConvexErrorMessage(
-                                err,
-                                "Remove failed.",
-                              ),
-                            });
-                          },
-                        );
+                      onClick={async () => {
+                        const ok = await dialog.confirm({
+                          title: "Remove from whitelist?",
+                          description: (
+                            <>
+                              Remove <strong>{row.email}</strong>? They will
+                              lose access to the internal evaluation window.
+                            </>
+                          ),
+                          confirmText: "Remove",
+                          variant: "destructive",
+                        });
+                        if (!ok) return;
+                        try {
+                          await remove({ entryId: row._id });
+                          toast.success("Removed");
+                        } catch (err) {
+                          toast.error("Remove failed", {
+                            description: getConvexErrorMessage(
+                              err,
+                              "Remove failed.",
+                            ),
+                          });
+                        }
                       }}
                       aria-label="Remove"
                     >

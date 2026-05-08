@@ -1,5 +1,12 @@
 import { ConvexError, v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import {
+  internalMutation,
+  mutation,
+  query,
+  type MutationCtx,
+} from "./_generated/server";
+import { internal } from "./_generated/api";
+import type { Doc, Id } from "./_generated/dataModel";
 import { requireAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
 import {
@@ -183,14 +190,14 @@ export const setScheduledWindow = mutation({
     const e = await getElectionOrThrow(ctx, args.electionId);
 
     if (e.phase !== "setup" && e.phase !== "internalOpen") {
-      throw new Error(
+      throw new ConvexError(
         `Schedule can only be modified during Setup or Internal evaluation. Current phase: ${PHASE_LABEL[e.phase]}.`,
       );
     }
 
     if (args.startAt !== undefined && args.endAt !== undefined) {
       if (args.endAt <= args.startAt) {
-        throw new Error("End time must be after start time.");
+        throw new ConvexError("End time must be after start time.");
       }
     }
 

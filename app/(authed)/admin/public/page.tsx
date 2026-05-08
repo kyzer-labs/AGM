@@ -31,7 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getConvexErrorMessage } from "@/lib/convex-error";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
-import { friendlyError } from "@/lib/errors";
+
 
 interface SessionRow {
   positionId: Id<"positions">;

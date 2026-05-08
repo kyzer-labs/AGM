@@ -89,8 +89,13 @@ export const add = mutation({
     if (fullName.length < 2 || fullName.length > 120) {
       throw new ConvexError("Full name must be between 2 and 120 characters.");
     }
-    if (matric.length < 6 || matric.length > 20) {
-      throw new ConvexError("Matric number must be between 6 and 20 characters.");
+
+    let matric: string | undefined = args.matric?.trim();
+    if (matric !== undefined && matric.length === 0) matric = undefined;
+    if (matric !== undefined && (matric.length < 6 || matric.length > 20)) {
+      throw new ConvexError(
+        "Matric number must be between 6 and 20 characters.",
+      );
     }
     if (matric === undefined) matric = generateAutoMatric();
 
@@ -104,7 +109,9 @@ export const add = mutation({
       const raw = args.photoUrl.trim();
       if (raw.length > 0) {
         if (!isHttpUrl(raw)) {
-          throw new Error("Photo link must start with http:// or https://.");
+          throw new ConvexError(
+            "Photo link must start with http:// or https://.",
+          );
         }
         photoUrl = normalisePhotoUrl(raw);
       }
@@ -179,8 +186,15 @@ export const update = mutation({
     }
     if (args.matric !== undefined) {
       const v2 = args.matric.trim();
-      if (v2.length < 6 || v2.length > 20) {
-        throw new ConvexError("Matric number must be between 6 and 20 characters.");
+      if (v2.length === 0) {
+        patch.matric = c.matric ?? generateAutoMatric();
+      } else {
+        if (v2.length < 6 || v2.length > 20) {
+          throw new ConvexError(
+            "Matric number must be between 6 and 20 characters.",
+          );
+        }
+        patch.matric = v2;
       }
     }
     if (args.bio !== undefined) {
@@ -210,7 +224,9 @@ export const update = mutation({
           patch.photoUrl = undefined;
         } else {
           if (!isHttpUrl(raw)) {
-            throw new Error("Photo link must start with http:// or https://.");
+            throw new ConvexError(
+              "Photo link must start with http:// or https://.",
+            );
           }
           patch.photoUrl = normalisePhotoUrl(raw);
           if (c.photoStorageId && patch.photoStorageId === undefined) {

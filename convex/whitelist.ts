@@ -139,10 +139,10 @@ export const setClass = mutation({
   handler: async (ctx, args) => {
     const { voter } = await requireAdmin(ctx);
     const row = await ctx.db.get(args.entryId);
-    if (!row) throw new Error("Whitelist entry not found.");
+    if (!row) throw new ConvexError("Whitelist entry not found.");
     const e = await getElectionOrThrow(ctx, row.electionId);
     if (e.phase !== "setup" && e.phase !== "internalOpen") {
-      throw new Error(
+      throw new ConvexError(
         "Whitelist can only be edited during Setup or Internal Open phases.",
       );
     }

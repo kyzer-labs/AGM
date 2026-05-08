@@ -30,7 +30,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { downloadCsv } from "@/lib/csv";
 import { getConvexErrorMessage } from "@/lib/convex-error";
 import type { Doc } from "@/convex/_generated/dataModel";
-import { friendlyError } from "@/lib/errors";
+
 
 export default function ExportsPage() {
   return (
@@ -124,6 +124,22 @@ function Body({ election }: { election: Doc<"elections"> }) {
       });
       downloadCsv(rows, `${safeName}-combined-results.csv`);
       toast.success("Downloaded combined results");
+    } catch (err) {
+      const m = getConvexErrorMessage(err, "Failed.");
+      toast.error("Export failed", { description: m });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const downloadInternalByClass = async () => {
+    setBusy("internalByClass");
+    try {
+      const rows = await convex.query(api.exports.internalScoresByClass, {
+        electionId: election._id,
+      });
+      downloadCsv(rows, `${safeName}-internal-by-class.csv`);
+      toast.success("Downloaded internal scores by class");
     } catch (err) {
       const m = getConvexErrorMessage(err, "Failed.");
       toast.error("Export failed", { description: m });

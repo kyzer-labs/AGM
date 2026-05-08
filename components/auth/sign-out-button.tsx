@@ -6,7 +6,7 @@ import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { signOutFirebase } from "@/lib/firebase";
 import { toast } from "sonner";
-import { friendlyError } from "@/lib/errors";
+import { getConvexErrorMessage } from "@/lib/convex-error";
 
 export function SignOutButton({
   variant = "ghost",
@@ -27,7 +27,7 @@ export function SignOutButton({
       router.refresh();
     } catch (err) {
       const message =
-        friendlyError(err, "Could not sign out.");
+        getConvexErrorMessage(err, "Could not sign out.");
       toast.error("Sign-out failed", { description: message });
     } finally {
       setLoading(false);
