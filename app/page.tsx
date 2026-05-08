@@ -53,41 +53,86 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <section className="container-narrow py-16 sm:py-24 text-center">
-        <Badge tone="muted" className="mb-5">
-          <Sparkles className="h-3 w-3" aria-hidden /> Official AGM portal
-        </Badge>
-        <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight text-balance">
-          Elect the next USM Computer Science Society committee.
-        </h1>
-        <p className="mt-5 text-lg text-[var(--color-muted-foreground)] text-balance">
-          Sign in with your <strong>@student.usm.my</strong> Microsoft account
-          to evaluate candidates internally, vote in the live AGM, and view
-          published results.
-        </p>
+      <section className="container-wide w-full px-4 py-16 sm:py-24">
+        <div className="grid items-center gap-10 md:grid-cols-12 md:gap-16">
+          <div className="text-center md:col-span-7 md:text-left">
+            <Badge tone="muted" className="mb-5">
+              <Sparkles className="h-3 w-3" aria-hidden /> Official AGM portal
+            </Badge>
+            <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+              Elect the next USM Computer Science Society committee.
+            </h1>
+            <p className="mt-5 text-lg text-[var(--color-muted-foreground)] text-balance md:max-w-[60ch]">
+              Sign in with your <strong>@student.usm.my</strong> Microsoft
+              account to evaluate candidates internally, vote in the live AGM,
+              and view published results.
+            </p>
 
-        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          {firebase.isLoading ? (
-            <Button disabled loading size="lg">
-              Loading
-            </Button>
-          ) : isAuthenticated ? (
-            <Link href="/dashboard">
-              <Button size="lg">Go to dashboard</Button>
-            </Link>
-          ) : (
-            <SignInButton size="lg" />
-          )}
-          <Link href="#how">
-            <Button variant="outline" size="lg">
-              Learn more
-            </Button>
-          </Link>
+            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row md:justify-start">
+              {firebase.isLoading ? (
+                <Button disabled loading size="lg">
+                  Loading
+                </Button>
+              ) : isAuthenticated ? (
+                <Link href="/dashboard">
+                  <Button size="lg">Go to dashboard</Button>
+                </Link>
+              ) : (
+                <SignInButton size="lg" />
+              )}
+              <Link href="#how">
+                <Button variant="outline" size="lg">
+                  Learn more
+                </Button>
+              </Link>
+            </div>
+            <p className="mt-3 text-xs text-[var(--color-muted-foreground)]">
+              Only @student.usm.my accounts may sign in. Other Microsoft
+              accounts will be rejected automatically.
+            </p>
+          </div>
+
+          <div
+            aria-hidden
+            className="relative hidden md:col-span-5 md:flex md:items-center md:justify-center"
+          >
+            <div
+              className="absolute inset-0 -z-10 rounded-[2.5rem] blur-2xl"
+              style={{
+                background:
+                  "radial-gradient(60% 60% at 50% 50%, oklch(0.55 0.18 250 / 0.22) 0%, transparent 70%)",
+              }}
+            />
+            <div className="relative w-full max-w-sm">
+              <div className="rounded-[2rem] bg-[var(--color-foreground)]/[0.04] p-1.5 ring-1 ring-[var(--color-foreground)]/5">
+                <div className="grid aspect-square place-items-center rounded-[calc(2rem-0.375rem)] bg-[var(--color-card)] p-10 ring-1 ring-[var(--color-foreground)]/5 shadow-[0_30px_60px_-30px_oklch(0.55_0.18_250/0.28)]">
+                  <Image
+                    src="/logos/cs-soc-official.svg"
+                    alt=""
+                    width={240}
+                    height={240}
+                    className="h-auto w-full max-w-[220px]"
+                  />
+                </div>
+              </div>
+
+              <div className="absolute -top-3 -right-3 rounded-full border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--color-muted-foreground)] shadow-[0_8px_24px_-12px_oklch(0.145_0_0/0.18)]">
+                <span className="text-[var(--color-brand)]">Internal</span>
+                <span className="mx-1.5 text-[var(--color-border)]">/</span>
+                <span className="font-mono normal-case tracking-normal text-[var(--color-foreground)]">
+                  75%
+                </span>
+              </div>
+              <div className="absolute -bottom-3 -left-3 rounded-full border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--color-muted-foreground)] shadow-[0_8px_24px_-12px_oklch(0.145_0_0/0.18)]">
+                <span className="text-[var(--color-success)]">Public</span>
+                <span className="mx-1.5 text-[var(--color-border)]">/</span>
+                <span className="font-mono normal-case tracking-normal text-[var(--color-foreground)]">
+                  25%
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
-        <p className="mt-3 text-xs text-[var(--color-muted-foreground)]">
-          Only @student.usm.my accounts may sign in. Other Microsoft accounts
-          will be rejected automatically.
-        </p>
       </section>
 
       <section id="how" className="container-wide pb-20">
