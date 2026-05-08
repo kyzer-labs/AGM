@@ -82,50 +82,53 @@ function AdminPageInner() {
 
       {isAdmin ? (
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <PlaceholderTile
+          <Tile
             title="Election cycle"
             description="Create and configure the AGM cycle for this year."
             href="/admin/election"
           />
-          <PlaceholderTile
+          <Tile
             title="Positions & ballot order"
             description="Define hierarchy and the live AGM ballot order."
             href="/admin/positions"
           />
-          <PlaceholderTile
+          <Tile
             title="Candidates"
             description="Add/edit candidates, photos, and eligible positions."
             href="/admin/candidates"
           />
-          <PlaceholderTile
+          <Tile
             title="Internal whitelist"
-            description="Import the Year 2 evaluator whitelist from CSV."
+            description="Year 2 evaluator allowlist (single + bulk + CSV)."
             href="/admin/whitelist"
           />
-          <PlaceholderTile
-            title="Internal evaluation window"
-            description="Open/close the rubric scoring window and monitor submissions."
+          <Tile
+            title="Internal evaluation"
+            description="Track submissions and aggregate rubric scores."
             href="/admin/internal"
           />
-          <PlaceholderTile
+          <Tile
             title="Public AGM voting"
-            description="Run live ballots one position at a time, see live counts."
+            description="Run live ballots one at a time with live counts."
             href="/admin/public"
           />
-          <PlaceholderTile
+          <Tile
             title="Results & publishing"
-            description="Preview combined results, resolve ties, and publish."
+            description="Preview combined 75/25 results, resolve ties, publish."
             href="/admin/results"
+            badge="Phase 6"
           />
-          <PlaceholderTile
+          <Tile
             title="Exports"
-            description="Download CSVs of scores, votes, results, and audit log."
+            description="CSV downloads + audit access."
             href="/admin/exports"
+            badge="Phase 7"
           />
-          <PlaceholderTile
+          <Tile
             title="Admins"
             description="Super admins manage the admin allowlist."
             href="/admin/admins"
+            badge="Phase 7"
           />
         </section>
       ) : null}
@@ -141,25 +144,27 @@ export default function AdminPage() {
   );
 }
 
-function PlaceholderTile({
+function Tile({
   title,
   description,
   href,
+  badge,
 }: {
   title: string;
   description: string;
   href: string;
+  badge?: string;
 }) {
   return (
     <Link href={href} className="group">
       <Card className="h-full transition-colors group-hover:border-[var(--color-foreground)]/20">
         <CardHeader>
-          <CardTitle className="text-base">{title}</CardTitle>
+          <div className="flex items-start justify-between gap-2">
+            <CardTitle className="text-base">{title}</CardTitle>
+            {badge ? <Badge tone="muted">{badge}</Badge> : null}
+          </div>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
-        <CardContent>
-          <Badge tone="muted">Coming next</Badge>
-        </CardContent>
       </Card>
     </Link>
   );

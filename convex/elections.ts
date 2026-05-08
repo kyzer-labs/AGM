@@ -155,6 +155,51 @@ export const transitionPhase = mutation({
       }
     }
 
+    if (args.toPhase === "resultsPreview") {
+      const positions = await ctx.db
+        .query("positions")
+        .withIndex("by_election", (q) => q.eq("electionId", e._id))
+        .collect();
+      const open = positions.filter((p) => p.sessionStatus !== "closed");
+      if (open.length > 0) {
+        throw new Error(
+          `Close every ballot before moving to results preview. ${open.length} position(s) are still open or pending.`,
+        );
+      }
+      const results = await ctx.db
+        .query("results")
+        .withIndex("by_election", (q) => q.eq("electionId", e._id))
+        .collect();
+      const unresolved = results.filter((r) => r.winnerCandidateId === undefined);
+      if (unresolved.length > 0) {
+        throw new Error(
+          `Resolve all ties before moving to results preview. ${unresolved.length} unresolved.`,
+        );
+      }
+    }
+
+    if (args.toPhase === "published") {
+      const results = await ctx.db
+        .query("results")
+        .withIndex("by_election", (q) => q.eq("electionId", e._id))
+        .collect();
+      if (results.length === 0) {
+        throw new Error("No results to publish.");
+      }
+      const unresolved = results.filter((r) => r.winnerCandidateId === undefined);
+      if (unresolved.length > 0) {
+        throw new Error(
+          `${unresolved.length} unresolved tie(s) — resolve before publishing.`,
+        );
+      }
+      const now = Date.now();
+      for (const r of results) {
+        if (r.state !== "published") {
+          await ctx.db.patch(r._id, { state: "published", publishedAt: now });
+        }
+      }
+    }
+
     await ctx.db.patch(e._id, {
       phase: args.toPhase,
       updatedAt: Date.now(),
