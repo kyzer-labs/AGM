@@ -2,14 +2,23 @@
 
 This document describes the intended user-facing behavior for a new AGM voting website. It is written for a future coding agent or implementation team. Focus on the actual website use cases, voting rules, operational flows, and known pitfalls. Do not treat this document as an architecture mandate unless a technical constraint is explicitly listed.
 
+> **Implementation note (May 2026):** the original "75/25 single-class
+> rubric" model below has been superseded by the **60/40
+> weighted-classes model** described in `Marking Sheet.xlsx` and
+> implemented in this repo. See `docs/RUNBOOK.md` → "Scoring model" for
+> the current weights, normalisation, and tie-break ladder. The original
+> requirements below are kept as historical reference for the rest of
+> the system (roles, flows, candidate management, etc.) which still
+> apply.
+
 ## Product Context
 
 The Computer Science Society AGM is a public annual meeting where the society presents reports and elects the next committee. The society is made up of Year 1 and Year 2 students. Year 2 members are retiring and passing leadership to Year 1 members.
 
 The election result has two components:
 
-- Internal evaluation: 75% of the final result.
-- External public vote: 25% of the final result.
+- Internal evaluation: by default 60% of the final result, split across three voter classes (Top Committee 30%, Head Executive 20%, Year 2 Committee 10%). Configurable per cycle, frozen once the internal window opens.
+- External public vote: by default 40% of the final result. Configurable per cycle.
 
 Internal evaluation is performed before AGM day by eligible Year 2 committee members. External public voting happens during the live AGM event and is open to eligible USM students who are not in the internal Year 2 whitelist.
 

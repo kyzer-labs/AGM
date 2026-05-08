@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useForm } from "react-hook-form";
@@ -9,11 +9,19 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import {
+  AlertCircle,
+  ArrowDown,
+  ArrowRight,
+  ArrowUp,
   CalendarPlus,
   CheckCircle2,
-  AlertCircle,
+  Clock,
+  ListChecks,
+  Plus,
+  Save,
+  Sliders,
   Trash2,
-  ArrowRight,
+  X,
 } from "lucide-react";
 
 import { AuthGate } from "@/components/auth/auth-gate";
@@ -32,7 +40,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import type { Id } from "@/convex/_generated/dataModel";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
 
 const PHASE_LABELS: Record<string, string> = {
   setup: "Setup",
@@ -107,8 +115,9 @@ function Inner() {
           Election cycles
         </h1>
         <p className="text-sm text-[var(--color-muted-foreground)]">
-          Each cycle holds positions, candidates, the Year-2 whitelist,
-          internal evaluations, and final results.
+          Each cycle holds positions, candidates, the internal whitelist
+          (split across three voter classes), the rubric criteria, and the
+          weighted scoring configuration.
         </p>
       </header>
 
@@ -117,8 +126,9 @@ function Inner() {
           <CardTitle className="text-base">New cycle</CardTitle>
           <CardDescription>
             Create a fresh AGM cycle. It starts in <strong>Setup</strong>{" "}
-            phase — add positions, candidates, and the whitelist before
-            opening the internal evaluation window.
+            phase with default weights (30% TC + 20% HE + 10% Y2 + 40%
+            Public) and the standard 5-criterion rubric. You can change
+            both before opening the internal evaluation.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -158,13 +168,7 @@ function Inner() {
       ) : (
         <div className="space-y-4">
           {elections.map((e) => (
-            <ElectionCard
-              key={e._id}
-              electionId={e._id}
-              name={e.name}
-              year={e.year}
-              phase={e.phase}
-            />
+            <ElectionCard key={e._id} election={e} />
           ))}
         </div>
       )}
@@ -172,24 +176,16 @@ function Inner() {
   );
 }
 
-function ElectionCard({
-  electionId,
-  name,
-  year,
-  phase,
-}: {
-  electionId: Id<"elections">;
-  name: string;
-  year: number;
-  phase: string;
-}) {
+function ElectionCard({ election }: { election: Doc<"elections"> }) {
   const dialog = useDialog();
-  const readiness = useQuery(api.elections.setupReadiness, { electionId });
+  const readiness = useQuery(api.elections.setupReadiness, {
+    electionId: election._id,
+  });
   const transition = useMutation(api.elections.transitionPhase);
   const remove = useMutation(api.elections.remove);
   const rename = useMutation(api.elections.rename);
   const [editing, setEditing] = useState(false);
-  const [draftName, setDraftName] = useState(name);
+  const [draftName, setDraftName] = useState(election.name);
   const [busy, setBusy] = useState(false);
 
   const onTransition = async (toPhase: string) => {
@@ -202,8 +198,8 @@ function ElectionCard({
         title: `Move to ${PHASE_LABELS[toPhase] ?? toPhase}?`,
         description: (
           <>
-            Optional note for the audit log. Leave blank if you don&apos;t need
-            to record one.
+            Optional note for the audit log. Leave blank if you don&apos;t
+            need to record one.
           </>
         ),
         label: "Audit note (optional)",
@@ -212,16 +208,18 @@ function ElectionCard({
         multiline: true,
       });
       if (promptResult === null) return;
-      reason = promptResult.trim().length > 0 ? promptResult.trim() : undefined;
+      reason =
+        promptResult.trim().length > 0 ? promptResult.trim() : undefined;
     }
 
     const ok = await dialog.confirm({
       title: `Move to ${PHASE_LABELS[toPhase] ?? toPhase}?`,
       description: (
         <>
-          Move <strong>{name}</strong> to{" "}
+          Move <strong>{election.name}</strong> to{" "}
           <strong>{PHASE_LABELS[toPhase] ?? toPhase}</strong>. This phase
-          transition is logged.
+          transition is logged. Any pending scheduled jobs will be
+          cancelled.
         </>
       ),
       confirmText: PHASE_LABELS[toPhase] ?? "Confirm",
@@ -231,7 +229,7 @@ function ElectionCard({
     setBusy(true);
     try {
       await transition({
-        electionId,
+        electionId: election._id,
         toPhase: toPhase as
           | "setup"
           | "internalOpen"
@@ -255,8 +253,9 @@ function ElectionCard({
       title: "Delete cycle?",
       description: (
         <>
-          Delete <strong>{name}</strong>. This permanently removes positions,
-          candidates, and the whitelist for this cycle. Cannot be undone.
+          Delete <strong>{election.name}</strong>. This permanently removes
+          positions, candidates, rubric criteria, and the whitelist for
+          this cycle. Cannot be undone.
         </>
       ),
       confirmText: "Delete cycle",
@@ -265,7 +264,7 @@ function ElectionCard({
     if (!ok) return;
     setBusy(true);
     try {
-      await remove({ electionId });
+      await remove({ electionId: election._id });
       toast.success("Election deleted");
     } catch (err) {
       const m = err instanceof Error ? err.message : "Delete failed.";
@@ -278,7 +277,7 @@ function ElectionCard({
   const onRename = async () => {
     setBusy(true);
     try {
-      await rename({ electionId, name: draftName });
+      await rename({ electionId: election._id, name: draftName });
       toast.success("Renamed");
       setEditing(false);
     } catch (err) {
@@ -288,6 +287,11 @@ function ElectionCard({
       setBusy(false);
     }
   };
+
+  const showWeights = election.phase === "setup";
+  const showSchedule =
+    election.phase === "setup" || election.phase === "internalOpen";
+  const showRubric = election.phase === "setup";
 
   return (
     <Card>
@@ -307,7 +311,7 @@ function ElectionCard({
                 size="sm"
                 onClick={() => {
                   setEditing(false);
-                  setDraftName(name);
+                  setDraftName(election.name);
                 }}
               >
                 Cancel
@@ -316,9 +320,9 @@ function ElectionCard({
           ) : (
             <>
               <CardTitle className="flex-1 text-lg">
-                {name}{" "}
+                {election.name}{" "}
                 <span className="text-[var(--color-muted-foreground)]">
-                  · {year}
+                  · {election.year}
                 </span>
               </CardTitle>
               <Button
@@ -330,14 +334,14 @@ function ElectionCard({
               </Button>
             </>
           )}
-          <Badge tone={PHASE_TONES[phase] ?? "muted"}>
-            {PHASE_LABELS[phase] ?? phase}
+          <Badge tone={PHASE_TONES[election.phase] ?? "muted"}>
+            {PHASE_LABELS[election.phase] ?? election.phase}
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
         {readiness ? (
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
             <Stat
               label="Positions"
               value={String(readiness.positionsCount)}
@@ -349,6 +353,15 @@ function ElectionCard({
             <Stat
               label="Whitelist"
               value={String(readiness.whitelistCount)}
+            />
+            <Stat
+              label="Rubric criteria"
+              value={String(readiness.rubricCriteriaCount)}
+            />
+            <Stat
+              label="Weights"
+              value={readiness.weightsValid ? "100%" : "Invalid"}
+              tone={readiness.weightsValid ? "ok" : "warn"}
             />
           </div>
         ) : null}
@@ -372,6 +385,10 @@ function ElectionCard({
           </div>
         ) : null}
 
+        {showWeights ? <WeightsPanel election={election} /> : null}
+        {showSchedule ? <ScheduledWindowPanel election={election} /> : null}
+        {showRubric ? <RubricCriteriaPanel election={election} /> : null}
+
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/admin/positions">
             <Button variant="outline" size="sm">
@@ -390,11 +407,11 @@ function ElectionCard({
           </Link>
           <div className="flex-1" />
           <PhaseButtons
-            phase={phase}
+            phase={election.phase}
             onTransition={onTransition}
             disabled={busy}
           />
-          {phase === "setup" ? (
+          {election.phase === "setup" ? (
             <Button
               variant="destructive"
               size="sm"
@@ -410,14 +427,620 @@ function ElectionCard({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string;
+  value: string;
+  tone?: "default" | "ok" | "warn";
+}) {
+  const valueColor =
+    tone === "ok"
+      ? "text-[var(--color-success)]"
+      : tone === "warn"
+        ? "text-[var(--color-warning)]"
+        : undefined;
   return (
     <div className="rounded-md border p-3">
       <div className="text-xs text-[var(--color-muted-foreground)]">
         {label}
       </div>
-      <div className="text-xl font-semibold">{value}</div>
+      <div className={`text-xl font-semibold ${valueColor ?? ""}`}>
+        {value}
+      </div>
     </div>
+  );
+}
+
+const weightsSchema = z
+  .object({
+    weightTopCommittee: z.coerce.number().int().min(0).max(100),
+    weightHeadExecutive: z.coerce.number().int().min(0).max(100),
+    weightYear2Committee: z.coerce.number().int().min(0).max(100),
+    weightPublic: z.coerce.number().int().min(0).max(100),
+  })
+  .refine(
+    (v) =>
+      v.weightTopCommittee +
+        v.weightHeadExecutive +
+        v.weightYear2Committee +
+        v.weightPublic ===
+      100,
+    { message: "Weights must sum to exactly 100%." },
+  );
+type WeightsFormValues = z.infer<typeof weightsSchema>;
+
+function WeightsPanel({ election }: { election: Doc<"elections"> }) {
+  const setWeights = useMutation(api.elections.setWeights);
+
+  const initial = useMemo(
+    () => ({
+      weightTopCommittee: election.weightTopCommittee ?? 30,
+      weightHeadExecutive: election.weightHeadExecutive ?? 20,
+      weightYear2Committee: election.weightYear2Committee ?? 10,
+      weightPublic: election.weightPublic ?? 40,
+    }),
+    [election],
+  );
+
+  const form = useForm<WeightsFormValues>({
+    resolver: zodResolver(weightsSchema),
+    defaultValues: initial,
+  });
+
+  useEffect(() => {
+    form.reset(initial);
+  }, [initial, form]);
+
+  const values = form.watch();
+  const sum =
+    Number(values.weightTopCommittee || 0) +
+    Number(values.weightHeadExecutive || 0) +
+    Number(values.weightYear2Committee || 0) +
+    Number(values.weightPublic || 0);
+  const sumOk = sum === 100;
+
+  const onSubmit = form.handleSubmit(async (v) => {
+    try {
+      await setWeights({
+        electionId: election._id,
+        weightTopCommittee: v.weightTopCommittee,
+        weightHeadExecutive: v.weightHeadExecutive,
+        weightYear2Committee: v.weightYear2Committee,
+        weightPublic: v.weightPublic,
+      });
+      toast.success("Weights saved");
+    } catch (err) {
+      const m = err instanceof Error ? err.message : "Save failed.";
+      toast.error("Save failed", { description: m });
+    }
+  });
+
+  return (
+    <section className="rounded-md border p-4">
+      <header className="mb-3 flex items-center gap-2">
+        <Sliders className="h-4 w-4" aria-hidden />
+        <h2 className="text-sm font-semibold">Scoring weights</h2>
+        <Badge tone="muted">Setup only</Badge>
+      </header>
+      <p className="mb-3 text-xs text-[var(--color-muted-foreground)]">
+        Internal classes (TC + HE + Y2) and Public must sum to 100%. Locked
+        once the internal evaluation is opened. The internal aggregate is
+        derived from each class&apos;s sum-of-totals share, then weighted
+        with the public-vote share.
+      </p>
+      <form
+        onSubmit={onSubmit}
+        className="grid gap-3 sm:grid-cols-[repeat(4,minmax(0,1fr))_auto] sm:items-end"
+      >
+        <WeightField
+          id="wTc"
+          label="Top Committee"
+          register={form.register("weightTopCommittee")}
+          error={form.formState.errors.weightTopCommittee?.message}
+        />
+        <WeightField
+          id="wHe"
+          label="Head Executive"
+          register={form.register("weightHeadExecutive")}
+          error={form.formState.errors.weightHeadExecutive?.message}
+        />
+        <WeightField
+          id="wY2"
+          label="Year 2 Committee"
+          register={form.register("weightYear2Committee")}
+          error={form.formState.errors.weightYear2Committee?.message}
+        />
+        <WeightField
+          id="wPub"
+          label="Public"
+          register={form.register("weightPublic")}
+          error={form.formState.errors.weightPublic?.message}
+        />
+        <div className="grid gap-2">
+          <span
+            className={`text-xs ${
+              sumOk
+                ? "text-[var(--color-success)]"
+                : "text-[var(--color-warning)]"
+            }`}
+          >
+            Sum: {sum}%
+          </span>
+          <Button
+            type="submit"
+            size="sm"
+            disabled={!sumOk}
+            loading={form.formState.isSubmitting}
+          >
+            <Save className="h-4 w-4" /> Save
+          </Button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+function WeightField({
+  id,
+  label,
+  register,
+  error,
+}: {
+  id: string;
+  label: string;
+  register: ReturnType<ReturnType<typeof useForm<WeightsFormValues>>["register"]>;
+  error?: string;
+}) {
+  return (
+    <div className="grid gap-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        id={id}
+        type="number"
+        min={0}
+        max={100}
+        step={1}
+        {...register}
+      />
+      {error ? (
+        <span className="text-xs text-[var(--color-destructive)]">
+          {error}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function ScheduledWindowPanel({ election }: { election: Doc<"elections"> }) {
+  const setScheduledWindow = useMutation(api.elections.setScheduledWindow);
+  const clearScheduledWindow = useMutation(
+    api.elections.clearScheduledWindow,
+  );
+  const dialog = useDialog();
+
+  const [start, setStart] = useState<string>(
+    election.scheduledStartAt
+      ? millisToInput(election.scheduledStartAt)
+      : "",
+  );
+  const [end, setEnd] = useState<string>(
+    election.scheduledEndAt ? millisToInput(election.scheduledEndAt) : "",
+  );
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setStart(
+      election.scheduledStartAt
+        ? millisToInput(election.scheduledStartAt)
+        : "",
+    );
+    setEnd(
+      election.scheduledEndAt
+        ? millisToInput(election.scheduledEndAt)
+        : "",
+    );
+  }, [election.scheduledStartAt, election.scheduledEndAt]);
+
+  const onSave = async () => {
+    const startMs = start ? new Date(start).getTime() : undefined;
+    const endMs = end ? new Date(end).getTime() : undefined;
+    if (startMs !== undefined && endMs !== undefined && endMs <= startMs) {
+      toast.error("End time must be after start time");
+      return;
+    }
+    setBusy(true);
+    try {
+      await setScheduledWindow({
+        electionId: election._id,
+        startAt: startMs,
+        endAt: endMs,
+      });
+      toast.success("Schedule saved");
+    } catch (err) {
+      const m = err instanceof Error ? err.message : "Save failed.";
+      toast.error("Save failed", { description: m });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onClear = async () => {
+    const ok = await dialog.confirm({
+      title: "Clear scheduled window?",
+      description:
+        "Cancels any pending open/close jobs. The phase stays where it is — you'll need to transition it manually.",
+      confirmText: "Clear schedule",
+      variant: "destructive",
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await clearScheduledWindow({ electionId: election._id });
+      toast.success("Schedule cleared");
+    } catch (err) {
+      const m = err instanceof Error ? err.message : "Clear failed.";
+      toast.error("Clear failed", { description: m });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const hasSchedule =
+    election.scheduledStartAt !== undefined ||
+    election.scheduledEndAt !== undefined;
+
+  return (
+    <section className="rounded-md border p-4">
+      <header className="mb-3 flex items-center gap-2">
+        <Clock className="h-4 w-4" aria-hidden />
+        <h2 className="text-sm font-semibold">Internal evaluation window</h2>
+        <Badge tone="muted">
+          {election.phase === "setup" ? "Setup or open" : "Active"}
+        </Badge>
+      </header>
+      <p className="mb-3 text-xs text-[var(--color-muted-foreground)]">
+        Optional auto-open and auto-close timestamps. The cycle moves into{" "}
+        <strong>Internal evaluation open</strong> at the start time (only if
+        setup is ready) and into <strong>Internal evaluation closed</strong>{" "}
+        at the end time. Manual phase changes cancel any pending jobs.
+      </p>
+
+      <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+        <div className="grid gap-1.5">
+          <Label htmlFor="schedStart">Start (auto-open)</Label>
+          <Input
+            id="schedStart"
+            type="datetime-local"
+            value={start}
+            onChange={(e) => setStart(e.target.value)}
+            disabled={election.phase !== "setup"}
+          />
+          {election.phase !== "setup" ? (
+            <span className="text-xs text-[var(--color-muted-foreground)]">
+              Auto-open only triggers from Setup; cycle is already past
+              Setup.
+            </span>
+          ) : null}
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="schedEnd">End (auto-close)</Label>
+          <Input
+            id="schedEnd"
+            type="datetime-local"
+            value={end}
+            onChange={(e) => setEnd(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Button onClick={onSave} loading={busy} size="sm">
+            <Save className="h-4 w-4" /> Save schedule
+          </Button>
+          {hasSchedule ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClear}
+              disabled={busy}
+            >
+              <X className="h-4 w-4" /> Clear
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function millisToInput(ms: number): string {
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function RubricCriteriaPanel({ election }: { election: Doc<"elections"> }) {
+  const dialog = useDialog();
+  const criteria = useQuery(api.rubric.list, { electionId: election._id });
+  const add = useMutation(api.rubric.add);
+  const renameC = useMutation(api.rubric.rename);
+  const setMaxScore = useMutation(api.rubric.setMaxScore);
+  const removeC = useMutation(api.rubric.remove);
+  const move = useMutation(api.rubric.move);
+  const seedDefaults = useMutation(api.rubric.seedDefaults);
+
+  const [newName, setNewName] = useState("");
+  const [newMax, setNewMax] = useState<number>(5);
+  const [busy, setBusy] = useState(false);
+
+  const onAdd = async () => {
+    const name = newName.trim();
+    if (name.length < 2) {
+      toast.error("Name too short");
+      return;
+    }
+    setBusy(true);
+    try {
+      await add({
+        electionId: election._id,
+        name,
+        maxScore: newMax,
+      });
+      setNewName("");
+      setNewMax(5);
+      toast.success("Criterion added");
+    } catch (err) {
+      const m = err instanceof Error ? err.message : "Add failed.";
+      toast.error("Add failed", { description: m });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onSeed = async () => {
+    const ok = await dialog.confirm({
+      title: "Seed default criteria?",
+      description:
+        "Adds the standard 5-criterion rubric (Leadership, Teamwork, Professionalism, Commitment, Personality) at max score 5 each. Only works when the rubric is empty.",
+      confirmText: "Seed defaults",
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const count = await seedDefaults({ electionId: election._id });
+      toast.success(`Seeded ${count} criteria`);
+    } catch (err) {
+      const m = err instanceof Error ? err.message : "Seed failed.";
+      toast.error("Seed failed", { description: m });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onRename = async (
+    criterionId: Id<"rubricCriteria">,
+    currentName: string,
+  ) => {
+    const next = await dialog.prompt({
+      title: "Rename criterion",
+      description: (
+        <>
+          Rename <strong>{currentName}</strong>. The change applies to all
+          existing draft scores under this criterion.
+        </>
+      ),
+      label: "New name",
+      defaultValue: currentName,
+      required: true,
+      validate: (v) =>
+        v.trim().length < 2 ? "At least 2 characters" : null,
+    });
+    if (!next || next.trim() === currentName) return;
+    setBusy(true);
+    try {
+      await renameC({ criterionId, name: next.trim() });
+      toast.success("Renamed");
+    } catch (err) {
+      const m = err instanceof Error ? err.message : "Rename failed.";
+      toast.error("Rename failed", { description: m });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onSetMax = async (
+    criterionId: Id<"rubricCriteria">,
+    currentMax: number,
+  ) => {
+    const next = await dialog.prompt({
+      title: "Set max score",
+      description:
+        "Update the maximum value evaluators can give for this criterion. Must be an integer between 1 and 20.",
+      label: "Max score",
+      defaultValue: String(currentMax),
+      required: true,
+      validate: (v) => {
+        const n = Number(v);
+        if (!Number.isInteger(n) || n < 1 || n > 20)
+          return "Integer between 1 and 20";
+        return null;
+      },
+    });
+    if (!next) return;
+    const value = Number(next);
+    if (value === currentMax) return;
+    setBusy(true);
+    try {
+      await setMaxScore({ criterionId, maxScore: value });
+      toast.success("Max score updated");
+    } catch (err) {
+      const m = err instanceof Error ? err.message : "Update failed.";
+      toast.error("Update failed", { description: m });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onRemove = async (
+    criterionId: Id<"rubricCriteria">,
+    currentName: string,
+  ) => {
+    const ok = await dialog.confirm({
+      title: "Remove criterion?",
+      description: (
+        <>
+          Removes <strong>{currentName}</strong> and any draft scores tied
+          to it. Cannot be undone.
+        </>
+      ),
+      confirmText: "Remove",
+      variant: "destructive",
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await removeC({ criterionId });
+      toast.success("Removed");
+    } catch (err) {
+      const m = err instanceof Error ? err.message : "Remove failed.";
+      toast.error("Remove failed", { description: m });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onMove = async (
+    criterionId: Id<"rubricCriteria">,
+    direction: "up" | "down",
+  ) => {
+    setBusy(true);
+    try {
+      await move({ criterionId, direction });
+    } catch (err) {
+      const m = err instanceof Error ? err.message : "Move failed.";
+      toast.error("Move failed", { description: m });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="rounded-md border p-4">
+      <header className="mb-3 flex items-center gap-2">
+        <ListChecks className="h-4 w-4" aria-hidden />
+        <h2 className="text-sm font-semibold">Rubric criteria</h2>
+        <Badge tone="muted">Setup only</Badge>
+      </header>
+      <p className="mb-3 text-xs text-[var(--color-muted-foreground)]">
+        Internal evaluators score every candidate on every criterion. Each
+        criterion has its own max score (1–20). Once internal evaluation
+        opens, the rubric is frozen for the rest of the cycle.
+      </p>
+
+      {criteria === undefined ? (
+        <Skeleton className="h-20 w-full" />
+      ) : criteria.length === 0 ? (
+        <div className="space-y-3">
+          <p className="text-sm text-[var(--color-muted-foreground)]">
+            No criteria yet. Seed the default rubric to start, or add one
+            manually below.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onSeed}
+            disabled={busy}
+          >
+            <Plus className="h-4 w-4" /> Seed default rubric
+          </Button>
+        </div>
+      ) : (
+        <ul className="mb-3 divide-y rounded-md border">
+          {criteria.map((c, idx) => (
+            <li
+              key={c._id}
+              className="flex items-center gap-2 px-3 py-2 text-sm"
+            >
+              <span className="w-6 text-xs text-[var(--color-muted-foreground)]">
+                {idx + 1}
+              </span>
+              <span className="flex-1 font-medium">{c.name}</span>
+              <Badge tone="muted">max {c.maxScore}</Badge>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onMove(c._id, "up")}
+                disabled={busy || idx === 0}
+                aria-label={`Move ${c.name} up`}
+              >
+                <ArrowUp className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onMove(c._id, "down")}
+                disabled={busy || idx === criteria.length - 1}
+                aria-label={`Move ${c.name} down`}
+              >
+                <ArrowDown className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onRename(c._id, c.name)}
+                disabled={busy}
+              >
+                Rename
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onSetMax(c._id, c.maxScore)}
+                disabled={busy}
+              >
+                Max score
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => onRemove(c._id, c.name)}
+                disabled={busy}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="grid gap-2 sm:grid-cols-[1fr_120px_auto] sm:items-end">
+        <div className="grid gap-1.5">
+          <Label htmlFor="critName">Add new criterion</Label>
+          <Input
+            id="critName"
+            placeholder="e.g. Vision & Direction"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+          />
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="critMax">Max score</Label>
+          <Input
+            id="critMax"
+            type="number"
+            min={1}
+            max={20}
+            step={1}
+            value={newMax}
+            onChange={(e) => setNewMax(Number(e.target.value))}
+          />
+        </div>
+        <Button onClick={onAdd} size="sm" loading={busy}>
+          <Plus className="h-4 w-4" /> Add
+        </Button>
+      </div>
+    </section>
   );
 }
 

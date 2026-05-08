@@ -98,6 +98,22 @@ function Body({ election }: { election: Doc<"elections"> }) {
     }
   };
 
+  const downloadInternalByClass = async () => {
+    setBusy("internalByClass");
+    try {
+      const rows = await convex.query(api.exports.internalScoresByClass, {
+        electionId: election._id,
+      });
+      downloadCsv(rows, `${safeName}-internal-scores-by-class.csv`);
+      toast.success("Downloaded per-class scores");
+    } catch (err) {
+      const m = err instanceof Error ? err.message : "Failed.";
+      toast.error("Export failed", { description: m });
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const downloadPublicCounts = async () => {
     setBusy("publicCounts");
     try {
@@ -195,10 +211,17 @@ function Body({ election }: { election: Doc<"elections"> }) {
       <section className="grid gap-3 md:grid-cols-2">
         <ExportCard
           title="Internal rubric scores"
-          description="Per evaluator × candidate × category. Includes draft + submitted with a status column."
+          description="Per evaluator × candidate × criterion. Includes draft + submitted, voter class column, and the configured max score for each row."
           icon={<FileSpreadsheet className="h-4 w-4" aria-hidden />}
           loading={busy === "internal"}
           onClick={downloadInternal}
+        />
+        <ExportCard
+          title="Internal scores by class"
+          description="Aggregated per voter-class × candidate: evaluator count, sum-of-totals, class share, and weighted contribution. Useful for AGM minutes and tie-break review."
+          icon={<FileSpreadsheet className="h-4 w-4" aria-hidden />}
+          loading={busy === "internalByClass"}
+          onClick={downloadInternalByClass}
         />
         <ExportCard
           title="Public vote counts"
@@ -209,7 +232,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
         />
         <ExportCard
           title="Combined results"
-          description="The 75/25 normalized output: internal share, public share, final score, and winner per position."
+          description="The weighted 60/40 output (per cycle): per-class shares (TC/HE/Y2), public share, internal aggregate, public aggregate, final score, and winner. Includes tie-break-step column."
           icon={<FileSpreadsheet className="h-4 w-4" aria-hidden />}
           loading={busy === "combined"}
           onClick={downloadCombined}
