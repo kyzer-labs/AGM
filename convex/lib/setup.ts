@@ -1,5 +1,12 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import {
+  getEntryClass,
+  getWeights,
+  VOTER_CLASS_LABEL,
+  VOTER_CLASSES,
+  type VoterClass,
+} from "./cycle";
 
 export type ElectionPhase = Doc<"elections">["phase"];
 
@@ -55,8 +62,11 @@ export interface SetupReadiness {
   positionsCount: number;
   candidatesCount: number;
   whitelistCount: number;
+  whitelistByClass: Record<VoterClass, number>;
   unassignedCandidates: number;
   positionsWithoutCandidates: number;
+  rubricCriteriaCount: number;
+  weightsValid: boolean;
   warnings: string[];
 }
 
@@ -64,6 +74,8 @@ export async function computeSetupReadiness(
   ctx: QueryCtx | MutationCtx,
   electionId: Id<"elections">,
 ): Promise<SetupReadiness> {
+  const election = await getElectionOrThrow(ctx, electionId);
+
   const positions = await ctx.db
     .query("positions")
     .withIndex("by_election", (q) => q.eq("electionId", electionId))
@@ -76,6 +88,11 @@ export async function computeSetupReadiness(
 
   const whitelist = await ctx.db
     .query("internalWhitelist")
+    .withIndex("by_election", (q) => q.eq("electionId", electionId))
+    .collect();
+
+  const rubricCriteria = await ctx.db
+    .query("rubricCriteria")
     .withIndex("by_election", (q) => q.eq("electionId", electionId))
     .collect();
 
@@ -108,11 +125,30 @@ export async function computeSetupReadiness(
     (p) => (candidatePositionsByPosition.get(p._id) ?? []).length === 0,
   ).length;
 
+  const whitelistByClass: Record<VoterClass, number> = {
+    topCommittee: 0,
+    headExecutive: 0,
+    year2Committee: 0,
+  };
+  for (const entry of whitelist) {
+    whitelistByClass[getEntryClass(entry)] += 1;
+  }
+
+  const weights = getWeights(election);
+  const sum =
+    weights.topCommittee +
+    weights.headExecutive +
+    weights.year2Committee +
+    weights.public;
+  const weightsValid = Math.abs(sum - 100) < 0.001;
+
   const warnings: string[] = [];
   if (positions.length === 0) warnings.push("No positions configured.");
   if (candidates.length === 0) warnings.push("No candidates added.");
+  if (rubricCriteria.length === 0)
+    warnings.push("Rubric criteria not configured.");
   if (whitelist.length === 0)
-    warnings.push("Year 2 internal whitelist is empty.");
+    warnings.push("Internal whitelist is empty.");
   if (unassignedCandidates > 0)
     warnings.push(
       `${unassignedCandidates} candidate(s) are not assigned to any position.`,
@@ -121,21 +157,56 @@ export async function computeSetupReadiness(
     warnings.push(
       `${positionsWithoutCandidates} position(s) have no candidates.`,
     );
+  if (!weightsValid) {
+    warnings.push(
+      `Weights must sum to 100% (currently ${sum.toFixed(2)}%).`,
+    );
+  }
+
+  for (const cls of VOTER_CLASSES) {
+    const weight =
+      cls === "topCommittee"
+        ? weights.topCommittee
+        : cls === "headExecutive"
+          ? weights.headExecutive
+          : weights.year2Committee;
+    if (weight > 0 && whitelistByClass[cls] === 0) {
+      warnings.push(
+        `${VOTER_CLASS_LABEL[cls]} has weight ${weight}% but no whitelisted evaluators.`,
+      );
+    }
+  }
 
   const ready =
     positions.length > 0 &&
     candidates.length > 0 &&
+    rubricCriteria.length > 0 &&
     whitelist.length > 0 &&
     unassignedCandidates === 0 &&
-    positionsWithoutCandidates === 0;
+    positionsWithoutCandidates === 0 &&
+    weightsValid &&
+    VOTER_CLASSES.every(
+      (cls) => {
+        const weight =
+          cls === "topCommittee"
+            ? weights.topCommittee
+            : cls === "headExecutive"
+              ? weights.headExecutive
+              : weights.year2Committee;
+        return weight === 0 || whitelistByClass[cls] > 0;
+      },
+    );
 
   return {
     ready,
     positionsCount: positions.length,
     candidatesCount: candidates.length,
     whitelistCount: whitelist.length,
+    whitelistByClass,
     unassignedCandidates,
     positionsWithoutCandidates,
+    rubricCriteriaCount: rubricCriteria.length,
+    weightsValid,
     warnings,
   };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Papa from "papaparse";
@@ -22,10 +22,31 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { Doc } from "@/convex/_generated/dataModel";
+
+type VoterClass = "topCommittee" | "headExecutive" | "year2Committee";
+
+const VOTER_CLASS_LABEL: Record<VoterClass, string> = {
+  topCommittee: "Top Committee",
+  headExecutive: "Head Executive",
+  year2Committee: "Year 2 Committee",
+};
+
+const VOTER_CLASS_OPTIONS: VoterClass[] = [
+  "topCommittee",
+  "headExecutive",
+  "year2Committee",
+];
+
+const VOTER_CLASS_TONE: Record<VoterClass, "brand" | "warning" | "muted"> = {
+  topCommittee: "brand",
+  headExecutive: "warning",
+  year2Committee: "muted",
+};
 
 export default function WhitelistPage() {
   return (
@@ -53,20 +74,45 @@ function Body({ election }: { election: Doc<"elections"> }) {
   const add = useMutation(api.whitelist.add);
   const bulkAdd = useMutation(api.whitelist.bulkAdd);
   const remove = useMutation(api.whitelist.remove);
+  const setClass = useMutation(api.whitelist.setClass);
 
   const [single, setSingle] = useState("");
+  const [singleClass, setSingleClass] = useState<VoterClass>("year2Committee");
   const [bulk, setBulk] = useState("");
+  const [bulkDefaultClass, setBulkDefaultClass] = useState<VoterClass>("year2Committee");
+  const [filterClass, setFilterClass] = useState<VoterClass | "all">("all");
   const [busy, setBusy] = useState(false);
 
   const editable =
     election.phase === "setup" || election.phase === "internalOpen";
+
+  const filteredList = useMemo(() => {
+    if (!list) return [];
+    if (filterClass === "all") return list;
+    return list.filter((row) => row.voterClass === filterClass);
+  }, [list, filterClass]);
+
+  const countByClass = useMemo(() => {
+    const counts: Record<VoterClass, number> = {
+      topCommittee: 0,
+      headExecutive: 0,
+      year2Committee: 0,
+    };
+    if (!list) return counts;
+    for (const row of list) counts[row.voterClass] += 1;
+    return counts;
+  }, [list]);
 
   const onAddSingle = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!single.trim()) return;
     setBusy(true);
     try {
-      await add({ electionId: election._id, email: single });
+      await add({
+        electionId: election._id,
+        email: single,
+        voterClass: singleClass,
+      });
       toast.success("Email added");
       setSingle("");
     } catch (err) {
@@ -77,17 +123,22 @@ function Body({ election }: { election: Doc<"elections"> }) {
     }
   };
 
-  const importBulk = async (emails: string[]) => {
+  const importBulk = async (
+    rows: { email: string; voterClass?: string }[],
+    defaultClass: VoterClass,
+  ) => {
     setBusy(true);
     try {
-      const summary = await bulkAdd({ electionId: election._id, emails });
-      const parts = [
-        `${summary.inserted} added`,
-        `${summary.skipped} skipped`,
-      ];
-      if (summary.invalid.length > 0) {
+      const summary = await bulkAdd({
+        electionId: election._id,
+        rows,
+        defaultClass,
+      });
+      const parts = [`${summary.inserted} added`, `${summary.skipped} skipped`];
+      if (summary.reclassified > 0)
+        parts.push(`${summary.reclassified} reclassified`);
+      if (summary.invalid.length > 0)
         parts.push(`${summary.invalid.length} invalid`);
-      }
       toast.success("Bulk import complete", { description: parts.join(" · ") });
       setBulk("");
     } catch (err) {
@@ -105,7 +156,10 @@ function Body({ election }: { election: Doc<"elections"> }) {
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
     if (emails.length === 0) return;
-    await importBulk(emails);
+    await importBulk(
+      emails.map((email) => ({ email })),
+      bulkDefaultClass,
+    );
   };
 
   const onCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -113,17 +167,55 @@ function Body({ election }: { election: Doc<"elections"> }) {
     e.target.value = "";
     if (!file) return;
 
-    Papa.parse<string[]>(file, {
+    Papa.parse<Record<string, string>>(file, {
+      header: true,
+      skipEmptyLines: true,
       complete: (result) => {
-        const flat: string[] = [];
+        const rows: { email: string; voterClass?: string }[] = [];
         for (const row of result.data) {
-          for (const cell of row) {
-            if (typeof cell === "string" && cell.trim().length > 0) {
-              flat.push(cell.trim());
-            }
-          }
+          const email =
+            row.email ??
+            row.Email ??
+            row["E-mail"] ??
+            row["e-mail"] ??
+            Object.values(row)[0];
+          if (typeof email !== "string" || email.trim().length === 0) continue;
+          const cls =
+            row.voterClass ??
+            row.VoterClass ??
+            row.class ??
+            row.Class ??
+            row.role ??
+            row.Role;
+          rows.push(
+            cls && cls.trim().length > 0
+              ? { email: email.trim(), voterClass: cls.trim() }
+              : { email: email.trim() },
+          );
         }
-        void importBulk(flat);
+        if (rows.length === 0) {
+          // Try header-less parsing as a fallback
+          Papa.parse<string[]>(file, {
+            complete: (r2) => {
+              const flat: { email: string }[] = [];
+              for (const row of r2.data) {
+                for (const cell of row) {
+                  if (typeof cell === "string" && cell.trim().length > 0) {
+                    flat.push({ email: cell.trim() });
+                  }
+                }
+              }
+              if (flat.length > 0) void importBulk(flat, bulkDefaultClass);
+              else
+                toast.error("No usable rows found in CSV.", {
+                  description:
+                    "Required column: email. Optional: voterClass.",
+                });
+            },
+          });
+          return;
+        }
+        void importBulk(rows, bulkDefaultClass);
       },
       error: (err) => {
         toast.error("CSV parse failed", { description: err.message });
@@ -147,9 +239,11 @@ function Body({ election }: { election: Doc<"elections"> }) {
             Internal whitelist
           </h1>
           <p className="text-sm text-[var(--color-muted-foreground)]">
-            Year 2 committee members who can submit internal evaluations for
-            <strong> {election.name}</strong>. Year 1 members and other
-            students are NOT added here — they vote externally on AGM day.
+            Committee members who can submit internal evaluations for{" "}
+            <strong>{election.name}</strong>. Each evaluator is assigned to a
+            class — Top Committee, Head Executive, or Year 2 Committee — and
+            their class&apos;s configured weight applies to their submitted
+            scores.
           </p>
         </div>
         <Badge tone={editable ? "muted" : "warning"}>
@@ -167,8 +261,11 @@ function Body({ election }: { election: Doc<"elections"> }) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={onAddSingle} className="flex items-end gap-2">
-                <div className="grid flex-1 gap-1.5">
+              <form
+                onSubmit={onAddSingle}
+                className="grid gap-3 sm:grid-cols-[1fr_180px_auto] sm:items-end"
+              >
+                <div className="grid gap-1.5">
                   <Label htmlFor="wl-email">Student email</Label>
                   <Input
                     id="wl-email"
@@ -178,6 +275,22 @@ function Body({ election }: { election: Doc<"elections"> }) {
                     value={single}
                     onChange={(e) => setSingle(e.target.value)}
                   />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="wl-class">Class</Label>
+                  <Select
+                    id="wl-class"
+                    value={singleClass}
+                    onChange={(e) =>
+                      setSingleClass(e.target.value as VoterClass)
+                    }
+                  >
+                    {VOTER_CLASS_OPTIONS.map((c) => (
+                      <option key={c} value={c}>
+                        {VOTER_CLASS_LABEL[c]}
+                      </option>
+                    ))}
+                  </Select>
                 </div>
                 <Button type="submit" loading={busy}>
                   <Plus className="h-4 w-4" /> Add
@@ -190,8 +303,9 @@ function Body({ election }: { election: Doc<"elections"> }) {
             <CardHeader>
               <CardTitle className="text-base">Bulk import</CardTitle>
               <CardDescription>
-                Paste comma/space/newline-separated emails, or upload a CSV.
-                Duplicates and non-USM addresses are skipped automatically.
+                Paste comma/space/newline-separated emails, or upload a CSV
+                with <code>email</code> and optional <code>voterClass</code>{" "}
+                columns. Rows without a class fall back to the default below.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -202,6 +316,22 @@ function Body({ election }: { election: Doc<"elections"> }) {
                   value={bulk}
                   onChange={(e) => setBulk(e.target.value)}
                 />
+                <div className="grid gap-1.5">
+                  <Label htmlFor="wl-bulk-class">Default class</Label>
+                  <Select
+                    id="wl-bulk-class"
+                    value={bulkDefaultClass}
+                    onChange={(e) =>
+                      setBulkDefaultClass(e.target.value as VoterClass)
+                    }
+                  >
+                    {VOTER_CLASS_OPTIONS.map((c) => (
+                      <option key={c} value={c}>
+                        {VOTER_CLASS_LABEL[c]}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button type="submit" loading={busy}>
                     Import pasted emails
@@ -213,9 +343,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
                       className="sr-only"
                       onChange={onCsvUpload}
                     />
-                    <span
-                      className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border bg-transparent px-4 text-sm font-medium hover:bg-[var(--color-muted)]"
-                    >
+                    <span className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border bg-transparent px-4 text-sm font-medium hover:bg-[var(--color-muted)]">
                       <Upload className="h-4 w-4" /> Upload CSV
                     </span>
                   </label>
@@ -228,25 +356,98 @@ function Body({ election }: { election: Doc<"elections"> }) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">
-            Whitelist <span className="text-[var(--color-muted-foreground)]">({list.length})</span>
-          </CardTitle>
+          <div className="flex flex-wrap items-center gap-3">
+            <CardTitle className="text-base">
+              Whitelist{" "}
+              <span className="text-[var(--color-muted-foreground)]">
+                ({list.length})
+              </span>
+            </CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              {VOTER_CLASS_OPTIONS.map((c) => (
+                <Badge key={c} tone={VOTER_CLASS_TONE[c]}>
+                  {VOTER_CLASS_LABEL[c]}: {countByClass[c]}
+                </Badge>
+              ))}
+            </div>
+            <div className="flex-1" />
+            <div className="flex items-center gap-2">
+              <Label htmlFor="wl-filter" className="text-xs">
+                Filter
+              </Label>
+              <Select
+                id="wl-filter"
+                value={filterClass}
+                onChange={(e) =>
+                  setFilterClass(e.target.value as VoterClass | "all")
+                }
+                className="h-8 w-44"
+              >
+                <option value="all">All classes</option>
+                {VOTER_CLASS_OPTIONS.map((c) => (
+                  <option key={c} value={c}>
+                    {VOTER_CLASS_LABEL[c]}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          {list.length === 0 ? (
+          {filteredList.length === 0 ? (
             <EmptyState
               icon={<Users2 className="h-5 w-5" aria-hidden />}
-              title="No emails added yet"
-              description="Internal evaluation cannot start until the whitelist has at least one Year 2 evaluator."
+              title={
+                filterClass === "all"
+                  ? "No emails added yet"
+                  : `No evaluators in ${VOTER_CLASS_LABEL[filterClass]}`
+              }
+              description={
+                filterClass === "all"
+                  ? "Internal evaluation cannot start until the whitelist has at least one evaluator with a non-zero weighted class."
+                  : "Use the form above to add some, or change the filter."
+              }
             />
           ) : (
             <ul className="divide-y">
-              {list.map((row) => (
+              {filteredList.map((row) => (
                 <li
                   key={row._id}
-                  className="flex items-center justify-between gap-3 py-2"
+                  className="flex flex-wrap items-center gap-3 py-2"
                 >
-                  <span className="text-sm">{row.email}</span>
+                  <span className="flex-1 text-sm">{row.email}</span>
+                  {editable ? (
+                    <Select
+                      value={row.voterClass}
+                      onChange={async (e) => {
+                        const v = e.target.value as VoterClass;
+                        try {
+                          await setClass({
+                            entryId: row._id,
+                            voterClass: v,
+                          });
+                          toast.success("Class updated");
+                        } catch (err) {
+                          const m =
+                            err instanceof Error
+                              ? err.message
+                              : "Update failed.";
+                          toast.error("Update failed", { description: m });
+                        }
+                      }}
+                      className="h-8 w-44"
+                    >
+                      {VOTER_CLASS_OPTIONS.map((c) => (
+                        <option key={c} value={c}>
+                          {VOTER_CLASS_LABEL[c]}
+                        </option>
+                      ))}
+                    </Select>
+                  ) : (
+                    <Badge tone={VOTER_CLASS_TONE[row.voterClass]}>
+                      {VOTER_CLASS_LABEL[row.voterClass]}
+                    </Badge>
+                  )}
                   {editable ? (
                     <Button
                       size="icon"

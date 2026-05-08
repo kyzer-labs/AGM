@@ -26,6 +26,17 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 
+interface PublicBreakdown {
+  candidateId: Id<"candidates">;
+  fullName: string;
+  matric: string;
+  photoUrl: string | null;
+  publicVotes: number;
+  internalAggregate: number;
+  publicAggregate: number;
+  finalScore: number;
+}
+
 interface PublicRow {
   positionId: Id<"positions">;
   positionName: string;
@@ -35,17 +46,13 @@ interface PublicRow {
   winnerName: string | null;
   publishedAt: number | null;
   totalPublicVotes: number;
-  breakdown: {
-    candidateId: Id<"candidates">;
-    fullName: string;
-    matric: string;
-    photoUrl: string | null;
-    internalAvg: number;
-    internalShare: number;
-    publicVotes: number;
-    publicShare: number;
-    finalScore: number;
-  }[];
+  weights: {
+    topCommittee: number;
+    headExecutive: number;
+    year2Committee: number;
+    public: number;
+  };
+  breakdown: PublicBreakdown[];
 }
 
 export default function PublicResultsPage() {
@@ -132,8 +139,9 @@ function Body({ election }: { election: Doc<"elections"> }) {
           {election.name}
         </h1>
         <p className="text-sm text-[var(--color-muted-foreground)]">
-          Combined 75% internal evaluation + 25% public vote, in ballot
-          order. Click any position to see the full per-candidate breakdown.
+          Combined internal aggregate ({data.weights.public < 100 ? 100 - data.weights.public : 0}%) +
+          public vote ({data.weights.public}%), in ballot order. Click any
+          position to see the full per-candidate breakdown.
         </p>
       </header>
 
@@ -220,16 +228,17 @@ function ResultBlock({ row }: { row: PublicRow }) {
                 <tr className="border-b text-left text-xs text-[var(--color-muted-foreground)]">
                   <th className="px-2 py-1.5 font-medium">Candidate</th>
                   <th className="px-2 py-1.5 font-medium text-right">
-                    Internal avg
+                    Internal aggregate (
+                    {row.weights.public < 100
+                      ? 100 - row.weights.public
+                      : 0}
+                    %)
                   </th>
                   <th className="px-2 py-1.5 font-medium text-right">
-                    Internal share
+                    Public ({row.weights.public}%)
                   </th>
                   <th className="px-2 py-1.5 font-medium text-right">
                     Public votes
-                  </th>
-                  <th className="px-2 py-1.5 font-medium text-right">
-                    Public share
                   </th>
                   <th className="px-2 py-1.5 font-medium text-right">
                     Final
@@ -262,16 +271,13 @@ function ResultBlock({ row }: { row: PublicRow }) {
                       </div>
                     </td>
                     <td className="px-2 py-2 text-right tabular-nums">
-                      {b.internalAvg.toFixed(2)}
+                      {(b.internalAggregate * 100).toFixed(2)}%
                     </td>
                     <td className="px-2 py-2 text-right tabular-nums">
-                      {(b.internalShare * 100).toFixed(1)}%
+                      {(b.publicAggregate * 100).toFixed(2)}%
                     </td>
                     <td className="px-2 py-2 text-right tabular-nums">
                       {b.publicVotes}
-                    </td>
-                    <td className="px-2 py-2 text-right tabular-nums">
-                      {(b.publicShare * 100).toFixed(1)}%
                     </td>
                     <td className="px-2 py-2 text-right font-semibold tabular-nums">
                       {(b.finalScore * 100).toFixed(2)}%

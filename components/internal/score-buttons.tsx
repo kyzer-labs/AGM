@@ -2,26 +2,27 @@
 
 import { cn } from "@/lib/utils";
 
-const SCORES = [1, 2, 3, 4, 5] as const;
-
 export function ScoreButtons({
   value,
+  maxScore = 5,
   onChange,
   ariaLabel,
   disabled,
 }: {
   value: number | undefined;
+  maxScore?: number;
   onChange: (n: number) => void;
   ariaLabel: string;
   disabled?: boolean;
 }) {
+  const scores = Array.from({ length: maxScore }, (_, i) => i + 1);
   return (
     <div
       className="inline-flex items-center gap-1"
       role="radiogroup"
       aria-label={ariaLabel}
     >
-      {SCORES.map((s) => {
+      {scores.map((s) => {
         const selected = value === s;
         return (
           <button

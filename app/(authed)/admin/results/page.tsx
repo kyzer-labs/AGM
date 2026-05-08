@@ -38,6 +38,21 @@ const PHASE_LABELS: Record<string, string> = {
   published: "Published",
 };
 
+interface PreviewBreakdown {
+  candidateId: Id<"candidates">;
+  fullName: string;
+  matric: string;
+  photoUrl: string | null;
+  tcShare: number;
+  heShare: number;
+  y2Share: number;
+  publicVotes: number;
+  publicShare: number;
+  internalAggregate: number;
+  publicAggregate: number;
+  finalScore: number;
+}
+
 interface PreviewRow {
   positionId: Id<"positions">;
   positionName: string;
@@ -47,21 +62,28 @@ interface PreviewRow {
   winnerCandidateId: Id<"candidates"> | null;
   winnerName: string | null;
   hasUnresolvedTie: boolean;
+  tieBreakStep: string | null;
   manualResolutionReason: string | null;
   publishedAt: number | null;
   totalPublicVotes: number;
-  breakdown: {
-    candidateId: Id<"candidates">;
-    fullName: string;
-    matric: string;
-    photoUrl: string | null;
-    internalAvg: number;
-    internalShare: number;
-    publicVotes: number;
-    publicShare: number;
-    finalScore: number;
-  }[];
+  weights: {
+    topCommittee: number;
+    headExecutive: number;
+    year2Committee: number;
+    public: number;
+  };
+  breakdown: PreviewBreakdown[];
 }
+
+const TIE_STEP_LABELS: Record<string, string> = {
+  finalScore: "Final score",
+  tcShare: "Top Committee share",
+  heShare: "Head Executive share",
+  y2Share: "Year 2 Committee share",
+  publicShare: "Public vote share",
+  internalShare: "Internal share (legacy)",
+  manual: "Manual decision",
+};
 
 export default function AdminResultsPage() {
   return (
@@ -205,9 +227,10 @@ function Body({ election }: { election: Doc<"elections"> }) {
             Results &amp; publishing
           </h1>
           <p className="text-sm text-[var(--color-muted-foreground)]">
-            Combined 75% internal + 25% public scoring for{" "}
-            <strong>{election.name}</strong>. Review every position before
-            publishing — once you publish, voters can see results on{" "}
+            Combined internal (60%) + public (40%) scoring for{" "}
+            <strong>{election.name}</strong>, normalised by the configured
+            class weights. Review every position before publishing — once
+            you publish, voters can see results on{" "}
             <a className="underline" href="/results">
               the results page
             </a>
@@ -336,6 +359,11 @@ function ResultCard({
     return <Badge tone="muted">Not computed yet</Badge>;
   })();
 
+  const tieBreakLabel =
+    row.tieBreakStep && row.tieBreakStep !== "finalScore"
+      ? (TIE_STEP_LABELS[row.tieBreakStep] ?? row.tieBreakStep)
+      : null;
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-start gap-3 space-y-0">
@@ -358,6 +386,11 @@ function ResultCard({
               Manual decision: {row.manualResolutionReason}
             </p>
           ) : null}
+          {tieBreakLabel ? (
+            <p className="mt-1 text-xs text-[var(--color-warning)]">
+              Tie broken by: {tieBreakLabel}
+            </p>
+          ) : null}
         </div>
         {stateBadge}
       </CardHeader>
@@ -373,16 +406,19 @@ function ResultCard({
                 <tr className="border-b text-left text-xs text-[var(--color-muted-foreground)]">
                   <th className="px-2 py-1.5 font-medium">Candidate</th>
                   <th className="px-2 py-1.5 font-medium text-right">
-                    Internal avg
+                    TC ({row.weights.topCommittee}%)
                   </th>
                   <th className="px-2 py-1.5 font-medium text-right">
-                    Internal share
+                    HE ({row.weights.headExecutive}%)
                   </th>
                   <th className="px-2 py-1.5 font-medium text-right">
-                    Public votes
+                    Y2 ({row.weights.year2Committee}%)
                   </th>
                   <th className="px-2 py-1.5 font-medium text-right">
-                    Public share
+                    Public ({row.weights.public}%)
+                  </th>
+                  <th className="px-2 py-1.5 font-medium text-right">
+                    Internal agg
                   </th>
                   <th className="px-2 py-1.5 font-medium text-right">
                     Final
@@ -429,16 +465,20 @@ function ResultCard({
                         </div>
                       </td>
                       <td className="px-2 py-2 text-right tabular-nums">
-                        {b.internalAvg.toFixed(2)}
+                        {(b.tcShare * 100).toFixed(1)}%
                       </td>
                       <td className="px-2 py-2 text-right tabular-nums">
-                        {(b.internalShare * 100).toFixed(1)}%
+                        {(b.heShare * 100).toFixed(1)}%
                       </td>
                       <td className="px-2 py-2 text-right tabular-nums">
-                        {b.publicVotes}
+                        {(b.y2Share * 100).toFixed(1)}%
                       </td>
                       <td className="px-2 py-2 text-right tabular-nums">
-                        {(b.publicShare * 100).toFixed(1)}%
+                        {b.publicVotes} (
+                        {(b.publicShare * 100).toFixed(1)}%)
+                      </td>
+                      <td className="px-2 py-2 text-right tabular-nums">
+                        {(b.internalAggregate * 100).toFixed(2)}%
                       </td>
                       <td className="px-2 py-2 text-right font-semibold tabular-nums">
                         {(b.finalScore * 100).toFixed(2)}%

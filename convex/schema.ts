@@ -56,6 +56,16 @@ export default defineSchema({
     createdByVoterId: v.id("voters"),
     createdAt: v.number(),
     updatedAt: v.optional(v.number()),
+
+    weightTopCommittee: v.optional(v.number()),
+    weightHeadExecutive: v.optional(v.number()),
+    weightYear2Committee: v.optional(v.number()),
+    weightPublic: v.optional(v.number()),
+
+    scheduledStartAt: v.optional(v.number()),
+    scheduledEndAt: v.optional(v.number()),
+    scheduledOpenJobId: v.optional(v.id("_scheduled_functions")),
+    scheduledCloseJobId: v.optional(v.id("_scheduled_functions")),
   })
     .index("by_phase", ["phase"])
     .index("by_year", ["year"]),
@@ -98,11 +108,28 @@ export default defineSchema({
   internalWhitelist: defineTable({
     electionId: v.id("elections"),
     email: v.string(),
+    voterClass: v.optional(
+      v.union(
+        v.literal("topCommittee"),
+        v.literal("headExecutive"),
+        v.literal("year2Committee"),
+      ),
+    ),
     addedByVoterId: v.id("voters"),
     addedAt: v.number(),
   })
     .index("by_election", ["electionId"])
-    .index("by_election_email", ["electionId", "email"]),
+    .index("by_election_email", ["electionId", "email"])
+    .index("by_election_class", ["electionId", "voterClass"]),
+
+  rubricCriteria: defineTable({
+    electionId: v.id("elections"),
+    name: v.string(),
+    maxScore: v.number(),
+    order: v.number(),
+  })
+    .index("by_election", ["electionId"])
+    .index("by_election_order", ["electionId", "order"]),
 
   internalEvaluations: defineTable({
     electionId: v.id("elections"),
@@ -117,14 +144,19 @@ export default defineSchema({
   internalScores: defineTable({
     evaluationId: v.id("internalEvaluations"),
     candidateId: v.id("candidates"),
-    leadership: v.number(),
-    teamwork: v.number(),
-    professionalism: v.number(),
-    commitment: v.number(),
-    personality: v.number(),
+
+    criterionId: v.optional(v.id("rubricCriteria")),
+    score: v.optional(v.number()),
+
+    leadership: v.optional(v.number()),
+    teamwork: v.optional(v.number()),
+    professionalism: v.optional(v.number()),
+    commitment: v.optional(v.number()),
+    personality: v.optional(v.number()),
   })
     .index("by_evaluation", ["evaluationId"])
     .index("by_evaluation_candidate", ["evaluationId", "candidateId"])
+    .index("by_evaluation_criterion", ["evaluationId", "criterionId"])
     .index("by_candidate", ["candidateId"]),
 
   publicVotes: defineTable({
@@ -150,12 +182,29 @@ export default defineSchema({
     breakdown: v.array(
       v.object({
         candidateId: v.id("candidates"),
-        internalAvg: v.number(),
-        internalShare: v.number(),
+
+        internalAvg: v.optional(v.number()),
+        internalShare: v.optional(v.number()),
+
+        tcShare: v.optional(v.number()),
+        heShare: v.optional(v.number()),
+        y2Share: v.optional(v.number()),
+
         publicVotes: v.number(),
         publicShare: v.number(),
         finalScore: v.number(),
       }),
+    ),
+    tieBreakStep: v.optional(
+      v.union(
+        v.literal("finalScore"),
+        v.literal("tcShare"),
+        v.literal("heShare"),
+        v.literal("y2Share"),
+        v.literal("publicShare"),
+        v.literal("internalShare"),
+        v.literal("manual"),
+      ),
     ),
     manualResolutionReason: v.optional(v.string()),
     resolvedByVoterId: v.optional(v.id("voters")),

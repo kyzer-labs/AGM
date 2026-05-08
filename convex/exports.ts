@@ -2,15 +2,15 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAdmin, requireSuperAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
+import {
+  getEntryClass,
+  getWeights,
+  VOTER_CLASS_LABEL,
+  VOTER_CLASSES,
+  type VoterClass,
+} from "./lib/cycle";
+import { getElectionOrThrow } from "./lib/setup";
 import type { Doc, Id } from "./_generated/dataModel";
-
-const RUBRIC_KEYS = [
-  "leadership",
-  "teamwork",
-  "professionalism",
-  "commitment",
-  "personality",
-] as const;
 
 export const internalScores = query({
   args: { electionId: v.id("elections") },
@@ -30,46 +30,65 @@ export const internalScores = query({
       candidatesById.set(c._id, c);
     }
 
+    const criteria = await ctx.db
+      .query("rubricCriteria")
+      .withIndex("by_election_order", (q) =>
+        q.eq("electionId", args.electionId),
+      )
+      .collect();
+    const criteriaById = new Map(
+      criteria.map((c) => [c._id, c] as const),
+    );
+
+    const whitelist = await ctx.db
+      .query("internalWhitelist")
+      .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
+      .collect();
+    const classByEmail = new Map<string, VoterClass>();
+    for (const wl of whitelist) {
+      classByEmail.set(wl.email, getEntryClass(wl));
+    }
+
     const rows: {
       evaluatorEmail: string;
       evaluatorName: string;
+      voterClass: string;
       status: "draft" | "submitted";
       submittedAt: string;
       candidateName: string;
       candidateMatric: string;
-      leadership: number;
-      teamwork: number;
-      professionalism: number;
-      commitment: number;
-      personality: number;
-      average: number;
+      criterion: string;
+      score: number;
+      maxScore: number;
     }[] = [];
 
     for (const ev of evaluations) {
       const voter = await ctx.db.get(ev.evaluatorVoterId);
+      const voterClass = voter ? classByEmail.get(voter.email) : undefined;
+
       const scores = await ctx.db
         .query("internalScores")
         .withIndex("by_evaluation", (q) => q.eq("evaluationId", ev._id))
         .collect();
+
       for (const s of scores) {
+        if (s.criterionId === undefined || s.score === undefined) continue;
         const c = candidatesById.get(s.candidateId);
-        if (!c) continue;
-        const sum = RUBRIC_KEYS.reduce((acc, k) => acc + s[k], 0);
+        const crit = criteriaById.get(s.criterionId);
+        if (!c || !crit) continue;
         rows.push({
           evaluatorEmail: voter?.email ?? "—",
           evaluatorName: voter?.fullName ?? "—",
+          voterClass: voterClass ? VOTER_CLASS_LABEL[voterClass] : "Unknown",
           status: ev.status,
           submittedAt: ev.submittedAt
             ? new Date(ev.submittedAt).toISOString()
             : "",
           candidateName: c.fullName,
           candidateMatric: c.matric,
-          leadership: s.leadership,
-          teamwork: s.teamwork,
-          professionalism: s.professionalism,
-          commitment: s.commitment,
-          personality: s.personality,
-          average: sum / RUBRIC_KEYS.length,
+          criterion: crit.name,
+          score: s.score,
+          maxScore: crit.maxScore,
         });
       }
     }
@@ -77,7 +96,132 @@ export const internalScores = query({
     rows.sort(
       (a, b) =>
         a.evaluatorEmail.localeCompare(b.evaluatorEmail) ||
-        a.candidateName.localeCompare(b.candidateName),
+        a.candidateName.localeCompare(b.candidateName) ||
+        a.criterion.localeCompare(b.criterion),
+    );
+    return rows;
+  },
+});
+
+export const internalScoresByClass = query({
+  args: { electionId: v.id("elections") },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+
+    const election = await getElectionOrThrow(ctx, args.electionId);
+    const weights = getWeights(election);
+
+    const candidates = await ctx.db
+      .query("candidates")
+      .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
+      .collect();
+    const candidatesById = new Map<Id<"candidates">, Doc<"candidates">>();
+    for (const c of candidates) candidatesById.set(c._id, c);
+
+    const whitelist = await ctx.db
+      .query("internalWhitelist")
+      .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
+      .collect();
+    const classByEmail = new Map<string, VoterClass>();
+    for (const wl of whitelist) classByEmail.set(wl.email, getEntryClass(wl));
+
+    const evaluations = await ctx.db
+      .query("internalEvaluations")
+      .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
+      .collect();
+    const submitted = evaluations.filter((e) => e.status === "submitted");
+
+    const evalClassMap = new Map<Id<"internalEvaluations">, VoterClass>();
+    for (const ev of submitted) {
+      const voter = await ctx.db.get(ev.evaluatorVoterId);
+      if (!voter) continue;
+      const cls = classByEmail.get(voter.email);
+      if (!cls) continue;
+      evalClassMap.set(ev._id, cls);
+    }
+
+    const classCandidateSum: Record<VoterClass, Map<Id<"candidates">, number>> = {
+      topCommittee: new Map(),
+      headExecutive: new Map(),
+      year2Committee: new Map(),
+    };
+    const classCandidateEvalCount: Record<
+      VoterClass,
+      Map<Id<"candidates">, Set<Id<"internalEvaluations">>>
+    > = {
+      topCommittee: new Map(),
+      headExecutive: new Map(),
+      year2Committee: new Map(),
+    };
+    const classGrandTotal: Record<VoterClass, number> = {
+      topCommittee: 0,
+      headExecutive: 0,
+      year2Committee: 0,
+    };
+
+    for (const [evalId, cls] of evalClassMap.entries()) {
+      const scores = await ctx.db
+        .query("internalScores")
+        .withIndex("by_evaluation", (q) => q.eq("evaluationId", evalId))
+        .collect();
+      for (const s of scores) {
+        if (s.criterionId === undefined || s.score === undefined) continue;
+        classCandidateSum[cls].set(
+          s.candidateId,
+          (classCandidateSum[cls].get(s.candidateId) ?? 0) + s.score,
+        );
+        classGrandTotal[cls] += s.score;
+        const set =
+          classCandidateEvalCount[cls].get(s.candidateId) ??
+          new Set<Id<"internalEvaluations">>();
+        set.add(evalId);
+        classCandidateEvalCount[cls].set(s.candidateId, set);
+      }
+    }
+
+    const rows: {
+      voterClass: string;
+      voterClassWeight: number;
+      candidateName: string;
+      candidateMatric: string;
+      evaluatorCount: number;
+      sumOfRubricTotals: number;
+      classGrandTotal: number;
+      classShare: number;
+      weightedContribution: number;
+    }[] = [];
+
+    for (const cls of VOTER_CLASSES) {
+      const w =
+        cls === "topCommittee"
+          ? weights.topCommittee
+          : cls === "headExecutive"
+            ? weights.headExecutive
+            : weights.year2Committee;
+      const total = classGrandTotal[cls];
+      for (const c of candidates) {
+        const sum = classCandidateSum[cls].get(c._id) ?? 0;
+        const evalCount =
+          classCandidateEvalCount[cls].get(c._id)?.size ?? 0;
+        const share = total > 0 ? sum / total : 0;
+        rows.push({
+          voterClass: VOTER_CLASS_LABEL[cls],
+          voterClassWeight: w,
+          candidateName: c.fullName,
+          candidateMatric: c.matric,
+          evaluatorCount: evalCount,
+          sumOfRubricTotals: sum,
+          classGrandTotal: total,
+          classShare: share,
+          weightedContribution: (w / 100) * share,
+        });
+      }
+    }
+
+    rows.sort(
+      (a, b) =>
+        a.voterClass.localeCompare(b.voterClass) ||
+        b.classShare - a.classShare,
     );
     return rows;
   },
@@ -121,8 +265,8 @@ export const publicCounts = query({
         .withIndex("by_position", (q) => q.eq("positionId", p._id))
         .collect();
       const counts = new Map<string, number>();
-      for (const v of votes)
-        counts.set(v.candidateId, (counts.get(v.candidateId) ?? 0) + 1);
+      for (const vote of votes)
+        counts.set(vote.candidateId, (counts.get(vote.candidateId) ?? 0) + 1);
       for (const l of links) {
         const c = candidatesById.get(l.candidateId);
         if (!c) continue;
@@ -145,6 +289,9 @@ export const combined = query({
   args: { electionId: v.id("elections") },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
+    const election = await getElectionOrThrow(ctx, args.electionId);
+    const weights = getWeights(election);
+
     const positions = await ctx.db
       .query("positions")
       .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
@@ -166,6 +313,11 @@ export const combined = query({
       candidatesById.set(c._id, c);
     }
 
+    const wTc = weights.topCommittee / 100;
+    const wHe = weights.headExecutive / 100;
+    const wY2 = weights.year2Committee / 100;
+    const wPub = weights.public / 100;
+
     const rows: {
       positionName: string;
       tier: number;
@@ -174,11 +326,15 @@ export const combined = query({
       candidateName: string;
       candidateMatric: string;
       isWinner: boolean;
-      internalAvg: number;
-      internalShare: number;
+      tcShare: number;
+      heShare: number;
+      y2Share: number;
       publicVotes: number;
       publicShare: number;
+      internalAggregate: number;
+      publicAggregate: number;
       finalScore: number;
+      tieBreakStep: string;
     }[] = [];
 
     for (const p of positions) {
@@ -186,6 +342,9 @@ export const combined = query({
       if (!r) continue;
       for (const b of r.breakdown) {
         const c = candidatesById.get(b.candidateId);
+        const tcShare = b.tcShare ?? b.internalShare ?? 0;
+        const heShare = b.heShare ?? 0;
+        const y2Share = b.y2Share ?? 0;
         rows.push({
           positionName: p.name,
           tier: p.tier,
@@ -194,11 +353,15 @@ export const combined = query({
           candidateName: c?.fullName ?? "Unknown",
           candidateMatric: c?.matric ?? "—",
           isWinner: r.winnerCandidateId === b.candidateId,
-          internalAvg: b.internalAvg,
-          internalShare: b.internalShare,
+          tcShare,
+          heShare,
+          y2Share,
           publicVotes: b.publicVotes,
           publicShare: b.publicShare,
+          internalAggregate: wTc * tcShare + wHe * heShare + wY2 * y2Share,
+          publicAggregate: wPub * b.publicShare,
           finalScore: b.finalScore,
+          tieBreakStep: r.tieBreakStep ?? "",
         });
       }
     }
@@ -216,7 +379,8 @@ export const participation = query({
       .query("internalWhitelist")
       .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
       .collect();
-    const whitelistEmails = new Set(whitelist.map((w) => w.email));
+    const whitelistByEmail = new Map<string, Doc<"internalWhitelist">>();
+    for (const w of whitelist) whitelistByEmail.set(w.email, w);
 
     const evaluations = await ctx.db
       .query("internalEvaluations")
@@ -253,23 +417,27 @@ export const participation = query({
     for (const a of await ctx.db.query("admins").collect())
       adminEmails.add(a.email);
 
-    return voters.map((v) => ({
-      email: v.email,
-      fullName: v.fullName ?? "—",
-      profileComplete: v.profileComplete,
-      isAdmin: adminEmails.has(v.email),
-      isInternalEvaluator: whitelistEmails.has(v.email),
-      evaluationStatus: evalsByVoter.get(v._id)?.status ?? "notStarted",
-      submittedAt: evalsByVoter.get(v._id)?.submittedAt
-        ? new Date(
-            evalsByVoter.get(v._id)?.submittedAt as number,
-          ).toISOString()
-        : "",
-      positionsVoted: positions
-        .filter((p) => votesByVoter.get(v._id)?.has(p._id) ?? false)
-        .map((p) => p.name)
-        .join("; "),
-    }));
+    return voters.map((v) => {
+      const wl = whitelistByEmail.get(v.email);
+      return {
+        email: v.email,
+        fullName: v.fullName ?? "—",
+        profileComplete: v.profileComplete,
+        isAdmin: adminEmails.has(v.email),
+        isInternalEvaluator: wl !== undefined,
+        voterClass: wl ? VOTER_CLASS_LABEL[getEntryClass(wl)] : "",
+        evaluationStatus: evalsByVoter.get(v._id)?.status ?? "notStarted",
+        submittedAt: evalsByVoter.get(v._id)?.submittedAt
+          ? new Date(
+              evalsByVoter.get(v._id)?.submittedAt as number,
+            ).toISOString()
+          : "",
+        positionsVoted: positions
+          .filter((p) => votesByVoter.get(v._id)?.has(p._id) ?? false)
+          .map((p) => p.name)
+          .join("; "),
+      };
+    });
   },
 });
 
@@ -309,13 +477,6 @@ export const auditLog = query({
   },
 });
 
-/**
- * Emergency audit: per-voter privacy-sensitive lookup.
- *
- * Restricted to super admins, requires a written reason. The act of
- * requesting this view is itself audited so future investigators can
- * see every emergency lookup in the chain of trust.
- */
 export const emergencyVoterAudit = mutation({
   args: {
     targetEmail: v.string(),

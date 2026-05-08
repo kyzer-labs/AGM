@@ -1,29 +1,31 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import {
-  isInInternalWhitelist,
   requireAdmin,
   requireCompletedProfile,
   requireVoter,
 } from "./lib/auth";
 import { audit } from "./lib/audit";
 import { getElectionOrThrow } from "./lib/setup";
+import {
+  getEntryClass,
+  getWeights,
+  VOTER_CLASSES,
+  type VoterClass,
+} from "./lib/cycle";
 import type { Doc, Id } from "./_generated/dataModel";
 
-const SCORE_VALIDATOR = v.number();
-
-const RUBRIC_CATEGORIES = [
-  "leadership",
-  "teamwork",
-  "professionalism",
-  "commitment",
-  "personality",
-] as const;
-
-type RubricCategory = (typeof RUBRIC_CATEGORIES)[number];
-
-function validScore(n: number): boolean {
-  return Number.isInteger(n) && n >= 1 && n <= 5;
+async function getWhitelistEntry(
+  ctx: { db: import("./_generated/server").QueryCtx["db"] },
+  electionId: Id<"elections">,
+  email: string,
+): Promise<Doc<"internalWhitelist"> | null> {
+  return await ctx.db
+    .query("internalWhitelist")
+    .withIndex("by_election_email", (q) =>
+      q.eq("electionId", electionId).eq("email", email.toLowerCase()),
+    )
+    .unique();
 }
 
 async function getOrCreateMyEvaluation(
@@ -52,13 +54,22 @@ async function getOrCreateMyEvaluation(
   return created;
 }
 
+function classWeightFromRow(
+  weights: ReturnType<typeof getWeights>,
+  cls: VoterClass,
+): number {
+  if (cls === "topCommittee") return weights.topCommittee;
+  if (cls === "headExecutive") return weights.headExecutive;
+  return weights.year2Committee;
+}
+
 export const myStatus = query({
   args: { electionId: v.id("elections") },
   handler: async (ctx, args) => {
     const election = await getElectionOrThrow(ctx, args.electionId);
     const voter = await requireCompletedProfile(ctx);
 
-    const whitelisted = await isInInternalWhitelist(
+    const whitelistEntry = await getWhitelistEntry(
       ctx,
       election._id,
       voter.email,
@@ -71,9 +82,16 @@ export const myStatus = query({
       )
       .unique();
 
+    const voterClass = whitelistEntry ? getEntryClass(whitelistEntry) : null;
+    const weights = getWeights(election);
+    const weight =
+      voterClass === null ? 0 : classWeightFromRow(weights, voterClass);
+
     return {
       phase: election.phase,
-      isWhitelisted: whitelisted,
+      isWhitelisted: whitelistEntry !== null,
+      voterClass,
+      voterClassWeight: weight,
       hasEvaluation: evaluation !== null,
       evaluationStatus: evaluation?.status ?? null,
       submittedAt: evaluation?.submittedAt ?? null,
@@ -87,12 +105,12 @@ export const myEvaluation = query({
     const election = await getElectionOrThrow(ctx, args.electionId);
     const voter = await requireCompletedProfile(ctx);
 
-    const whitelisted = await isInInternalWhitelist(
+    const whitelistEntry = await getWhitelistEntry(
       ctx,
       election._id,
       voter.email,
     );
-    if (!whitelisted) return null;
+    if (!whitelistEntry) return null;
 
     const evaluation = await ctx.db
       .query("internalEvaluations")
@@ -110,19 +128,32 @@ export const myEvaluation = query({
           .collect()
       : [];
 
+    const criteria = await ctx.db
+      .query("rubricCriteria")
+      .withIndex("by_election_order", (q) => q.eq("electionId", election._id))
+      .collect();
+
     return {
       electionPhase: election.phase,
+      voterClass: getEntryClass(whitelistEntry),
       evaluationId: evaluation?._id ?? null,
       status: evaluation?.status ?? "draft",
       submittedAt: evaluation?.submittedAt ?? null,
-      scores: scores.map((s) => ({
-        candidateId: s.candidateId,
-        leadership: s.leadership,
-        teamwork: s.teamwork,
-        professionalism: s.professionalism,
-        commitment: s.commitment,
-        personality: s.personality,
-      })),
+      criteria: criteria
+        .sort((a, b) => a.order - b.order)
+        .map((c) => ({
+          _id: c._id,
+          name: c.name,
+          maxScore: c.maxScore,
+          order: c.order,
+        })),
+      scores: scores
+        .filter((s) => s.criterionId !== undefined && s.score !== undefined)
+        .map((s) => ({
+          candidateId: s.candidateId,
+          criterionId: s.criterionId as Id<"rubricCriteria">,
+          score: s.score as number,
+        })),
     };
   },
 });
@@ -133,11 +164,8 @@ export const saveScores = mutation({
     scores: v.array(
       v.object({
         candidateId: v.id("candidates"),
-        leadership: SCORE_VALIDATOR,
-        teamwork: SCORE_VALIDATOR,
-        professionalism: SCORE_VALIDATOR,
-        commitment: SCORE_VALIDATOR,
-        personality: SCORE_VALIDATOR,
+        criterionId: v.id("rubricCriteria"),
+        score: v.number(),
       }),
     ),
   },
@@ -152,28 +180,41 @@ export const saveScores = mutation({
         "Internal evaluation is not open. Scores cannot be saved.",
       );
     }
-    const whitelisted = await isInInternalWhitelist(
+    const whitelistEntry = await getWhitelistEntry(
       ctx,
       election._id,
       voter.email,
     );
-    if (!whitelisted) {
+    if (!whitelistEntry) {
       throw new Error(
-        "You are not on the Year 2 internal whitelist for this election.",
+        "You are not on the internal whitelist for this election.",
       );
     }
+
+    const criteria = await ctx.db
+      .query("rubricCriteria")
+      .withIndex("by_election", (q) => q.eq("electionId", election._id))
+      .collect();
+    const criteriaById = new Map(criteria.map((c) => [c._id, c] as const));
 
     for (const s of args.scores) {
       const c = await ctx.db.get(s.candidateId);
       if (!c || c.electionId !== election._id) {
         throw new Error("Score references a candidate from another election.");
       }
-      for (const cat of RUBRIC_CATEGORIES) {
-        if (!validScore(s[cat])) {
-          throw new Error(
-            `Score for "${cat}" must be an integer between 1 and 5.`,
-          );
-        }
+      const crit = criteriaById.get(s.criterionId);
+      if (!crit) {
+        throw new Error("Score references an unknown rubric criterion.");
+      }
+      if (
+        !Number.isFinite(s.score) ||
+        !Number.isInteger(s.score) ||
+        s.score < 1 ||
+        s.score > crit.maxScore
+      ) {
+        throw new Error(
+          `Score for "${crit.name}" must be an integer between 1 and ${crit.maxScore}.`,
+        );
       }
     }
 
@@ -191,25 +232,28 @@ export const saveScores = mutation({
     }
 
     for (const incoming of args.scores) {
-      const existing = await ctx.db
-        .query("internalScores")
-        .withIndex("by_evaluation_candidate", (q) =>
-          q
-            .eq("evaluationId", evaluation._id)
-            .eq("candidateId", incoming.candidateId),
-        )
-        .unique();
+      const existing = (
+        await ctx.db
+          .query("internalScores")
+          .withIndex("by_evaluation_candidate", (q) =>
+            q
+              .eq("evaluationId", evaluation._id)
+              .eq("candidateId", incoming.candidateId),
+          )
+          .collect()
+      ).find((row) => row.criterionId === incoming.criterionId);
+
       const payload = {
         evaluationId: evaluation._id,
         candidateId: incoming.candidateId,
-        leadership: incoming.leadership,
-        teamwork: incoming.teamwork,
-        professionalism: incoming.professionalism,
-        commitment: incoming.commitment,
-        personality: incoming.personality,
+        criterionId: incoming.criterionId,
+        score: incoming.score,
       };
-      if (existing) await ctx.db.patch(existing._id, payload);
-      else await ctx.db.insert("internalScores", payload);
+      if (existing) {
+        await ctx.db.patch(existing._id, payload);
+      } else {
+        await ctx.db.insert("internalScores", payload);
+      }
     }
 
     await ctx.db.patch(evaluation._id, { updatedAt: Date.now() });
@@ -232,14 +276,14 @@ export const submit = mutation({
     if (election.phase !== "internalOpen") {
       throw new Error("Internal evaluation is not open.");
     }
-    const whitelisted = await isInInternalWhitelist(
+    const whitelistEntry = await getWhitelistEntry(
       ctx,
       election._id,
       voter.email,
     );
-    if (!whitelisted) {
+    if (!whitelistEntry) {
       throw new Error(
-        "You are not on the Year 2 internal whitelist for this election.",
+        "You are not on the internal whitelist for this election.",
       );
     }
 
@@ -258,26 +302,27 @@ export const submit = mutation({
       .withIndex("by_election", (q) => q.eq("electionId", election._id))
       .collect();
 
-    const scoresByCandidate = new Map<Id<"candidates">, Doc<"internalScores">>();
+    const criteria = await ctx.db
+      .query("rubricCriteria")
+      .withIndex("by_election", (q) => q.eq("electionId", election._id))
+      .collect();
+
     const scoreRows = await ctx.db
       .query("internalScores")
-      .withIndex("by_evaluation", (q) =>
-        q.eq("evaluationId", evaluation._id),
-      )
+      .withIndex("by_evaluation", (q) => q.eq("evaluationId", evaluation._id))
       .collect();
-    for (const s of scoreRows) scoresByCandidate.set(s.candidateId, s);
+
+    const seen = new Set<string>();
+    for (const row of scoreRows) {
+      if (row.criterionId === undefined || row.score === undefined) continue;
+      seen.add(`${row.candidateId}::${row.criterionId}`);
+    }
 
     const missing: string[] = [];
     for (const c of candidates) {
-      const s = scoresByCandidate.get(c._id);
-      if (!s) {
-        missing.push(c.fullName);
-        continue;
-      }
-      for (const cat of RUBRIC_CATEGORIES) {
-        if (!validScore(s[cat])) {
-          missing.push(`${c.fullName} (${cat})`);
-          break;
+      for (const crit of criteria) {
+        if (!seen.has(`${c._id}::${crit._id}`)) {
+          missing.push(`${c.fullName} (${crit.name})`);
         }
       }
     }
@@ -302,6 +347,7 @@ export const submit = mutation({
       action: "internal.submitted",
       entityType: "internalEvaluations",
       entityId: evaluation._id,
+      payload: { voterClass: getEntryClass(whitelistEntry) },
     });
   },
 });
@@ -367,10 +413,11 @@ export const adminCompletionList = query({
           .withIndex("by_email", (q) => q.eq("email", w.email))
           .unique();
         const evaluation = voter
-          ? evalsByVoterId.get(voter._id) ?? null
+          ? (evalsByVoterId.get(voter._id) ?? null)
           : null;
         return {
           email: w.email,
+          voterClass: getEntryClass(w),
           fullName: voter?.fullName ?? null,
           signedIn: voter !== null,
           status: evaluation?.status ?? "notStarted",
@@ -389,22 +436,40 @@ export const adminAggregate = query({
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
 
+    const election = await getElectionOrThrow(ctx, args.electionId);
+
     const candidates = await ctx.db
       .query("candidates")
       .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
       .collect();
 
+    const criteria = await ctx.db
+      .query("rubricCriteria")
+      .withIndex("by_election_order", (q) =>
+        q.eq("electionId", args.electionId),
+      )
+      .collect();
+    const sortedCriteria = criteria
+      .slice()
+      .sort((a, b) => a.order - b.order);
+
     const evaluations = await ctx.db
       .query("internalEvaluations")
       .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
       .collect();
+    const submittedEvals = evaluations.filter((e) => e.status === "submitted");
 
-    const submittedEvalIds = new Set(
-      evaluations.filter((e) => e.status === "submitted").map((e) => e._id),
-    );
+    const evalClassMap = new Map<Id<"internalEvaluations">, VoterClass>();
+    for (const ev of submittedEvals) {
+      const voter = await ctx.db.get(ev.evaluatorVoterId);
+      if (!voter) continue;
+      const wl = await getWhitelistEntry(ctx, args.electionId, voter.email);
+      if (!wl) continue;
+      evalClassMap.set(ev._id, getEntryClass(wl));
+    }
 
     const allScores = await Promise.all(
-      Array.from(submittedEvalIds).map((id) =>
+      Array.from(evalClassMap.keys()).map((id) =>
         ctx.db
           .query("internalScores")
           .withIndex("by_evaluation", (q) => q.eq("evaluationId", id))
@@ -413,53 +478,110 @@ export const adminAggregate = query({
     );
     const flatScores = allScores.flat();
 
-    const byCandidate = new Map<Id<"candidates">, Doc<"internalScores">[]>();
-    for (const s of flatScores) {
-      const arr = byCandidate.get(s.candidateId) ?? [];
-      arr.push(s);
-      byCandidate.set(s.candidateId, arr);
+    type CellAgg = {
+      total: number;
+      count: number;
+    };
+    type CandidateClassAgg = {
+      countEvaluators: number;
+      totalSum: number;
+      perCriterion: Map<Id<"rubricCriteria">, CellAgg>;
+    };
+
+    const aggregator: Record<VoterClass, Map<Id<"candidates">, CandidateClassAgg>> = {
+      topCommittee: new Map(),
+      headExecutive: new Map(),
+      year2Committee: new Map(),
+    };
+
+    const evaluatorsByClass: Record<VoterClass, Set<Id<"internalEvaluations">>> = {
+      topCommittee: new Set(),
+      headExecutive: new Set(),
+      year2Committee: new Set(),
+    };
+    for (const [evalId, cls] of evalClassMap.entries()) {
+      evaluatorsByClass[cls].add(evalId);
     }
 
-    const rows = candidates.map((c) => {
-      const scores = byCandidate.get(c._id) ?? [];
-      const n = scores.length;
-      const totals: Record<RubricCategory, number> = {
-        leadership: 0,
-        teamwork: 0,
-        professionalism: 0,
-        commitment: 0,
-        personality: 0,
+    const evalCandidateScored: Record<
+      VoterClass,
+      Map<Id<"candidates">, Set<Id<"internalEvaluations">>>
+    > = {
+      topCommittee: new Map(),
+      headExecutive: new Map(),
+      year2Committee: new Map(),
+    };
+
+    for (const s of flatScores) {
+      if (s.criterionId === undefined || s.score === undefined) continue;
+      const cls = evalClassMap.get(s.evaluationId);
+      if (!cls) continue;
+      const agg =
+        aggregator[cls].get(s.candidateId) ??
+        ({
+          countEvaluators: 0,
+          totalSum: 0,
+          perCriterion: new Map(),
+        } satisfies CandidateClassAgg);
+      const cell = agg.perCriterion.get(s.criterionId) ?? {
+        total: 0,
+        count: 0,
       };
-      for (const s of scores) {
-        for (const cat of RUBRIC_CATEGORIES) totals[cat] += s[cat];
+      cell.total += s.score;
+      cell.count += 1;
+      agg.perCriterion.set(s.criterionId, cell);
+      agg.totalSum += s.score;
+      aggregator[cls].set(s.candidateId, agg);
+
+      const evalSet =
+        evalCandidateScored[cls].get(s.candidateId) ?? new Set<Id<"internalEvaluations">>();
+      evalSet.add(s.evaluationId);
+      evalCandidateScored[cls].set(s.candidateId, evalSet);
+    }
+
+    for (const cls of VOTER_CLASSES) {
+      for (const [candidateId, evalSet] of evalCandidateScored[cls].entries()) {
+        const agg = aggregator[cls].get(candidateId);
+        if (agg) agg.countEvaluators = evalSet.size;
       }
-      const avgs: Record<RubricCategory, number> = {
-        leadership: n > 0 ? totals.leadership / n : 0,
-        teamwork: n > 0 ? totals.teamwork / n : 0,
-        professionalism: n > 0 ? totals.professionalism / n : 0,
-        commitment: n > 0 ? totals.commitment / n : 0,
-        personality: n > 0 ? totals.personality / n : 0,
-      };
-      const overall =
-        n > 0
-          ? (avgs.leadership +
-              avgs.teamwork +
-              avgs.professionalism +
-              avgs.commitment +
-              avgs.personality) /
-            5
-          : 0;
-      return {
+    }
+
+    const weights = getWeights(election);
+
+    return {
+      criteria: sortedCriteria.map((c) => ({
+        _id: c._id,
+        name: c.name,
+        maxScore: c.maxScore,
+        order: c.order,
+      })),
+      candidates: candidates.map((c) => ({
         candidateId: c._id,
         fullName: c.fullName,
         matric: c.matric,
-        evaluatorCount: n,
-        averages: avgs,
-        overall,
-      };
-    });
-
-    rows.sort((a, b) => b.overall - a.overall || a.fullName.localeCompare(b.fullName));
-    return rows;
+        byClass: VOTER_CLASSES.map((cls) => {
+          const agg = aggregator[cls].get(c._id);
+          return {
+            voterClass: cls,
+            evaluatorCount: agg?.countEvaluators ?? 0,
+            totalSum: agg?.totalSum ?? 0,
+            perCriterion: sortedCriteria.map((cr) => {
+              const cell = agg?.perCriterion.get(cr._id);
+              return {
+                criterionId: cr._id,
+                total: cell?.total ?? 0,
+                count: cell?.count ?? 0,
+                average: cell && cell.count > 0 ? cell.total / cell.count : 0,
+              };
+            }),
+          };
+        }),
+      })),
+      evaluatorsByClass: VOTER_CLASSES.map((cls) => ({
+        voterClass: cls,
+        weight: classWeightFromRow(weights, cls),
+        submitted: evaluatorsByClass[cls].size,
+      })),
+    };
   },
 });

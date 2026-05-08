@@ -4,6 +4,7 @@ import { requireAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
 import { getElectionOrThrow } from "./lib/setup";
 import {
+  breakdownToStored,
   computeResultForPosition,
   getResolvedWinnerCandidateIds,
   getUnresolvedTiePositionIds,
@@ -275,7 +276,10 @@ export const closeSession = mutation({
           ? ("manualTieResolved" as const)
           : ("previewed" as const),
       winnerCandidateId: computed.winnerCandidateId ?? undefined,
-      breakdown: computed.breakdown,
+      breakdown: breakdownToStored(computed.breakdown),
+      tieBreakStep: computed.tieBreakStep,
+      manualResolutionReason: undefined,
+      resolvedByVoterId: undefined,
       updatedAt: now,
     };
 
@@ -294,12 +298,14 @@ export const closeSession = mutation({
         name: position.name,
         winner: computed.winnerCandidateId ?? null,
         tied: computed.tieGroup.length > 0 ? computed.tieGroup.length : 0,
+        tieBreakStep: computed.tieBreakStep,
       },
     });
 
     return {
       winnerCandidateId: computed.winnerCandidateId,
       tieGroup: computed.tieGroup,
+      tieBreakStep: computed.tieBreakStep,
     };
   },
 });
@@ -338,6 +344,7 @@ export const resolveTie = mutation({
     await ctx.db.patch(result._id, {
       winnerCandidateId: args.winnerCandidateId,
       state: "manualTieResolved",
+      tieBreakStep: "manual",
       manualResolutionReason: reason,
       resolvedByVoterId: voter._id,
       updatedAt: Date.now(),

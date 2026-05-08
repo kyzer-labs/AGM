@@ -1,5 +1,12 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import {
+  internalMutation,
+  mutation,
+  query,
+  type MutationCtx,
+} from "./_generated/server";
+import { internal } from "./_generated/api";
+import type { Doc, Id } from "./_generated/dataModel";
 import { requireAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
 import {
@@ -7,7 +14,13 @@ import {
   computeSetupReadiness,
   getElectionOrThrow,
   PHASE_LABEL,
+  requireSetupPhase,
 } from "./lib/setup";
+import {
+  DEFAULT_RUBRIC_CRITERIA,
+  DEFAULT_WEIGHTS,
+  validateWeights,
+} from "./lib/cycle";
 
 const PHASE_VALIDATOR = v.union(
   v.literal("setup"),
@@ -17,6 +30,31 @@ const PHASE_VALIDATOR = v.union(
   v.literal("resultsPreview"),
   v.literal("published"),
 );
+
+async function cancelScheduledJobs(
+  ctx: MutationCtx,
+  election: Doc<"elections">,
+): Promise<{ cancelledOpen: boolean; cancelledClose: boolean }> {
+  let cancelledOpen = false;
+  let cancelledClose = false;
+  if (election.scheduledOpenJobId) {
+    try {
+      await ctx.scheduler.cancel(election.scheduledOpenJobId);
+      cancelledOpen = true;
+    } catch {
+      // job already completed or not found
+    }
+  }
+  if (election.scheduledCloseJobId) {
+    try {
+      await ctx.scheduler.cancel(election.scheduledCloseJobId);
+      cancelledClose = true;
+    } catch {
+      // job already completed or not found
+    }
+  }
+  return { cancelledOpen, cancelledClose };
+}
 
 export const create = mutation({
   args: {
@@ -40,14 +78,33 @@ export const create = mutation({
       phase: "setup",
       createdByVoterId: voter._id,
       createdAt: Date.now(),
+      weightTopCommittee: DEFAULT_WEIGHTS.topCommittee,
+      weightHeadExecutive: DEFAULT_WEIGHTS.headExecutive,
+      weightYear2Committee: DEFAULT_WEIGHTS.year2Committee,
+      weightPublic: DEFAULT_WEIGHTS.public,
     });
+
+    for (let i = 0; i < DEFAULT_RUBRIC_CRITERIA.length; i++) {
+      const c = DEFAULT_RUBRIC_CRITERIA[i];
+      if (!c) continue;
+      await ctx.db.insert("rubricCriteria", {
+        electionId,
+        name: c.name,
+        maxScore: c.maxScore,
+        order: i,
+      });
+    }
 
     await audit(ctx, {
       actor: voter,
       action: "election.created",
       entityType: "elections",
       entityId: electionId,
-      payload: { name, year: args.year },
+      payload: {
+        name,
+        year: args.year,
+        seededRubricCriteria: DEFAULT_RUBRIC_CRITERIA.length,
+      },
     });
 
     return electionId;
@@ -79,6 +136,138 @@ export const rename = mutation({
   },
 });
 
+export const setWeights = mutation({
+  args: {
+    electionId: v.id("elections"),
+    weightTopCommittee: v.number(),
+    weightHeadExecutive: v.number(),
+    weightYear2Committee: v.number(),
+    weightPublic: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const { voter } = await requireAdmin(ctx);
+    const e = await requireSetupPhase(ctx, args.electionId);
+
+    const weights = {
+      topCommittee: args.weightTopCommittee,
+      headExecutive: args.weightHeadExecutive,
+      year2Committee: args.weightYear2Committee,
+      public: args.weightPublic,
+    };
+    validateWeights(weights);
+
+    await ctx.db.patch(e._id, {
+      weightTopCommittee: weights.topCommittee,
+      weightHeadExecutive: weights.headExecutive,
+      weightYear2Committee: weights.year2Committee,
+      weightPublic: weights.public,
+      updatedAt: Date.now(),
+    });
+
+    await audit(ctx, {
+      actor: voter,
+      action: "election.weightsSet",
+      entityType: "elections",
+      entityId: e._id,
+      payload: {
+        topCommittee: weights.topCommittee,
+        headExecutive: weights.headExecutive,
+        year2Committee: weights.year2Committee,
+        public: weights.public,
+      },
+    });
+  },
+});
+
+export const setScheduledWindow = mutation({
+  args: {
+    electionId: v.id("elections"),
+    startAt: v.optional(v.number()),
+    endAt: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const { voter } = await requireAdmin(ctx);
+    const e = await getElectionOrThrow(ctx, args.electionId);
+
+    if (e.phase !== "setup" && e.phase !== "internalOpen") {
+      throw new Error(
+        `Schedule can only be modified during Setup or Internal evaluation. Current phase: ${PHASE_LABEL[e.phase]}.`,
+      );
+    }
+
+    if (args.startAt !== undefined && args.endAt !== undefined) {
+      if (args.endAt <= args.startAt) {
+        throw new Error("End time must be after start time.");
+      }
+    }
+
+    await cancelScheduledJobs(ctx, e);
+
+    let scheduledOpenJobId: Id<"_scheduled_functions"> | undefined;
+    let scheduledCloseJobId: Id<"_scheduled_functions"> | undefined;
+
+    const now = Date.now();
+    if (args.startAt !== undefined && args.startAt > now && e.phase === "setup") {
+      scheduledOpenJobId = await ctx.scheduler.runAt(
+        args.startAt,
+        internal.elections.scheduledOpen,
+        { electionId: e._id },
+      );
+    }
+    if (args.endAt !== undefined && args.endAt > now) {
+      scheduledCloseJobId = await ctx.scheduler.runAt(
+        args.endAt,
+        internal.elections.scheduledClose,
+        { electionId: e._id },
+      );
+    }
+
+    await ctx.db.patch(e._id, {
+      scheduledStartAt: args.startAt,
+      scheduledEndAt: args.endAt,
+      scheduledOpenJobId,
+      scheduledCloseJobId,
+      updatedAt: Date.now(),
+    });
+
+    await audit(ctx, {
+      actor: voter,
+      action: "election.scheduledWindowSet",
+      entityType: "elections",
+      entityId: e._id,
+      payload: {
+        startAt: args.startAt ?? null,
+        endAt: args.endAt ?? null,
+      },
+    });
+  },
+});
+
+export const clearScheduledWindow = mutation({
+  args: { electionId: v.id("elections") },
+  handler: async (ctx, args) => {
+    const { voter } = await requireAdmin(ctx);
+    const e = await getElectionOrThrow(ctx, args.electionId);
+
+    await cancelScheduledJobs(ctx, e);
+
+    await ctx.db.patch(e._id, {
+      scheduledStartAt: undefined,
+      scheduledEndAt: undefined,
+      scheduledOpenJobId: undefined,
+      scheduledCloseJobId: undefined,
+      updatedAt: Date.now(),
+    });
+
+    await audit(ctx, {
+      actor: voter,
+      action: "election.scheduledWindowCleared",
+      entityType: "elections",
+      entityId: e._id,
+    });
+  },
+});
+
 export const remove = mutation({
   args: { electionId: v.id("elections") },
   handler: async (ctx, args) => {
@@ -90,6 +279,8 @@ export const remove = mutation({
       );
     }
 
+    await cancelScheduledJobs(ctx, e);
+
     const positions = await ctx.db
       .query("positions")
       .withIndex("by_election", (q) => q.eq("electionId", e._id))
@@ -100,6 +291,10 @@ export const remove = mutation({
       .collect();
     const whitelist = await ctx.db
       .query("internalWhitelist")
+      .withIndex("by_election", (q) => q.eq("electionId", e._id))
+      .collect();
+    const rubricCriteria = await ctx.db
+      .query("rubricCriteria")
       .withIndex("by_election", (q) => q.eq("electionId", e._id))
       .collect();
 
@@ -116,6 +311,7 @@ export const remove = mutation({
     }
     for (const p of positions) await ctx.db.delete(p._id);
     for (const w of whitelist) await ctx.db.delete(w._id);
+    for (const r of rubricCriteria) await ctx.db.delete(r._id);
 
     await ctx.db.delete(e._id);
     await audit(ctx, {
@@ -200,6 +396,14 @@ export const transitionPhase = mutation({
       }
     }
 
+    if (e.scheduledOpenJobId || e.scheduledCloseJobId) {
+      await cancelScheduledJobs(ctx, e);
+      await ctx.db.patch(e._id, {
+        scheduledOpenJobId: undefined,
+        scheduledCloseJobId: undefined,
+      });
+    }
+
     await ctx.db.patch(e._id, {
       phase: args.toPhase,
       updatedAt: Date.now(),
@@ -213,8 +417,65 @@ export const transitionPhase = mutation({
       payload: {
         from: e.phase,
         to: args.toPhase,
+        manualOverride:
+          (e.scheduledOpenJobId || e.scheduledCloseJobId) ? true : false,
       },
       reason: args.reason,
+    });
+  },
+});
+
+export const scheduledOpen = internalMutation({
+  args: { electionId: v.id("elections") },
+  handler: async (ctx, args) => {
+    const e = await ctx.db.get(args.electionId);
+    if (!e) return;
+    if (e.phase !== "setup") return;
+
+    const readiness = await computeSetupReadiness(ctx, e._id);
+    if (!readiness.ready) {
+      await audit(ctx, {
+        action: "election.scheduledOpenSkipped",
+        entityType: "elections",
+        entityId: e._id,
+        reason: readiness.warnings.join(" "),
+      });
+      return;
+    }
+
+    await ctx.db.patch(e._id, {
+      phase: "internalOpen",
+      scheduledOpenJobId: undefined,
+      updatedAt: Date.now(),
+    });
+
+    await audit(ctx, {
+      action: "election.scheduledOpenTriggered",
+      entityType: "elections",
+      entityId: e._id,
+      payload: { from: "setup", to: "internalOpen" },
+    });
+  },
+});
+
+export const scheduledClose = internalMutation({
+  args: { electionId: v.id("elections") },
+  handler: async (ctx, args) => {
+    const e = await ctx.db.get(args.electionId);
+    if (!e) return;
+    if (e.phase !== "internalOpen") return;
+
+    await ctx.db.patch(e._id, {
+      phase: "internalClosed",
+      scheduledCloseJobId: undefined,
+      updatedAt: Date.now(),
+    });
+
+    await audit(ctx, {
+      action: "election.scheduledCloseTriggered",
+      entityType: "elections",
+      entityId: e._id,
+      payload: { from: "internalOpen", to: "internalClosed" },
     });
   },
 });
@@ -238,12 +499,6 @@ export const getById = query({
   },
 });
 
-/**
- * Single source of truth for "what election should the current user
- * see right now?". Admins see the most recent of any phase. Non-admins
- * only see post-setup elections (internalOpen / internalClosed /
- * publicVoting / resultsPreview / published).
- */
 export const getCurrent = query({
   args: {},
   handler: async (ctx) => {

@@ -3,7 +3,9 @@ import { mutation, query } from "./_generated/server";
 import { requireAdmin, requireSuperAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
 import { getElectionOrThrow } from "./lib/setup";
+import { getWeights } from "./lib/cycle";
 import {
+  breakdownToStored,
   computeResultForPosition,
   getResolvedWinnerCandidateIds,
 } from "./lib/results";
@@ -14,10 +16,13 @@ interface BreakdownEnriched {
   fullName: string;
   matric: string;
   photoUrl: string | null;
-  internalAvg: number;
-  internalShare: number;
+  tcShare: number;
+  heShare: number;
+  y2Share: number;
   publicVotes: number;
   publicShare: number;
+  internalAggregate: number;
+  publicAggregate: number;
   finalScore: number;
 }
 
@@ -30,9 +35,11 @@ interface ResultRow {
   winnerCandidateId: Id<"candidates"> | null;
   winnerName: string | null;
   hasUnresolvedTie: boolean;
+  tieBreakStep: string | null;
   manualResolutionReason: string | null;
   publishedAt: number | null;
   totalPublicVotes: number;
+  weights: ReturnType<typeof getWeights>;
   breakdown: BreakdownEnriched[];
 }
 
@@ -41,6 +48,9 @@ async function buildResultRows(
   electionId: Id<"elections">,
   publishedOnly: boolean,
 ): Promise<ResultRow[]> {
+  const election = await getElectionOrThrow(ctx, electionId);
+  const weights = getWeights(election);
+
   const positions = await ctx.db
     .query("positions")
     .withIndex("by_election", (q) => q.eq("electionId", electionId))
@@ -61,6 +71,11 @@ async function buildResultRows(
     candidatesById.set(c._id, c);
   }
 
+  const wTc = weights.topCommittee / 100;
+  const wHe = weights.headExecutive / 100;
+  const wY2 = weights.year2Committee / 100;
+  const wPub = weights.public / 100;
+
   const rows: ResultRow[] = [];
   for (const p of positions) {
     const r = resultByPosition.get(p._id);
@@ -75,9 +90,11 @@ async function buildResultRows(
         winnerCandidateId: null,
         winnerName: null,
         hasUnresolvedTie: false,
+        tieBreakStep: null,
         manualResolutionReason: null,
         publishedAt: null,
         totalPublicVotes: 0,
+        weights,
         breakdown: [],
       });
       continue;
@@ -91,15 +108,23 @@ async function buildResultRows(
           c?.photoStorageId !== undefined
             ? await ctx.storage.getUrl(c.photoStorageId)
             : null;
+        const tcShare = b.tcShare ?? b.internalShare ?? 0;
+        const heShare = b.heShare ?? 0;
+        const y2Share = b.y2Share ?? 0;
+        const internalAggregate = wTc * tcShare + wHe * heShare + wY2 * y2Share;
+        const publicAggregate = wPub * b.publicShare;
         return {
           candidateId: b.candidateId,
           fullName: c?.fullName ?? "Unknown",
           matric: c?.matric ?? "—",
           photoUrl,
-          internalAvg: b.internalAvg,
-          internalShare: b.internalShare,
+          tcShare,
+          heShare,
+          y2Share,
           publicVotes: b.publicVotes,
           publicShare: b.publicShare,
+          internalAggregate,
+          publicAggregate,
           finalScore: b.finalScore,
         };
       }),
@@ -122,9 +147,11 @@ async function buildResultRows(
         ? (candidatesById.get(r.winnerCandidateId)?.fullName ?? null)
         : null,
       hasUnresolvedTie: r.winnerCandidateId === undefined,
+      tieBreakStep: r.tieBreakStep ?? null,
       manualResolutionReason: r.manualResolutionReason ?? null,
       publishedAt: r.publishedAt ?? null,
       totalPublicVotes,
+      weights,
       breakdown,
     });
   }
@@ -147,10 +174,14 @@ export const publicPublished = query({
     const election = await ctx.db.get(args.electionId);
     if (!election) return null;
     if (election.phase !== "published") {
-      return { phase: election.phase, rows: [] };
+      return { phase: election.phase, rows: [], weights: getWeights(election) };
     }
     const rows = await buildResultRows(ctx, args.electionId, true);
-    return { phase: election.phase, rows };
+    return {
+      phase: election.phase,
+      rows,
+      weights: getWeights(election),
+    };
   },
 });
 
@@ -205,7 +236,8 @@ export const recompute = mutation({
           ? ("manualTieResolved" as const)
           : ("previewed" as const),
       winnerCandidateId: computed.winnerCandidateId ?? undefined,
-      breakdown: computed.breakdown,
+      breakdown: breakdownToStored(computed.breakdown),
+      tieBreakStep: computed.tieBreakStep,
       manualResolutionReason: undefined,
       resolvedByVoterId: undefined,
       publishedAt: undefined,
@@ -223,6 +255,7 @@ export const recompute = mutation({
       payload: {
         positionId: position._id,
         winner: computed.winnerCandidateId ?? null,
+        tieBreakStep: computed.tieBreakStep,
       },
       reason,
     });

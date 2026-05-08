@@ -1,47 +1,87 @@
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import {
+  getEntryClass,
+  getWeights,
+  type CycleWeights,
+  type VoterClass,
+} from "./cycle";
+import { getElectionOrThrow } from "./setup";
 
 export interface CandidateBreakdown {
   candidateId: Id<"candidates">;
-  internalAvg: number;
-  internalShare: number;
+  tcShare: number;
+  heShare: number;
+  y2Share: number;
   publicVotes: number;
   publicShare: number;
+  internalAggregate: number;
+  publicAggregate: number;
   finalScore: number;
 }
+
+export type TieBreakStep =
+  | "finalScore"
+  | "tcShare"
+  | "heShare"
+  | "y2Share"
+  | "publicShare"
+  | "manual";
 
 export interface ComputedResult {
   breakdown: CandidateBreakdown[];
   winnerCandidateId: Id<"candidates"> | null;
   tieGroup: Id<"candidates">[];
+  tieBreakStep: TieBreakStep;
+  weights: CycleWeights;
 }
 
-const RUBRIC_KEYS = [
-  "leadership",
-  "teamwork",
-  "professionalism",
-  "commitment",
-  "personality",
-] as const;
+const EPS = 1e-9;
 
-/**
- * Computes the 75/25 result for one position.
- *
- * - Eligible candidates are those assigned to this position and not
- *   already a winner of a higher / earlier position.
- * - Internal share: each candidate's mean rubric score is divided by
- *   the sum across eligible candidates in this position.
- * - Public share: candidate's vote count divided by the position's
- *   total votes among eligible candidates.
- * - Final = 0.75 * internalShare + 0.25 * publicShare.
- * - Tie ladder: highest finalScore -> highest internalAvg -> manual.
- */
+async function buildEvaluatorClassMap(
+  ctx: QueryCtx | MutationCtx,
+  electionId: Id<"elections">,
+): Promise<Map<Id<"internalEvaluations">, VoterClass>> {
+  const evals = await ctx.db
+    .query("internalEvaluations")
+    .withIndex("by_election", (q) => q.eq("electionId", electionId))
+    .collect();
+  const submitted = evals.filter((e) => e.status === "submitted");
+
+  const map = new Map<Id<"internalEvaluations">, VoterClass>();
+  for (const ev of submitted) {
+    const voter = await ctx.db.get(ev.evaluatorVoterId);
+    if (!voter) continue;
+    const wl = await ctx.db
+      .query("internalWhitelist")
+      .withIndex("by_election_email", (q) =>
+        q.eq("electionId", electionId).eq("email", voter.email),
+      )
+      .unique();
+    if (!wl) continue;
+    map.set(ev._id, getEntryClass(wl));
+  }
+  return map;
+}
+
+function shareForCandidate(
+  cls: VoterClass,
+  breakdown: CandidateBreakdown,
+): number {
+  if (cls === "topCommittee") return breakdown.tcShare;
+  if (cls === "headExecutive") return breakdown.heShare;
+  return breakdown.y2Share;
+}
+
 export async function computeResultForPosition(
   ctx: QueryCtx | MutationCtx,
   electionId: Id<"elections">,
   positionId: Id<"positions">,
   excludedCandidateIds: Set<string>,
 ): Promise<ComputedResult> {
+  const election = await getElectionOrThrow(ctx, electionId);
+  const weights = getWeights(election);
+
   const links = await ctx.db
     .query("candidatePositions")
     .withIndex("by_position", (q) => q.eq("positionId", positionId))
@@ -51,118 +91,153 @@ export async function computeResultForPosition(
     .map((l) => l.candidateId)
     .filter((id) => !excludedCandidateIds.has(id));
 
-  const submittedEvals = (
-    await ctx.db
-      .query("internalEvaluations")
-      .withIndex("by_election", (q) => q.eq("electionId", electionId))
-      .collect()
-  ).filter((e) => e.status === "submitted");
-  const submittedEvalIds = new Set(submittedEvals.map((e) => e._id));
+  const eligibleSet = new Set<string>(eligibleIds);
 
-  const internalAvgByCandidate = new Map<string, number>();
-  for (const candidateId of eligibleIds) {
-    const allScores = await ctx.db
+  const evalClassMap = await buildEvaluatorClassMap(ctx, electionId);
+
+  const classCandidateSum: Record<VoterClass, Map<string, number>> = {
+    topCommittee: new Map(),
+    headExecutive: new Map(),
+    year2Committee: new Map(),
+  };
+  const classGrandTotal: Record<VoterClass, number> = {
+    topCommittee: 0,
+    headExecutive: 0,
+    year2Committee: 0,
+  };
+
+  for (const [evalId, cls] of evalClassMap.entries()) {
+    const scores = await ctx.db
       .query("internalScores")
-      .withIndex("by_candidate", (q) => q.eq("candidateId", candidateId))
+      .withIndex("by_evaluation", (q) => q.eq("evaluationId", evalId))
       .collect();
-    const filtered = allScores.filter((s) =>
-      submittedEvalIds.has(s.evaluationId),
-    );
-    if (filtered.length === 0) {
-      internalAvgByCandidate.set(candidateId, 0);
-      continue;
+
+    const perCandidateTotal = new Map<string, number>();
+    for (const s of scores) {
+      if (!eligibleSet.has(s.candidateId)) continue;
+      if (s.criterionId === undefined || s.score === undefined) continue;
+      perCandidateTotal.set(
+        s.candidateId,
+        (perCandidateTotal.get(s.candidateId) ?? 0) + s.score,
+      );
     }
-    let sum = 0;
-    for (const s of filtered) {
-      let perEvaluator = 0;
-      for (const k of RUBRIC_KEYS) perEvaluator += s[k];
-      sum += perEvaluator / RUBRIC_KEYS.length;
+
+    for (const [candidateId, total] of perCandidateTotal.entries()) {
+      classCandidateSum[cls].set(
+        candidateId,
+        (classCandidateSum[cls].get(candidateId) ?? 0) + total,
+      );
+      classGrandTotal[cls] += total;
     }
-    internalAvgByCandidate.set(candidateId, sum / filtered.length);
   }
 
-  const publicVotesByCandidate = new Map<string, number>();
   const allVotes = await ctx.db
     .query("publicVotes")
     .withIndex("by_position", (q) => q.eq("positionId", positionId))
     .collect();
-  for (const v of allVotes) {
-    if (excludedCandidateIds.has(v.candidateId)) continue;
+
+  const publicVotesByCandidate = new Map<string, number>();
+  let publicTotal = 0;
+  for (const vote of allVotes) {
+    if (!eligibleSet.has(vote.candidateId)) continue;
     publicVotesByCandidate.set(
-      v.candidateId,
-      (publicVotesByCandidate.get(v.candidateId) ?? 0) + 1,
+      vote.candidateId,
+      (publicVotesByCandidate.get(vote.candidateId) ?? 0) + 1,
     );
+    publicTotal += 1;
   }
 
-  const sumInternal = Array.from(internalAvgByCandidate.values()).reduce(
-    (a, b) => a + b,
-    0,
-  );
-  const sumPublic = Array.from(publicVotesByCandidate.values()).reduce(
-    (a, b) => a + b,
-    0,
-  );
+  const wTc = weights.topCommittee / 100;
+  const wHe = weights.headExecutive / 100;
+  const wY2 = weights.year2Committee / 100;
+  const wPub = weights.public / 100;
 
   const breakdown: CandidateBreakdown[] = eligibleIds.map((id) => {
-    const internalAvg = internalAvgByCandidate.get(id) ?? 0;
-    const publicVotes = publicVotesByCandidate.get(id) ?? 0;
-    const internalShare = sumInternal > 0 ? internalAvg / sumInternal : 0;
-    const publicShare = sumPublic > 0 ? publicVotes / sumPublic : 0;
-    const finalScore = 0.75 * internalShare + 0.25 * publicShare;
+    const tcSum = classCandidateSum.topCommittee.get(id) ?? 0;
+    const heSum = classCandidateSum.headExecutive.get(id) ?? 0;
+    const y2Sum = classCandidateSum.year2Committee.get(id) ?? 0;
+    const pubVotes = publicVotesByCandidate.get(id) ?? 0;
+
+    const tcShare =
+      classGrandTotal.topCommittee > 0
+        ? tcSum / classGrandTotal.topCommittee
+        : 0;
+    const heShare =
+      classGrandTotal.headExecutive > 0
+        ? heSum / classGrandTotal.headExecutive
+        : 0;
+    const y2Share =
+      classGrandTotal.year2Committee > 0
+        ? y2Sum / classGrandTotal.year2Committee
+        : 0;
+    const publicShare = publicTotal > 0 ? pubVotes / publicTotal : 0;
+
+    const internalAggregate = wTc * tcShare + wHe * heShare + wY2 * y2Share;
+    const publicAggregate = wPub * publicShare;
+    const finalScore = internalAggregate + publicAggregate;
+
     return {
       candidateId: id as Id<"candidates">,
-      internalAvg,
-      internalShare,
-      publicVotes,
+      tcShare,
+      heShare,
+      y2Share,
+      publicVotes: pubVotes,
       publicShare,
+      internalAggregate,
+      publicAggregate,
       finalScore,
     };
   });
 
   if (breakdown.length === 0) {
-    return { breakdown, winnerCandidateId: null, tieGroup: [] };
-  }
-
-  const sorted = breakdown.slice().sort((a, b) => b.finalScore - a.finalScore);
-  const top = sorted[0];
-  if (!top) {
-    return { breakdown, winnerCandidateId: null, tieGroup: [] };
-  }
-  const tiedFinal = sorted.filter((b) =>
-    Math.abs(b.finalScore - top.finalScore) < 1e-9,
-  );
-
-  if (tiedFinal.length === 1) {
     return {
       breakdown,
-      winnerCandidateId: top.candidateId,
+      winnerCandidateId: null,
       tieGroup: [],
+      tieBreakStep: "finalScore",
+      weights,
     };
   }
 
-  const tiedSorted = tiedFinal
-    .slice()
-    .sort((a, b) => b.internalAvg - a.internalAvg);
-  const topInternal = tiedSorted[0];
-  if (!topInternal) {
-    return { breakdown, winnerCandidateId: null, tieGroup: [] };
-  }
-  const tiedAfterInternal = tiedSorted.filter(
-    (b) => Math.abs(b.internalAvg - topInternal.internalAvg) < 1e-9,
-  );
+  let candidates = breakdown.slice();
+  let usedStep: TieBreakStep = "finalScore";
 
-  if (tiedAfterInternal.length === 1) {
-    return {
-      breakdown,
-      winnerCandidateId: topInternal.candidateId,
-      tieGroup: [],
-    };
+  const ladder: Array<{
+    step: TieBreakStep;
+    extract: (b: CandidateBreakdown) => number;
+  }> = [
+    { step: "finalScore", extract: (b) => b.finalScore },
+    { step: "tcShare", extract: (b) => shareForCandidate("topCommittee", b) },
+    { step: "heShare", extract: (b) => shareForCandidate("headExecutive", b) },
+    { step: "y2Share", extract: (b) => shareForCandidate("year2Committee", b) },
+    { step: "publicShare", extract: (b) => b.publicShare },
+  ];
+
+  for (const { step, extract } of ladder) {
+    const sorted = candidates.slice().sort((a, b) => extract(b) - extract(a));
+    const top = sorted[0];
+    if (!top) break;
+    const topValue = extract(top);
+    const tied = sorted.filter((b) => Math.abs(extract(b) - topValue) < EPS);
+    usedStep = step;
+    if (tied.length === 1) {
+      return {
+        breakdown,
+        winnerCandidateId: tied[0]!.candidateId,
+        tieGroup: [],
+        tieBreakStep: step,
+        weights,
+      };
+    }
+    candidates = tied;
   }
 
   return {
     breakdown,
     winnerCandidateId: null,
-    tieGroup: tiedAfterInternal.map((b) => b.candidateId),
+    tieGroup: candidates.map((c) => c.candidateId),
+    tieBreakStep: usedStep,
+    weights,
   };
 }
 
@@ -192,4 +267,18 @@ export async function getUnresolvedTiePositionIds(
   return results
     .filter((r) => r.winnerCandidateId === undefined)
     .map((r) => r.positionId);
+}
+
+export function breakdownToStored(
+  breakdown: CandidateBreakdown[],
+): Doc<"results">["breakdown"] {
+  return breakdown.map((b) => ({
+    candidateId: b.candidateId,
+    tcShare: b.tcShare,
+    heShare: b.heShare,
+    y2Share: b.y2Share,
+    publicVotes: b.publicVotes,
+    publicShare: b.publicShare,
+    finalScore: b.finalScore,
+  }));
 }

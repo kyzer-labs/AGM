@@ -27,26 +27,22 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { RubricHelp } from "@/components/internal/rubric-help";
 import { ScoreButtons } from "@/components/internal/score-buttons";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 
-type RubricCategory =
-  | "leadership"
-  | "teamwork"
-  | "professionalism"
-  | "commitment"
-  | "personality";
+type VoterClass = "topCommittee" | "headExecutive" | "year2Committee";
 
-const CATEGORIES: { key: RubricCategory; label: string }[] = [
-  { key: "leadership", label: "Leadership" },
-  { key: "teamwork", label: "Teamwork & Communication" },
-  { key: "professionalism", label: "Professionalism & Ethics" },
-  { key: "commitment", label: "Commitment" },
-  { key: "personality", label: "Personality" },
-];
+const VOTER_CLASS_LABEL: Record<VoterClass, string> = {
+  topCommittee: "Top Committee",
+  headExecutive: "Head Executive",
+  year2Committee: "Year 2 Committee",
+};
 
-type ScoreRow = Partial<Record<RubricCategory, number>>;
+type ScoreMap = Map<string, number>;
+
+function scoreKey(candidateId: Id<"candidates">, criterionId: Id<"rubricCriteria">): string {
+  return `${candidateId}::${criterionId}`;
+}
 
 export default function InternalPage() {
   return (
@@ -103,9 +99,9 @@ function Body({ election }: { election: Doc<"elections"> }) {
               <Badge tone="muted">External voter</Badge>
             </div>
             <CardDescription>
-              Internal evaluation is restricted to Year 2 committee members
-              on the whitelist for <strong>{election.name}</strong>. You will
-              vote externally during the live AGM. If you believe this is a
+              Internal evaluation is restricted to committee members on the
+              whitelist for <strong>{election.name}</strong>. You will vote
+              externally during the live AGM. If you believe this is a
               mistake, contact the AGM admin team.
             </CardDescription>
           </CardHeader>
@@ -118,7 +114,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
     return (
       <PhaseInfo
         title="Internal evaluation hasn't opened yet"
-        body={`Admins are still preparing "${election.name}". Check back when the internal evaluation window opens — typically about a week before AGM day.`}
+        body={`Admins are still preparing "${election.name}". Check back when the internal evaluation window opens.`}
         icon={<Clock className="h-5 w-5" aria-hidden />}
       />
     );
@@ -143,7 +139,13 @@ function Body({ election }: { election: Doc<"elections"> }) {
     );
   }
 
-  return <ActiveEvaluation election={election} />;
+  return (
+    <ActiveEvaluation
+      election={election}
+      voterClass={status.voterClass as VoterClass | null}
+      voterClassWeight={status.voterClassWeight}
+    />
+  );
 }
 
 function PhaseInfo({
@@ -170,7 +172,15 @@ function PhaseInfo({
   );
 }
 
-function ActiveEvaluation({ election }: { election: Doc<"elections"> }) {
+function ActiveEvaluation({
+  election,
+  voterClass,
+  voterClassWeight,
+}: {
+  election: Doc<"elections">;
+  voterClass: VoterClass | null;
+  voterClassWeight: number;
+}) {
   const dialog = useDialog();
   const evaluation = useQuery(api.internal.myEvaluation, {
     electionId: election._id,
@@ -182,9 +192,7 @@ function ActiveEvaluation({ election }: { election: Doc<"elections"> }) {
   const submit = useMutation(api.internal.submit);
   const unsubmit = useMutation(api.internal.unsubmit);
 
-  const [local, setLocal] = useState<Map<Id<"candidates">, ScoreRow>>(
-    new Map(),
-  );
+  const [local, setLocal] = useState<ScoreMap>(new Map());
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
@@ -195,15 +203,9 @@ function ActiveEvaluation({ election }: { election: Doc<"elections"> }) {
     const key = `${evaluation.evaluationId ?? "new"}-${evaluation.scores.length}`;
     if (seededFor.current === key) return;
     seededFor.current = key;
-    const next = new Map<Id<"candidates">, ScoreRow>();
+    const next: ScoreMap = new Map();
     for (const s of evaluation.scores) {
-      next.set(s.candidateId, {
-        leadership: s.leadership,
-        teamwork: s.teamwork,
-        professionalism: s.professionalism,
-        commitment: s.commitment,
-        personality: s.personality,
-      });
+      next.set(scoreKey(s.candidateId, s.criterionId), s.score);
     }
     setLocal(next);
     setDirty(false);
@@ -214,48 +216,37 @@ function ActiveEvaluation({ election }: { election: Doc<"elections"> }) {
   const editable = !isSubmitted;
 
   const totals = useMemo(() => {
-    if (!candidates) return { complete: 0, total: 0 };
+    if (!candidates || !evaluation)
+      return { complete: 0, total: 0, criteriaCount: 0 };
+    const criteriaCount = evaluation.criteria.length;
     let complete = 0;
     for (const c of candidates) {
-      const row = local.get(c._id);
-      if (
-        row &&
-        row.leadership !== undefined &&
-        row.teamwork !== undefined &&
-        row.professionalism !== undefined &&
-        row.commitment !== undefined &&
-        row.personality !== undefined
-      )
-        complete += 1;
+      const allFilled = evaluation.criteria.every(
+        (cr) => local.get(scoreKey(c._id, cr._id)) !== undefined,
+      );
+      if (allFilled) complete += 1;
     }
-    return { complete, total: candidates.length };
-  }, [candidates, local]);
+    return { complete, total: candidates.length, criteriaCount };
+  }, [candidates, evaluation, local]);
 
   const buildScoresPayload = (): {
     candidateId: Id<"candidates">;
-    leadership: number;
-    teamwork: number;
-    professionalism: number;
-    commitment: number;
-    personality: number;
+    criterionId: Id<"rubricCriteria">;
+    score: number;
   }[] => {
-    const out: ReturnType<typeof buildScoresPayload> = [];
-    for (const [candidateId, row] of local.entries()) {
-      if (
-        row.leadership === undefined ||
-        row.teamwork === undefined ||
-        row.professionalism === undefined ||
-        row.commitment === undefined ||
-        row.personality === undefined
-      )
-        continue;
+    if (!evaluation) return [];
+    const out: {
+      candidateId: Id<"candidates">;
+      criterionId: Id<"rubricCriteria">;
+      score: number;
+    }[] = [];
+    for (const [k, score] of local.entries()) {
+      const [candidateIdRaw, criterionIdRaw] = k.split("::");
+      if (!candidateIdRaw || !criterionIdRaw) continue;
       out.push({
-        candidateId,
-        leadership: row.leadership,
-        teamwork: row.teamwork,
-        professionalism: row.professionalism,
-        commitment: row.commitment,
-        personality: row.personality,
+        candidateId: candidateIdRaw as Id<"candidates">,
+        criterionId: criterionIdRaw as Id<"rubricCriteria">,
+        score,
       });
     }
     return out;
@@ -263,13 +254,12 @@ function ActiveEvaluation({ election }: { election: Doc<"elections"> }) {
 
   const onSetScore = (
     candidateId: Id<"candidates">,
-    cat: RubricCategory,
+    criterionId: Id<"rubricCriteria">,
     n: number,
   ) => {
     setLocal((prev) => {
       const next = new Map(prev);
-      const current = next.get(candidateId) ?? {};
-      next.set(candidateId, { ...current, [cat]: n });
+      next.set(scoreKey(candidateId, criterionId), n);
       return next;
     });
     setDirty(true);
@@ -281,7 +271,7 @@ function ActiveEvaluation({ election }: { election: Doc<"elections"> }) {
   ): Promise<boolean> => {
     if (payload.length === 0) {
       if (!silent) {
-        toast("Nothing to save yet — pick at least one full row first.");
+        toast("Nothing to save yet — pick at least one rubric score first.");
       }
       return false;
     }
@@ -349,7 +339,7 @@ function ActiveEvaluation({ election }: { election: Doc<"elections"> }) {
     }
   };
 
-  if (!candidates) {
+  if (!candidates || !evaluation) {
     return (
       <main className="container-wide py-10">
         <Skeleton className="h-40 w-full" />
@@ -369,6 +359,18 @@ function ActiveEvaluation({ election }: { election: Doc<"elections"> }) {
     );
   }
 
+  if (evaluation.criteria.length === 0) {
+    return (
+      <main className="container-narrow py-12">
+        <EmptyState
+          icon={<ClipboardCheck className="h-5 w-5" aria-hidden />}
+          title="No rubric criteria configured"
+          description="Admins haven't set up the rubric for this cycle yet."
+        />
+      </main>
+    );
+  }
+
   return (
     <main className="container-wide py-10 space-y-6">
       <header className="flex flex-wrap items-start gap-4">
@@ -377,10 +379,8 @@ function ActiveEvaluation({ election }: { election: Doc<"elections"> }) {
             Internal evaluation
           </h1>
           <p className="text-sm text-[var(--color-muted-foreground)]">
-            Score every active candidate against each rubric category from{" "}
-            <strong>1 (Unsatisfactory)</strong> to{" "}
-            <strong>5 (Excellent)</strong>. Drafts save explicitly — your
-            scores are private until you submit.
+            Score every active candidate against each rubric criterion.
+            Drafts save explicitly — your scores are private until you submit.
           </p>
         </div>
         <div className="flex flex-col items-end gap-1.5">
@@ -406,7 +406,19 @@ function ActiveEvaluation({ election }: { election: Doc<"elections"> }) {
         </div>
       </header>
 
-      <RubricHelp />
+      {voterClass ? (
+        <Card className="border-[var(--color-brand)]/30 bg-[var(--color-brand)]/5">
+          <CardContent className="flex flex-wrap items-center gap-3 p-4 text-sm">
+            <Badge tone="brand">{VOTER_CLASS_LABEL[voterClass]}</Badge>
+            <span>
+              Evaluating as <strong>{VOTER_CLASS_LABEL[voterClass]}</strong>{" "}
+              — your class contributes{" "}
+              <strong className="tabular-nums">{voterClassWeight}%</strong> of
+              the final result.
+            </span>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardContent className="p-0">
@@ -417,21 +429,23 @@ function ActiveEvaluation({ election }: { election: Doc<"elections"> }) {
                   <th className="sticky left-0 z-10 min-w-[14rem] bg-[var(--color-muted)]/40 px-3 py-2 font-medium">
                     Candidate
                   </th>
-                  {CATEGORIES.map((c) => (
+                  {evaluation.criteria.map((c) => (
                     <th
-                      key={c.key}
+                      key={c._id}
                       className="px-3 py-2 font-medium whitespace-nowrap"
                     >
-                      {c.label}
+                      <div>{c.name}</div>
+                      <div className="text-[10px] font-normal text-[var(--color-muted-foreground)]">
+                        max {c.maxScore}
+                      </div>
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {candidates.map((c) => {
-                  const row = local.get(c._id) ?? {};
-                  const allFilled = CATEGORIES.every(
-                    (cat) => row[cat.key] !== undefined,
+                  const allFilled = evaluation.criteria.every(
+                    (cr) => local.get(scoreKey(c._id, cr._id)) !== undefined,
                   );
                   return (
                     <tr key={c._id} className="border-b last:border-b-0">
@@ -476,12 +490,13 @@ function ActiveEvaluation({ election }: { election: Doc<"elections"> }) {
                           </div>
                         </div>
                       </td>
-                      {CATEGORIES.map((cat) => (
-                        <td key={cat.key} className="px-3 py-3 align-middle">
-                          <ScoreButtons
-                            value={row[cat.key]}
-                            onChange={(n) => onSetScore(c._id, cat.key, n)}
-                            ariaLabel={`${c.fullName} ${cat.label}`}
+                      {evaluation.criteria.map((cr) => (
+                        <td key={cr._id} className="px-3 py-3 align-middle">
+                          <CriterionScoreInput
+                            value={local.get(scoreKey(c._id, cr._id))}
+                            maxScore={cr.maxScore}
+                            onChange={(n) => onSetScore(c._id, cr._id, n)}
+                            ariaLabel={`${c.fullName} ${cr.name}`}
                             disabled={!editable}
                           />
                         </td>
@@ -520,6 +535,51 @@ function ActiveEvaluation({ election }: { election: Doc<"elections"> }) {
         )}
       </div>
     </main>
+  );
+}
+
+function CriterionScoreInput({
+  value,
+  maxScore,
+  onChange,
+  ariaLabel,
+  disabled,
+}: {
+  value: number | undefined;
+  maxScore: number;
+  onChange: (n: number) => void;
+  ariaLabel: string;
+  disabled: boolean;
+}) {
+  if (maxScore <= 5) {
+    return (
+      <ScoreButtons
+        value={value}
+        maxScore={maxScore}
+        onChange={onChange}
+        ariaLabel={ariaLabel}
+        disabled={disabled}
+      />
+    );
+  }
+  return (
+    <input
+      type="number"
+      inputMode="numeric"
+      min={1}
+      max={maxScore}
+      step={1}
+      value={value ?? ""}
+      disabled={disabled}
+      onChange={(e) => {
+        const n = Number(e.target.value);
+        if (!Number.isFinite(n)) return;
+        const clamped = Math.max(1, Math.min(maxScore, Math.round(n)));
+        onChange(clamped);
+      }}
+      aria-label={ariaLabel}
+      className="h-8 w-16 rounded-md border bg-[var(--color-background)] px-2 text-sm tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] disabled:cursor-not-allowed disabled:opacity-50"
+    />
   );
 }
 
