@@ -27,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
+import { friendlyError } from "@/lib/errors";
 
 export default function VotePage() {
   return (
@@ -259,7 +260,7 @@ function Ballot({ session }: { session: ActiveSession }) {
       await cast({ positionId: session.positionId, candidateId: selected });
       toast.success("Vote recorded");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Could not vote.";
+      const m = friendlyError(err, "Could not vote.");
       toast.error("Vote failed", { description: m });
     } finally {
       setSubmitting(false);

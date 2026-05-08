@@ -30,6 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
+import { friendlyError } from "@/lib/errors";
 
 interface SessionRow {
   positionId: Id<"positions">;
@@ -198,7 +199,7 @@ function SessionRowCard({
       await start({ positionId: row.positionId });
       toast.success(`Opened: ${row.name}`);
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Failed to open.";
+      const m = friendlyError(err, "Failed to open.");
       toast.error("Open failed", { description: m });
     } finally {
       setBusy(false);
@@ -233,7 +234,7 @@ function SessionRowCard({
         toast.success(`Closed. Winner: ${winnerName}`);
       }
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Failed to close.";
+      const m = friendlyError(err, "Failed to close.");
       toast.error("Close failed", { description: m });
     } finally {
       setBusy(false);
@@ -354,7 +355,7 @@ function SessionRowCard({
                 toast.success("Tie resolved");
               } catch (err) {
                 const m =
-                  err instanceof Error ? err.message : "Resolve failed.";
+                  friendlyError(err, "Resolve failed.");
                 toast.error("Resolve failed", { description: m });
               } finally {
                 setBusy(false);

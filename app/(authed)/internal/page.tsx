@@ -29,6 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ScoreButtons } from "@/components/internal/score-buttons";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
+import { friendlyError } from "@/lib/errors";
 
 type VoterClass = "topCommittee" | "headExecutive" | "year2Committee";
 
@@ -283,7 +284,7 @@ function ActiveEvaluation({
       if (!silent) toast.success("Draft saved");
       return true;
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Save failed.";
+      const m = friendlyError(err, "Save failed.");
       toast.error("Save failed", { description: m });
       return false;
     } finally {
@@ -317,7 +318,7 @@ function ActiveEvaluation({
       await submit({ electionId: election._id });
       toast.success("Submitted!");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Submit failed.";
+      const m = friendlyError(err, "Submit failed.");
       toast.error("Submit failed", { description: m });
     }
   };
@@ -334,7 +335,7 @@ function ActiveEvaluation({
       await unsubmit({ electionId: election._id });
       toast.success("Re-opened for editing");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Could not re-open.";
+      const m = friendlyError(err, "Could not re-open.");
       toast.error("Re-open failed", { description: m });
     }
   };

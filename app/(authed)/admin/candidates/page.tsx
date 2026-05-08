@@ -34,6 +34,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
+import { friendlyError } from "@/lib/errors";
 
 export default function CandidatesPage() {
   return (
@@ -160,7 +161,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
             description: `${summary.inserted} added · ${summary.skipped} skipped · ${summary.errors.length} errors`,
           });
         } catch (err) {
-          const m = err instanceof Error ? err.message : "Import failed.";
+          const m = friendlyError(err, "Import failed.");
           toast.error("Import failed", { description: m });
         } finally {
           setImporting(false);
@@ -289,7 +290,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
                   toast.success("Candidate removed");
                 } catch (err) {
                   const m =
-                    err instanceof Error ? err.message : "Remove failed.";
+                    friendlyError(err, "Remove failed.");
                   toast.error("Remove failed", { description: m });
                 }
               }}

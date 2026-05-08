@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { Doc } from "@/convex/_generated/dataModel";
+import { friendlyError } from "@/lib/errors";
 
 const TIER_LABELS: Record<number, string> = {
   1: "President",
@@ -108,7 +109,7 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
       toast.success("Position added");
       form.reset({ name: "", tier: values.tier });
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Add failed.";
+      const m = friendlyError(err, "Add failed.");
       toast.error("Add failed", { description: m });
     }
   });
@@ -131,7 +132,7 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
       }
       toast.success("Default positions added");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Seed failed.";
+      const m = friendlyError(err, "Seed failed.");
       toast.error("Seed failed", { description: m });
     }
   };
@@ -270,9 +271,7 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
                               toast.success("Position deleted");
                             } catch (err) {
                               const m =
-                                err instanceof Error
-                                  ? err.message
-                                  : "Delete failed.";
+                                friendlyError(err, "Delete failed.");
                               toast.error("Delete failed", { description: m });
                             }
                           }}
@@ -281,9 +280,7 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
                               undefined,
                               (err: unknown) => {
                                 const m =
-                                  err instanceof Error
-                                    ? err.message
-                                    : "Reorder failed.";
+                                  friendlyError(err, "Reorder failed.");
                                 toast.error("Reorder failed", {
                                   description: m,
                                 });
@@ -298,9 +295,7 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
                               () => toast.success("Renamed"),
                               (err: unknown) => {
                                 const m =
-                                  err instanceof Error
-                                    ? err.message
-                                    : "Rename failed.";
+                                  friendlyError(err, "Rename failed.");
                                 toast.error("Rename failed", {
                                   description: m,
                                 });

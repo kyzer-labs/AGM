@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { Doc } from "@/convex/_generated/dataModel";
+import { friendlyError } from "@/lib/errors";
 
 type VoterClass = "topCommittee" | "headExecutive" | "year2Committee";
 
@@ -116,7 +117,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
       toast.success("Email added");
       setSingle("");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Add failed.";
+      const m = friendlyError(err, "Add failed.");
       toast.error("Add failed", { description: m });
     } finally {
       setBusy(false);
@@ -142,7 +143,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
       toast.success("Bulk import complete", { description: parts.join(" · ") });
       setBulk("");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Import failed.";
+      const m = friendlyError(err, "Import failed.");
       toast.error("Import failed", { description: m });
     } finally {
       setBusy(false);
@@ -429,9 +430,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
                           toast.success("Class updated");
                         } catch (err) {
                           const m =
-                            err instanceof Error
-                              ? err.message
-                              : "Update failed.";
+                            friendlyError(err, "Update failed.");
                           toast.error("Update failed", { description: m });
                         }
                       }}
@@ -470,9 +469,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
                           toast.success("Removed");
                         } catch (err) {
                           const m =
-                            err instanceof Error
-                              ? err.message
-                              : "Remove failed.";
+                            friendlyError(err, "Remove failed.");
                           toast.error("Remove failed", { description: m });
                         }
                       }}

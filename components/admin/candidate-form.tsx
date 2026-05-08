@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
+import { friendlyError } from "@/lib/errors";
 
 const candidateSchema = z.object({
   fullName: z.string().trim().min(2).max(120),
@@ -128,7 +129,7 @@ export function CandidateForm({
       setPhotoStorageId(json.storageId);
       setPhotoPreview(URL.createObjectURL(file));
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Upload failed.";
+      const m = friendlyError(err, "Upload failed.");
       toast.error("Upload failed", { description: m });
     } finally {
       setUploading(false);
@@ -197,7 +198,7 @@ export function CandidateForm({
       toast.success(isEdit ? "Candidate updated" : "Candidate added");
       onSaved();
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Save failed.";
+      const m = friendlyError(err, "Save failed.");
       toast.error("Save failed", { description: m });
     } finally {
       setSubmitting(false);

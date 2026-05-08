@@ -41,6 +41,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
+import { friendlyError } from "@/lib/errors";
 
 const PHASE_LABELS: Record<string, string> = {
   setup: "Setup",
@@ -101,7 +102,7 @@ function Inner() {
       toast.success("Election created");
       form.reset({ name: "", year: new Date().getFullYear() });
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Could not create.";
+      const m = friendlyError(err, "Could not create.");
       toast.error("Create failed", { description: m });
     }
   });
@@ -241,7 +242,7 @@ function ElectionCard({ election }: { election: Doc<"elections"> }) {
       });
       toast.success(`Phase changed to ${PHASE_LABELS[toPhase]}`);
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Phase change failed.";
+      const m = friendlyError(err, "Phase change failed.");
       toast.error("Phase change failed", { description: m });
     } finally {
       setBusy(false);
@@ -267,7 +268,7 @@ function ElectionCard({ election }: { election: Doc<"elections"> }) {
       await remove({ electionId: election._id });
       toast.success("Election deleted");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Delete failed.";
+      const m = friendlyError(err, "Delete failed.");
       toast.error("Delete failed", { description: m });
     } finally {
       setBusy(false);
@@ -281,7 +282,7 @@ function ElectionCard({ election }: { election: Doc<"elections"> }) {
       toast.success("Renamed");
       setEditing(false);
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Rename failed.";
+      const m = friendlyError(err, "Rename failed.");
       toast.error("Rename failed", { description: m });
     } finally {
       setBusy(false);
@@ -513,7 +514,7 @@ function WeightsPanel({ election }: { election: Doc<"elections"> }) {
       });
       toast.success("Weights saved");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Save failed.";
+      const m = friendlyError(err, "Save failed.");
       toast.error("Save failed", { description: m });
     }
   });
@@ -660,7 +661,7 @@ function ScheduledWindowPanel({ election }: { election: Doc<"elections"> }) {
       });
       toast.success("Schedule saved");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Save failed.";
+      const m = friendlyError(err, "Save failed.");
       toast.error("Save failed", { description: m });
     } finally {
       setBusy(false);
@@ -681,7 +682,7 @@ function ScheduledWindowPanel({ election }: { election: Doc<"elections"> }) {
       await clearScheduledWindow({ electionId: election._id });
       toast.success("Schedule cleared");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Clear failed.";
+      const m = friendlyError(err, "Clear failed.");
       toast.error("Clear failed", { description: m });
     } finally {
       setBusy(false);
@@ -791,7 +792,7 @@ function RubricCriteriaPanel({ election }: { election: Doc<"elections"> }) {
       setNewMax(5);
       toast.success("Criterion added");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Add failed.";
+      const m = friendlyError(err, "Add failed.");
       toast.error("Add failed", { description: m });
     } finally {
       setBusy(false);
@@ -811,7 +812,7 @@ function RubricCriteriaPanel({ election }: { election: Doc<"elections"> }) {
       const count = await seedDefaults({ electionId: election._id });
       toast.success(`Seeded ${count} criteria`);
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Seed failed.";
+      const m = friendlyError(err, "Seed failed.");
       toast.error("Seed failed", { description: m });
     } finally {
       setBusy(false);
@@ -842,7 +843,7 @@ function RubricCriteriaPanel({ election }: { election: Doc<"elections"> }) {
       await renameC({ criterionId, name: next.trim() });
       toast.success("Renamed");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Rename failed.";
+      const m = friendlyError(err, "Rename failed.");
       toast.error("Rename failed", { description: m });
     } finally {
       setBusy(false);
@@ -875,7 +876,7 @@ function RubricCriteriaPanel({ election }: { election: Doc<"elections"> }) {
       await setMaxScore({ criterionId, maxScore: value });
       toast.success("Max score updated");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Update failed.";
+      const m = friendlyError(err, "Update failed.");
       toast.error("Update failed", { description: m });
     } finally {
       setBusy(false);
@@ -903,7 +904,7 @@ function RubricCriteriaPanel({ election }: { election: Doc<"elections"> }) {
       await removeC({ criterionId });
       toast.success("Removed");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Remove failed.";
+      const m = friendlyError(err, "Remove failed.");
       toast.error("Remove failed", { description: m });
     } finally {
       setBusy(false);
@@ -918,7 +919,7 @@ function RubricCriteriaPanel({ election }: { election: Doc<"elections"> }) {
     try {
       await move({ criterionId, direction });
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Move failed.";
+      const m = friendlyError(err, "Move failed.");
       toast.error("Move failed", { description: m });
     } finally {
       setBusy(false);

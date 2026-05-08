@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { friendlyError } from "@/lib/errors";
 
 const schema = z.object({
   fullName: z
@@ -77,7 +78,7 @@ export default function ProfileCompletePage() {
       router.replace("/dashboard");
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Could not save your profile.";
+        friendlyError(err, "Could not save your profile.");
       toast.error("Save failed", { description: message });
     }
   });

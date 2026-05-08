@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { friendlyError } from "@/lib/errors";
 
 function AdminPageInner() {
   const router = useRouter();
@@ -191,7 +192,7 @@ function BootstrapPanel() {
       toast.success("Super admin granted to your account.");
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Bootstrap failed.";
+        friendlyError(err, "Bootstrap failed.");
       toast.error("Bootstrap failed", { description: message });
     } finally {
       setSubmitting(false);

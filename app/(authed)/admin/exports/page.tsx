@@ -29,6 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { downloadCsv } from "@/lib/csv";
 import type { Doc } from "@/convex/_generated/dataModel";
+import { friendlyError } from "@/lib/errors";
 
 export default function ExportsPage() {
   return (
@@ -91,7 +92,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
       downloadCsv(rows, `${safeName}-internal-scores.csv`);
       toast.success("Downloaded internal scores");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Failed.";
+      const m = friendlyError(err, "Failed.");
       toast.error("Export failed", { description: m });
     } finally {
       setBusy(null);
@@ -107,7 +108,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
       downloadCsv(rows, `${safeName}-internal-scores-by-class.csv`);
       toast.success("Downloaded per-class scores");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Failed.";
+      const m = friendlyError(err, "Failed.");
       toast.error("Export failed", { description: m });
     } finally {
       setBusy(null);
@@ -123,7 +124,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
       downloadCsv(rows, `${safeName}-public-counts.csv`);
       toast.success("Downloaded public counts");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Failed.";
+      const m = friendlyError(err, "Failed.");
       toast.error("Export failed", { description: m });
     } finally {
       setBusy(null);
@@ -139,7 +140,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
       downloadCsv(rows, `${safeName}-combined-results.csv`);
       toast.success("Downloaded combined results");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Failed.";
+      const m = friendlyError(err, "Failed.");
       toast.error("Export failed", { description: m });
     } finally {
       setBusy(null);
@@ -155,7 +156,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
       downloadCsv(rows, `${safeName}-participation.csv`);
       toast.success("Downloaded participation");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Failed.";
+      const m = friendlyError(err, "Failed.");
       toast.error("Export failed", { description: m });
     } finally {
       setBusy(null);
@@ -169,7 +170,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
       downloadCsv(rows, `${safeName}-audit-log.csv`);
       toast.success("Downloaded audit log");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Failed.";
+      const m = friendlyError(err, "Failed.");
       toast.error("Export failed", { description: m });
     } finally {
       setBusy(null);
@@ -188,7 +189,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
       setEmResult(result);
       toast.success("Lookup complete (logged)");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Failed.";
+      const m = friendlyError(err, "Failed.");
       toast.error("Lookup failed", { description: m });
     } finally {
       setBusy(null);
