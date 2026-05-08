@@ -135,32 +135,55 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="how" className="container-wide pb-20">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Card>
-            <CardContent className="flex flex-col gap-3 p-6">
-              <div className="grid h-10 w-10 place-items-center rounded-md bg-[var(--color-secondary)]">
-                <ShieldCheck
-                  className="h-5 w-5 text-[var(--color-brand)]"
-                  aria-hidden
-                />
+      <section id="how" className="container-wide w-full px-4 pb-20">
+        <div className="grid gap-4 md:auto-rows-fr md:grid-cols-12">
+          <Card className="relative overflow-hidden md:col-span-7 md:row-span-2">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full opacity-60"
+              style={{
+                background:
+                  "radial-gradient(50% 50% at 50% 50%, oklch(0.55 0.18 250 / 0.10) 0%, transparent 70%)",
+              }}
+            />
+            <CardContent className="relative flex h-full flex-col justify-between gap-8 p-8 md:p-10">
+              <div className="flex items-start justify-between gap-4">
+                <div className="grid h-12 w-12 place-items-center rounded-xl bg-[var(--color-secondary)] ring-1 ring-[var(--color-foreground)]/5">
+                  <ShieldCheck
+                    className="h-6 w-6 text-[var(--color-brand)]"
+                    aria-hidden
+                  />
+                </div>
+                <Badge tone="brand" className="font-mono">
+                  75% weight
+                </Badge>
               </div>
-              <h2 className="text-lg font-semibold">Internal evaluation</h2>
-              <p className="text-sm text-[var(--color-muted-foreground)]">
-                Year 2 committee members on the whitelist score every
-                candidate using a 5-category rubric (Leadership, Teamwork &
-                Communication, Professionalism & Ethics, Commitment,
-                Personality) before AGM day.
-              </p>
+              <div className="space-y-3">
+                <h2 className="text-2xl font-semibold tracking-tight">
+                  Internal evaluation
+                </h2>
+                <p className="text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+                  Year 2 committee members on the whitelist score every
+                  candidate using a 5-category rubric (Leadership, Teamwork &
+                  Communication, Professionalism & Ethics, Commitment,
+                  Personality) before AGM day.
+                </p>
+              </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="flex flex-col gap-3 p-6">
-              <div className="grid h-10 w-10 place-items-center rounded-md bg-[var(--color-secondary)]">
-                <Vote
-                  className="h-5 w-5 text-[var(--color-brand)]"
-                  aria-hidden
-                />
+
+          <Card className="md:col-span-5">
+            <CardContent className="flex h-full flex-col gap-3 p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-md bg-[var(--color-secondary)]">
+                  <Vote
+                    className="h-5 w-5 text-[var(--color-brand)]"
+                    aria-hidden
+                  />
+                </div>
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-foreground)]">
+                  Live
+                </span>
               </div>
               <h2 className="text-lg font-semibold">Live AGM voting</h2>
               <p className="text-sm text-[var(--color-muted-foreground)]">
@@ -170,13 +193,19 @@ export default function LandingPage() {
               </p>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="flex flex-col gap-3 p-6">
-              <div className="grid h-10 w-10 place-items-center rounded-md bg-[var(--color-secondary)]">
-                <BarChart3
-                  className="h-5 w-5 text-[var(--color-brand)]"
-                  aria-hidden
-                />
+
+          <Card className="md:col-span-5">
+            <CardContent className="flex h-full flex-col gap-3 p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-md bg-[var(--color-secondary)]">
+                  <BarChart3
+                    className="h-5 w-5 text-[var(--color-brand)]"
+                    aria-hidden
+                  />
+                </div>
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-foreground)]">
+                  75 / 25
+                </span>
               </div>
               <h2 className="text-lg font-semibold">75 / 25 results</h2>
               <p className="text-sm text-[var(--color-muted-foreground)]">
