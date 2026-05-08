@@ -43,7 +43,6 @@ next-env.d.ts
 
 # convex
 .convex/
-convex/_generated/
 
 # AI / agent tooling artifacts (per-developer, not shared)
 .agents/
