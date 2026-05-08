@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { getConvexErrorMessage } from "@/lib/convex-error";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { friendlyError } from "@/lib/errors";
 
@@ -134,7 +135,7 @@ export function CandidateForm({
       setPhotoPreview(URL.createObjectURL(file));
       form.setValue("photoUrl", "");
     } catch (err) {
-      const m = friendlyError(err, "Upload failed.");
+      const m = getConvexErrorMessage(err, "Upload failed.");
       toast.error("Upload failed", { description: m });
     } finally {
       setUploading(false);
@@ -208,7 +209,7 @@ export function CandidateForm({
       toast.success(isEdit ? "Candidate updated" : "Candidate added");
       onSaved();
     } catch (err) {
-      const m = friendlyError(err, "Save failed.");
+      const m = getConvexErrorMessage(err, "Save failed.");
       toast.error("Save failed", { description: m });
     } finally {
       setSubmitting(false);

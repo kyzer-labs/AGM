@@ -39,9 +39,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Modal } from "@/components/ui/modal";
-import type { Doc, Id } from "@/convex/_generated/dataModel";
-import { friendlyError } from "@/lib/errors";
+import { getConvexErrorMessage } from "@/lib/convex-error";
+import type { Id } from "@/convex/_generated/dataModel";
 
 const PHASE_LABELS: Record<string, string> = {
   setup: "Setup",
@@ -108,6 +107,17 @@ function Inner() {
       </main>
     );
   }
+
+  const onCreate = form.handleSubmit(async (values) => {
+    try {
+      await createElection(values);
+      toast.success("Election created");
+      form.reset({ name: "", year: new Date().getFullYear() });
+    } catch (err) {
+      const m = getConvexErrorMessage(err, "Could not create.");
+      toast.error("Create failed", { description: m });
+    }
+  });
 
   return (
     <main className="container-wide py-10 space-y-8">
@@ -267,7 +277,7 @@ function ElectionCard({ election }: { election: Doc<"elections"> }) {
       });
       toast.success(`Phase changed to ${PHASE_LABELS[toPhase]}`);
     } catch (err) {
-      const m = friendlyError(err, "Phase change failed.");
+      const m = getConvexErrorMessage(err, "Phase change failed.");
       toast.error("Phase change failed", { description: m });
     } finally {
       setBusy(false);
@@ -293,7 +303,7 @@ function ElectionCard({ election }: { election: Doc<"elections"> }) {
       await remove({ electionId: election._id });
       toast.success("Election deleted");
     } catch (err) {
-      const m = friendlyError(err, "Delete failed.");
+      const m = getConvexErrorMessage(err, "Delete failed.");
       toast.error("Delete failed", { description: m });
     } finally {
       setBusy(false);
@@ -307,7 +317,7 @@ function ElectionCard({ election }: { election: Doc<"elections"> }) {
       toast.success("Renamed");
       setEditing(false);
     } catch (err) {
-      const m = friendlyError(err, "Rename failed.");
+      const m = getConvexErrorMessage(err, "Rename failed.");
       toast.error("Rename failed", { description: m });
     } finally {
       setBusy(false);

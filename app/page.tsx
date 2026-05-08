@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -26,9 +27,14 @@ export default function LandingPage() {
     <main className="gradient-brand min-h-dvh">
       <header className="container-wide flex h-16 items-center justify-between">
         <div className="flex items-center gap-2 font-semibold tracking-tight">
-          <span className="grid h-8 w-8 place-items-center rounded-md bg-[var(--color-primary)] text-[var(--color-primary-foreground)]">
-            <Vote className="h-4 w-4" aria-hidden />
-          </span>
+          <Image
+            src="/logos/cs-soc-official.svg"
+            alt="USM CS Society"
+            width={40}
+            height={40}
+            priority
+            className="h-10 w-10"
+          />
           <span>USM CSS AGM</span>
         </div>
         <div className="flex items-center gap-3">

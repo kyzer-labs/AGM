@@ -1,9 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Vote } from "lucide-react";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Badge } from "@/components/ui/badge";
 
@@ -17,9 +17,14 @@ export function SiteHeader() {
           href="/dashboard"
           className="flex items-center gap-2 font-semibold tracking-tight"
         >
-          <span className="grid h-7 w-7 place-items-center rounded-md bg-[var(--color-primary)] text-[var(--color-primary-foreground)]">
-            <Vote className="h-4 w-4" aria-hidden />
-          </span>
+          <Image
+            src="/logos/cs-soc-official.svg"
+            alt="USM CS Society"
+            width={36}
+            height={36}
+            priority
+            className="h-9 w-9"
+          />
           <span>USM CSS AGM</span>
         </Link>
         <div className="flex items-center gap-3">

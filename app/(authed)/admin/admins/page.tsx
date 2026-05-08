@@ -8,7 +8,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { ShieldCheck, ShieldOff, Trash2, UserPlus } from "lucide-react";
+import { Clock3, ShieldCheck, ShieldOff, Trash2, UserPlus } from "lucide-react";
+import { getConvexErrorMessage } from "@/lib/convex-error";
 
 import { AuthGate } from "@/components/auth/auth-gate";
 import { AdminBreadcrumb } from "@/components/admin/admin-breadcrumb";
@@ -84,13 +85,21 @@ function Inner() {
 
   const onGrant = form.handleSubmit(async (values) => {
     try {
-      await grant(values);
-      toast.success("Admin access granted");
+      const result = await grant(values);
+      if (result.pending) {
+        toast.success("Invite created", {
+          description:
+            "They have not signed in yet — admin access will activate automatically the first time they sign in.",
+        });
+      } else {
+        toast.success("Admin access granted");
+      }
       form.reset({ email: "", role: "admin" });
       setShowGrant(false);
     } catch (err) {
-      const m = friendlyError(err, "Grant failed.");
-      toast.error("Grant failed", { description: m });
+      toast.error("Grant failed", {
+        description: getConvexErrorMessage(err, "Grant failed."),
+      });
     }
   });
 
@@ -98,24 +107,13 @@ function Inner() {
     <main className="container-wide py-10 space-y-8">
       <AdminBreadcrumb items={[{ label: "Admins" }]} />
 
-      <header className="flex flex-wrap items-start gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Admin allowlist
-          </h1>
-          <p className="text-sm text-[var(--color-muted-foreground)]">
-            Super admins manage who else can run the AGM. Add an admin only
-            AFTER they have signed in once with their @student.usm.my account.
-          </p>
-        </div>
-        <Button
-          onClick={() => {
-            form.reset({ email: "", role: "admin" });
-            setShowGrant(true);
-          }}
-        >
-          <UserPlus className="h-4 w-4" /> Grant admin
-        </Button>
+      <header>
+        <h1 className="text-2xl font-semibold tracking-tight">Admin allowlist</h1>
+        <p className="text-sm text-[var(--color-muted-foreground)]">
+          Super admins manage who else can run the AGM. You can invite
+          someone before they sign in — their access will activate the
+          first time they sign in with their @student.usm.my account.
+        </p>
       </header>
 
       <Modal
@@ -206,40 +204,41 @@ function Inner() {
                       </>
                     )}
                   </Badge>
+                  {a.pending ? (
+                    <Badge tone="warning">
+                      <Clock3 className="h-3 w-3" aria-hidden /> Pending sign-in
+                    </Badge>
+                  ) : null}
                   <div className="flex-1 min-w-0">
                     <div className="truncate text-sm font-medium">
                       {a.fullName ?? a.email}
                     </div>
                     <div className="truncate text-xs text-[var(--color-muted-foreground)]">
-                      {a.email} · added{" "}
+                      {a.email} · {a.pending ? "invited" : "added"}{" "}
                       {new Date(a.createdAt).toLocaleDateString()}
                     </div>
                   </div>
                   <Button
                     size="icon"
                     variant="ghost"
-                    onClick={async () => {
-                      const ok = await dialog.confirm({
-                        title: `Revoke ${a.role} access?`,
-                        description: (
-                          <>
-                            Remove access for <strong>{a.email}</strong>. They
-                            will lose admin privileges immediately. This is
-                            logged.
-                          </>
-                        ),
-                        confirmText: "Revoke access",
-                        variant: "destructive",
-                      });
-                      if (!ok) return;
-                      try {
-                        await revoke({ adminId: a._id });
-                        toast.success("Revoked");
-                      } catch (err) {
-                        const m =
-                          friendlyError(err, "Revoke failed.");
-                        toast.error("Revoke failed", { description: m });
-                      }
+                    onClick={() => {
+                      if (
+                        !window.confirm(
+                          `Revoke ${a.role} access for ${a.email}?`,
+                        )
+                      )
+                        return;
+                      void revoke({ adminId: a._id }).then(
+                        () => toast.success("Revoked"),
+                        (err: unknown) => {
+                          toast.error("Revoke failed", {
+                            description: getConvexErrorMessage(
+                              err,
+                              "Revoke failed.",
+                            ),
+                          });
+                        },
+                      );
                     }}
                     aria-label="Revoke"
                   >

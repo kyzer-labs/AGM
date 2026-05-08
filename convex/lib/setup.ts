@@ -1,3 +1,4 @@
+import { ConvexError } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import {
@@ -40,7 +41,7 @@ export async function getElectionOrThrow(
   electionId: Id<"elections">,
 ): Promise<Doc<"elections">> {
   const e = await ctx.db.get(electionId);
-  if (!e) throw new Error("Election not found.");
+  if (!e) throw new ConvexError("Election not found.");
   return e;
 }
 
@@ -50,7 +51,7 @@ export async function requireSetupPhase(
 ): Promise<Doc<"elections">> {
   const e = await getElectionOrThrow(ctx, electionId);
   if (e.phase !== "setup") {
-    throw new Error(
+    throw new ConvexError(
       `This action is only allowed during the Setup phase. Current phase: ${PHASE_LABEL[e.phase]}.`,
     );
   }

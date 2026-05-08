@@ -25,7 +25,7 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Modal } from "@/components/ui/modal";
+import { getConvexErrorMessage } from "@/lib/convex-error";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { friendlyError } from "@/lib/errors";
 
@@ -120,7 +120,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
       setSingle("");
       setShowAdd(false);
     } catch (err) {
-      const m = friendlyError(err, "Add failed.");
+      const m = getConvexErrorMessage(err, "Add failed.");
       toast.error("Add failed", { description: m });
     } finally {
       setBusy(false);
@@ -147,7 +147,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
       setBulk("");
       setShowBulk(false);
     } catch (err) {
-      const m = friendlyError(err, "Import failed.");
+      const m = getConvexErrorMessage(err, "Import failed.");
       toast.error("Import failed", { description: m });
     } finally {
       setBusy(false);
@@ -481,27 +481,19 @@ function Body({ election }: { election: Doc<"elections"> }) {
                     <Button
                       size="icon"
                       variant="ghost"
-                      onClick={async () => {
-                        const ok = await dialog.confirm({
-                          title: "Remove from whitelist?",
-                          description: (
-                            <>
-                              Remove <strong>{row.email}</strong>? They will
-                              lose access to the internal evaluation window.
-                            </>
-                          ),
-                          confirmText: "Remove",
-                          variant: "destructive",
-                        });
-                        if (!ok) return;
-                        try {
-                          await remove({ entryId: row._id });
-                          toast.success("Removed");
-                        } catch (err) {
-                          const m =
-                            friendlyError(err, "Remove failed.");
-                          toast.error("Remove failed", { description: m });
-                        }
+                      onClick={() => {
+                        if (!window.confirm(`Remove ${row.email}?`)) return;
+                        void remove({ entryId: row._id }).then(
+                          () => toast.success("Removed"),
+                          (err: unknown) => {
+                            toast.error("Remove failed", {
+                              description: getConvexErrorMessage(
+                                err,
+                                "Remove failed.",
+                              ),
+                            });
+                          },
+                        );
                       }}
                       aria-label="Remove"
                     >

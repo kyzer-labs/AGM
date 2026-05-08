@@ -24,7 +24,7 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Modal } from "@/components/ui/modal";
+import { getConvexErrorMessage } from "@/lib/convex-error";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { friendlyError } from "@/lib/errors";
 
@@ -109,7 +109,7 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
       form.reset({ name: "", tier: values.tier });
       setShowAdd(false);
     } catch (err) {
-      const m = friendlyError(err, "Add failed.");
+      const m = getConvexErrorMessage(err, "Add failed.");
       toast.error("Add failed", { description: m });
     }
   });
@@ -132,7 +132,7 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
       }
       toast.success("Default positions added");
     } catch (err) {
-      const m = friendlyError(err, "Seed failed.");
+      const m = getConvexErrorMessage(err, "Seed failed.");
       toast.error("Seed failed", { description: m });
     }
   };
@@ -262,37 +262,34 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
                           isFirst={idx === 0}
                           isLast={idx === tierPositions.length - 1}
                           locked={lockedToSetup}
-                          onRemove={async () => {
-                            const ok = await dialog.confirm({
-                              title: "Delete position?",
-                              description: (
-                                <>
-                                  Delete <strong>{p.name}</strong>? This also
-                                  unassigns it from every candidate that
-                                  listed it.
-                                </>
-                              ),
-                              confirmText: "Delete position",
-                              variant: "destructive",
-                            });
-                            if (!ok) return;
-                            try {
-                              await remove({ positionId: p._id });
-                              toast.success("Position deleted");
-                            } catch (err) {
-                              const m =
-                                friendlyError(err, "Delete failed.");
-                              toast.error("Delete failed", { description: m });
-                            }
+                          onRemove={() => {
+                            if (
+                              !window.confirm(
+                                `Delete position "${p.name}"? This also unassigns it from any candidates.`,
+                              )
+                            )
+                              return;
+                            void remove({ positionId: p._id }).then(
+                              () => toast.success("Position deleted"),
+                              (err: unknown) => {
+                                toast.error("Delete failed", {
+                                  description: getConvexErrorMessage(
+                                    err,
+                                    "Delete failed.",
+                                  ),
+                                });
+                              },
+                            );
                           }}
                           onMove={(direction) =>
                             void move({ positionId: p._id, direction }).then(
                               undefined,
                               (err: unknown) => {
-                                const m =
-                                  friendlyError(err, "Reorder failed.");
                                 toast.error("Reorder failed", {
-                                  description: m,
+                                  description: getConvexErrorMessage(
+                                    err,
+                                    "Reorder failed.",
+                                  ),
                                 });
                               },
                             )
@@ -304,10 +301,11 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
                             }).then(
                               () => toast.success("Renamed"),
                               (err: unknown) => {
-                                const m =
-                                  friendlyError(err, "Rename failed.");
                                 toast.error("Rename failed", {
-                                  description: m,
+                                  description: getConvexErrorMessage(
+                                    err,
+                                    "Rename failed.",
+                                  ),
                                 });
                               },
                             )

@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
@@ -30,10 +30,10 @@ export const add = mutation({
 
     const name = args.name.trim();
     if (name.length < 2 || name.length > 80) {
-      throw new Error("Position name must be between 2 and 80 characters.");
+      throw new ConvexError("Position name must be between 2 and 80 characters.");
     }
     if (!Number.isInteger(args.tier) || args.tier < 1 || args.tier > 9) {
-      throw new Error("Tier must be an integer between 1 and 9.");
+      throw new ConvexError("Tier must be an integer between 1 and 9.");
     }
 
     const existing = await ctx.db
@@ -73,12 +73,12 @@ export const updateName = mutation({
   handler: async (ctx, args) => {
     const { voter } = await requireAdmin(ctx);
     const p = await ctx.db.get(args.positionId);
-    if (!p) throw new Error("Position not found.");
+    if (!p) throw new ConvexError("Position not found.");
     await requireSetupPhase(ctx, p.electionId);
 
     const name = args.name.trim();
     if (name.length < 2 || name.length > 80) {
-      throw new Error("Position name must be between 2 and 80 characters.");
+      throw new ConvexError("Position name must be between 2 and 80 characters.");
     }
     await ctx.db.patch(p._id, { name });
     await audit(ctx, {
@@ -96,7 +96,7 @@ export const remove = mutation({
   handler: async (ctx, args) => {
     const { voter } = await requireAdmin(ctx);
     const p = await ctx.db.get(args.positionId);
-    if (!p) throw new Error("Position not found.");
+    if (!p) throw new ConvexError("Position not found.");
     await requireSetupPhase(ctx, p.electionId);
 
     const links = await ctx.db
@@ -124,7 +124,7 @@ export const move = mutation({
   handler: async (ctx, args) => {
     const { voter } = await requireAdmin(ctx);
     const p = await ctx.db.get(args.positionId);
-    if (!p) throw new Error("Position not found.");
+    if (!p) throw new ConvexError("Position not found.");
     await requireSetupPhase(ctx, p.electionId);
 
     const sameTier = await ctx.db

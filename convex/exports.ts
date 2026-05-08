@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAdmin, requireSuperAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
@@ -487,7 +487,7 @@ export const emergencyVoterAudit = mutation({
     const targetEmail = args.targetEmail.trim().toLowerCase();
     const reason = args.reason.trim();
     if (reason.length < 10) {
-      throw new Error(
+      throw new ConvexError(
         "Provide a substantive reason (>= 10 chars) — this lookup is logged.",
       );
     }
@@ -497,7 +497,7 @@ export const emergencyVoterAudit = mutation({
       .withIndex("by_email", (q) => q.eq("email", targetEmail))
       .unique();
     if (!target) {
-      throw new Error("No voter found with that email.");
+      throw new ConvexError("No voter found with that email.");
     }
 
     const auditEntries = (

@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { friendlyError } from "@/lib/errors";
+import { getConvexErrorMessage } from "@/lib/convex-error";
 
 const schema = z.object({
   fullName: z
@@ -78,7 +78,7 @@ export default function ProfileCompletePage() {
       router.replace("/dashboard");
     } catch (err) {
       const message =
-        friendlyError(err, "Could not save your profile.");
+        getConvexErrorMessage(err, "Could not save your profile.");
       toast.error("Save failed", { description: message });
     }
   });

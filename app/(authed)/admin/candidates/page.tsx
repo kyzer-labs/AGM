@@ -30,7 +30,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Modal } from "@/components/ui/modal";
+import { getConvexErrorMessage } from "@/lib/convex-error";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { friendlyError } from "@/lib/errors";
 
@@ -168,7 +168,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
             description: `${summary.inserted} added · ${summary.skipped} skipped · ${summary.errors.length} errors`,
           });
         } catch (err) {
-          const m = friendlyError(err, "Import failed.");
+          const m = getConvexErrorMessage(err, "Import failed.");
           toast.error("Import failed", { description: m });
         } finally {
           setImporting(false);
@@ -271,28 +271,21 @@ function Body({ election }: { election: Doc<"elections"> }) {
               c={c}
               editable={editable}
               onEdit={() => setEditingId(c._id)}
-              onRemove={async () => {
-                const ok = await dialog.confirm({
-                  title: "Remove candidate?",
-                  description: (
-                    <>
-                      Remove <strong>{c.fullName}</strong>? This also unassigns
-                      them from every position they were eligible for. Existing
-                      internal scores and votes are NOT deleted.
-                    </>
-                  ),
-                  confirmText: "Remove candidate",
-                  variant: "destructive",
-                });
-                if (!ok) return;
-                try {
-                  await removeCandidate({ candidateId: c._id });
-                  toast.success("Candidate removed");
-                } catch (err) {
-                  const m =
-                    friendlyError(err, "Remove failed.");
-                  toast.error("Remove failed", { description: m });
-                }
+              onRemove={() => {
+                if (
+                  !window.confirm(
+                    `Remove candidate "${c.fullName}"? This also unassigns them from all positions.`,
+                  )
+                )
+                  return;
+                void removeCandidate({ candidateId: c._id }).then(
+                  () => toast.success("Candidate removed"),
+                  (err: unknown) => {
+                    const m =
+                      getConvexErrorMessage(err, "Remove failed.");
+                    toast.error("Remove failed", { description: m });
+                  },
+                );
               }}
             />
           ))}
