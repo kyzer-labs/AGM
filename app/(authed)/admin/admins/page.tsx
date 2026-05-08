@@ -12,6 +12,7 @@ import { ShieldCheck, ShieldOff, Trash2, UserPlus } from "lucide-react";
 
 import { AuthGate } from "@/components/auth/auth-gate";
 import { AdminBreadcrumb } from "@/components/admin/admin-breadcrumb";
+import { useDialog } from "@/components/dialog/dialog-provider";
 import {
   Card,
   CardContent,
@@ -51,6 +52,7 @@ export default function AdminsPage() {
 
 function Inner() {
   const router = useRouter();
+  const dialog = useDialog();
   const adminStatus = useQuery(api.admins.myAdminStatus);
   const list = useQuery(api.admins.listAdmins);
   const grant = useMutation(api.admins.grantAdmin);
@@ -190,23 +192,30 @@ function Inner() {
                   <Button
                     size="icon"
                     variant="ghost"
-                    onClick={() => {
-                      if (
-                        !window.confirm(
-                          `Revoke ${a.role} access for ${a.email}?`,
-                        )
-                      )
-                        return;
-                      void revoke({ adminId: a._id }).then(
-                        () => toast.success("Revoked"),
-                        (err: unknown) => {
-                          const m =
-                            err instanceof Error
-                              ? err.message
-                              : "Revoke failed.";
-                          toast.error("Revoke failed", { description: m });
-                        },
-                      );
+                    onClick={async () => {
+                      const ok = await dialog.confirm({
+                        title: `Revoke ${a.role} access?`,
+                        description: (
+                          <>
+                            Remove access for <strong>{a.email}</strong>. They
+                            will lose admin privileges immediately. This is
+                            logged.
+                          </>
+                        ),
+                        confirmText: "Revoke access",
+                        variant: "destructive",
+                      });
+                      if (!ok) return;
+                      try {
+                        await revoke({ adminId: a._id });
+                        toast.success("Revoked");
+                      } catch (err) {
+                        const m =
+                          err instanceof Error
+                            ? err.message
+                            : "Revoke failed.";
+                        toast.error("Revoke failed", { description: m });
+                      }
                     }}
                     aria-label="Revoke"
                   >

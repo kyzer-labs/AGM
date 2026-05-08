@@ -5,6 +5,7 @@ import { ConvexReactClient } from "convex/react";
 import { ConvexProviderWithAuth } from "convex/react";
 import { Toaster } from "sonner";
 import { useFirebaseAuth } from "@/lib/use-firebase-auth";
+import { DialogProvider } from "@/components/dialog/dialog-provider";
 
 function getConvexUrl(): string {
   const url = process.env.NEXT_PUBLIC_CONVEX_URL;
@@ -21,8 +22,10 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <ConvexProviderWithAuth client={convex} useAuth={useFirebaseAuth}>
-      {children}
-      <Toaster richColors closeButton position="top-center" />
+      <DialogProvider>
+        {children}
+        <Toaster richColors closeButton position="top-center" />
+      </DialogProvider>
     </ConvexProviderWithAuth>
   );
 }

@@ -17,6 +17,7 @@ import {
 import { AuthGate } from "@/components/auth/auth-gate";
 import { AdminBreadcrumb } from "@/components/admin/admin-breadcrumb";
 import { NoElection } from "@/components/admin/no-election";
+import { useDialog } from "@/components/dialog/dialog-provider";
 import {
   Card,
   CardContent,
@@ -160,6 +161,7 @@ function SessionRowCard({
   phaseOk: boolean;
   candidates: { _id: Id<"candidates">; fullName: string; matric: string }[];
 }) {
+  const dialog = useDialog();
   const [busy, setBusy] = useState(false);
   const start = useMutation(api.sessions.startSession);
   const close = useMutation(api.sessions.closeSession);
@@ -180,12 +182,17 @@ function SessionRowCard({
   );
 
   const onStart = async () => {
-    if (
-      !window.confirm(
-        `Open the ballot for "${row.name}"? Voters will be able to vote immediately.`,
-      )
-    )
-      return;
+    const ok = await dialog.confirm({
+      title: "Open this ballot?",
+      description: (
+        <>
+          Open public voting for <strong>{row.name}</strong>. Voters will be
+          able to cast votes immediately.
+        </>
+      ),
+      confirmText: "Open ballot",
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await start({ positionId: row.positionId });
@@ -199,12 +206,19 @@ function SessionRowCard({
   };
 
   const onClose = async () => {
-    if (
-      !window.confirm(
-        `Close voting for "${row.name}"? The result will be computed immediately.`,
-      )
-    )
-      return;
+    const ok = await dialog.confirm({
+      title: "Close ballot?",
+      description: (
+        <>
+          Close voting for <strong>{row.name}</strong>. The result will be
+          computed immediately and the cascade will update for the remaining
+          positions.
+        </>
+      ),
+      confirmText: "Close ballot",
+      variant: "destructive",
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const result = await close({ positionId: row.positionId });

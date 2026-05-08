@@ -10,6 +10,7 @@ import { Plus, Trash2, Upload, Users2 } from "lucide-react";
 import { AuthGate } from "@/components/auth/auth-gate";
 import { AdminBreadcrumb } from "@/components/admin/admin-breadcrumb";
 import { NoElection } from "@/components/admin/no-election";
+import { useDialog } from "@/components/dialog/dialog-provider";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -47,6 +48,7 @@ function Inner() {
 }
 
 function Body({ election }: { election: Doc<"elections"> }) {
+  const dialog = useDialog();
   const list = useQuery(api.whitelist.list, { electionId: election._id });
   const add = useMutation(api.whitelist.add);
   const bulkAdd = useMutation(api.whitelist.bulkAdd);
@@ -249,20 +251,29 @@ function Body({ election }: { election: Doc<"elections"> }) {
                     <Button
                       size="icon"
                       variant="ghost"
-                      onClick={() => {
-                        if (!window.confirm(`Remove ${row.email}?`)) return;
-                        void remove({ entryId: row._id }).then(
-                          () => toast.success("Removed"),
-                          (err: unknown) => {
-                            const m =
-                              err instanceof Error
-                                ? err.message
-                                : "Remove failed.";
-                            toast.error("Remove failed", {
-                              description: m,
-                            });
-                          },
-                        );
+                      onClick={async () => {
+                        const ok = await dialog.confirm({
+                          title: "Remove from whitelist?",
+                          description: (
+                            <>
+                              Remove <strong>{row.email}</strong>? They will
+                              lose access to the internal evaluation window.
+                            </>
+                          ),
+                          confirmText: "Remove",
+                          variant: "destructive",
+                        });
+                        if (!ok) return;
+                        try {
+                          await remove({ entryId: row._id });
+                          toast.success("Removed");
+                        } catch (err) {
+                          const m =
+                            err instanceof Error
+                              ? err.message
+                              : "Remove failed.";
+                          toast.error("Remove failed", { description: m });
+                        }
                       }}
                       aria-label="Remove"
                     >

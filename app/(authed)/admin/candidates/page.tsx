@@ -17,6 +17,7 @@ import {
 import { AuthGate } from "@/components/auth/auth-gate";
 import { AdminBreadcrumb } from "@/components/admin/admin-breadcrumb";
 import { NoElection } from "@/components/admin/no-election";
+import { useDialog } from "@/components/dialog/dialog-provider";
 import {
   CandidateForm,
   type PositionAssignment,
@@ -70,6 +71,7 @@ interface CandidateRow {
 }
 
 function Body({ election }: { election: Doc<"elections"> }) {
+  const dialog = useDialog();
   const candidates = useQuery(api.candidates.list, {
     electionId: election._id,
   });
@@ -268,21 +270,28 @@ function Body({ election }: { election: Doc<"elections"> }) {
               c={c}
               editable={editable}
               onEdit={() => setEditingId(c._id)}
-              onRemove={() => {
-                if (
-                  !window.confirm(
-                    `Remove candidate "${c.fullName}"? This also unassigns them from all positions.`,
-                  )
-                )
-                  return;
-                void removeCandidate({ candidateId: c._id }).then(
-                  () => toast.success("Candidate removed"),
-                  (err: unknown) => {
-                    const m =
-                      err instanceof Error ? err.message : "Remove failed.";
-                    toast.error("Remove failed", { description: m });
-                  },
-                );
+              onRemove={async () => {
+                const ok = await dialog.confirm({
+                  title: "Remove candidate?",
+                  description: (
+                    <>
+                      Remove <strong>{c.fullName}</strong>? This also unassigns
+                      them from every position they were eligible for. Existing
+                      internal scores and votes are NOT deleted.
+                    </>
+                  ),
+                  confirmText: "Remove candidate",
+                  variant: "destructive",
+                });
+                if (!ok) return;
+                try {
+                  await removeCandidate({ candidateId: c._id });
+                  toast.success("Candidate removed");
+                } catch (err) {
+                  const m =
+                    err instanceof Error ? err.message : "Remove failed.";
+                  toast.error("Remove failed", { description: m });
+                }
               }}
             />
           ))}

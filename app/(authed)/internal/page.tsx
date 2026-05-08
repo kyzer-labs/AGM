@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { AuthGate } from "@/components/auth/auth-gate";
+import { useDialog } from "@/components/dialog/dialog-provider";
 import {
   Card,
   CardContent,
@@ -170,6 +171,7 @@ function PhaseInfo({
 }
 
 function ActiveEvaluation({ election }: { election: Doc<"elections"> }) {
+  const dialog = useDialog();
   const evaluation = useQuery(api.internal.myEvaluation, {
     electionId: election._id,
   });
@@ -311,12 +313,13 @@ function ActiveEvaluation({ election }: { election: Doc<"elections"> }) {
       });
       return;
     }
-    if (
-      !window.confirm(
-        "Submit your evaluation? You can still edit until the window closes.",
-      )
-    )
-      return;
+    const confirmed = await dialog.confirm({
+      title: "Submit evaluation?",
+      description:
+        "Your scores will be visible to admins. You can still edit and resubmit until the internal window closes.",
+      confirmText: "Submit",
+    });
+    if (!confirmed) return;
     const payload = buildScoresPayload();
     const ok = await handleSave(payload, true);
     if (!ok) return;
@@ -330,12 +333,13 @@ function ActiveEvaluation({ election }: { election: Doc<"elections"> }) {
   };
 
   const onReopen = async () => {
-    if (
-      !window.confirm(
-        "Re-open this evaluation for editing? You can submit again afterwards.",
-      )
-    )
-      return;
+    const confirmed = await dialog.confirm({
+      title: "Re-open evaluation?",
+      description:
+        "Your evaluation will move back to draft status. Submit again before the window closes or your scores will not count.",
+      confirmText: "Re-open for editing",
+    });
+    if (!confirmed) return;
     try {
       await unsubmit({ electionId: election._id });
       toast.success("Re-opened for editing");

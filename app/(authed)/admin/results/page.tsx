@@ -15,6 +15,7 @@ import {
 import { AuthGate } from "@/components/auth/auth-gate";
 import { AdminBreadcrumb } from "@/components/admin/admin-breadcrumb";
 import { NoElection } from "@/components/admin/no-election";
+import { useDialog } from "@/components/dialog/dialog-provider";
 import {
   Card,
   CardContent,
@@ -83,6 +84,7 @@ function Inner() {
 }
 
 function Body({ election }: { election: Doc<"elections"> }) {
+  const dialog = useDialog();
   const adminStatus = useQuery(api.admins.myAdminStatus);
   const rows = useQuery(api.results.adminPreview, {
     electionId: election._id,
@@ -107,12 +109,13 @@ function Body({ election }: { election: Doc<"elections"> }) {
   const unresolvedTies = rows.filter((r) => r.hasUnresolvedTie);
 
   const onMoveToPreview = async () => {
-    if (
-      !window.confirm(
-        "Move election to Results preview? All ballots must already be closed.",
-      )
-    )
-      return;
+    const ok = await dialog.confirm({
+      title: "Move to Results preview?",
+      description:
+        "Every ballot must already be closed and every tie resolved. The cycle will lock in admin-only review mode.",
+      confirmText: "Move to preview",
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await transition({
@@ -129,21 +132,28 @@ function Body({ election }: { election: Doc<"elections"> }) {
   };
 
   const onPublish = async () => {
-    if (
-      !window.confirm(
-        "Publish results to all voters? This is the final reveal — make sure every position has a confirmed winner.",
-      )
-    )
-      return;
-    const reason = window.prompt(
-      "Optional note for the audit log (e.g. chairperson approved):",
-    );
+    const ok = await dialog.confirm({
+      title: "Publish results to all voters?",
+      description:
+        "This is the final reveal. Make sure every position has a confirmed winner. Once published, the cycle becomes terminal.",
+      confirmText: "Publish results",
+      variant: "destructive",
+    });
+    if (!ok) return;
+    const reason = await dialog.prompt({
+      title: "Optional audit note",
+      description:
+        "Add a short note for the audit log (e.g. chairperson approved). Leave blank to skip.",
+      label: "Audit note",
+      placeholder: "Approved by chairperson on AGM day",
+      multiline: true,
+    });
     setBusy(true);
     try {
       await transition({
         electionId: election._id,
         toPhase: "published",
-        reason: reason ?? undefined,
+        reason: reason && reason.trim().length > 0 ? reason : undefined,
       });
       toast.success("Results published");
     } catch (err) {
@@ -155,16 +165,27 @@ function Body({ election }: { election: Doc<"elections"> }) {
   };
 
   const onRecompute = async (row: PreviewRow) => {
-    const reason = window.prompt(
-      `Reason for recomputing "${row.positionName}"? (logged)`,
-    );
-    if (!reason || reason.trim().length < 3) {
-      toast.error("Recompute cancelled — reason required.");
-      return;
-    }
+    const reason = await dialog.prompt({
+      title: "Recompute position?",
+      description: (
+        <>
+          Recompute the result for <strong>{row.positionName}</strong>. The
+          previous winner is excluded from cascade exclusions during the
+          recomputation.
+        </>
+      ),
+      label: "Reason (required, written to audit log)",
+      placeholder: "e.g. internal scoring corrected by admin",
+      required: true,
+      validate: (v) =>
+        v.trim().length < 3 ? "Reason must be at least 3 characters" : null,
+      confirmText: "Recompute",
+      variant: "destructive",
+    });
+    if (!reason) return;
     setBusy(true);
     try {
-      await recompute({ positionId: row.positionId, reason });
+      await recompute({ positionId: row.positionId, reason: reason.trim() });
       toast.success("Recomputed");
     } catch (err) {
       const m = err instanceof Error ? err.message : "Recompute failed.";

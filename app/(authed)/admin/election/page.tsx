@@ -18,6 +18,7 @@ import {
 
 import { AuthGate } from "@/components/auth/auth-gate";
 import { AdminBreadcrumb } from "@/components/admin/admin-breadcrumb";
+import { useDialog } from "@/components/dialog/dialog-provider";
 import {
   Card,
   CardContent,
@@ -182,6 +183,7 @@ function ElectionCard({
   year: number;
   phase: string;
 }) {
+  const dialog = useDialog();
   const readiness = useQuery(api.elections.setupReadiness, { electionId });
   const transition = useMutation(api.elections.transitionPhase);
   const remove = useMutation(api.elections.remove);
@@ -191,20 +193,41 @@ function ElectionCard({
   const [busy, setBusy] = useState(false);
 
   const onTransition = async (toPhase: string) => {
-    const reason =
-      toPhase === "internalClosed" || toPhase === "internalOpen"
-        ? window.prompt(
-            `Reason for moving to "${PHASE_LABELS[toPhase]}"? (optional, written to audit log)`,
-          ) ?? undefined
-        : undefined;
+    const wantsReason =
+      toPhase === "internalClosed" || toPhase === "internalOpen";
 
-    if (
-      !window.confirm(
-        `Move "${name}" to ${PHASE_LABELS[toPhase]}? This is logged.`,
-      )
-    ) {
-      return;
+    let reason: string | undefined;
+    if (wantsReason) {
+      const promptResult = await dialog.prompt({
+        title: `Move to ${PHASE_LABELS[toPhase] ?? toPhase}?`,
+        description: (
+          <>
+            Optional note for the audit log. Leave blank if you don&apos;t need
+            to record one.
+          </>
+        ),
+        label: "Audit note (optional)",
+        placeholder: "e.g. opened by chairperson after orientation",
+        confirmText: "Continue",
+        multiline: true,
+      });
+      if (promptResult === null) return;
+      reason = promptResult.trim().length > 0 ? promptResult.trim() : undefined;
     }
+
+    const ok = await dialog.confirm({
+      title: `Move to ${PHASE_LABELS[toPhase] ?? toPhase}?`,
+      description: (
+        <>
+          Move <strong>{name}</strong> to{" "}
+          <strong>{PHASE_LABELS[toPhase] ?? toPhase}</strong>. This phase
+          transition is logged.
+        </>
+      ),
+      confirmText: PHASE_LABELS[toPhase] ?? "Confirm",
+    });
+    if (!ok) return;
+
     setBusy(true);
     try {
       await transition({
@@ -228,13 +251,18 @@ function ElectionCard({
   };
 
   const onDelete = async () => {
-    if (
-      !window.confirm(
-        `Delete "${name}"? This permanently removes positions, candidates, and the whitelist for this cycle.`,
-      )
-    ) {
-      return;
-    }
+    const ok = await dialog.confirm({
+      title: "Delete cycle?",
+      description: (
+        <>
+          Delete <strong>{name}</strong>. This permanently removes positions,
+          candidates, and the whitelist for this cycle. Cannot be undone.
+        </>
+      ),
+      confirmText: "Delete cycle",
+      variant: "destructive",
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await remove({ electionId });

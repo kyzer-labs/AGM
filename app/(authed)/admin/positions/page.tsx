@@ -12,6 +12,7 @@ import { ArrowDown, ArrowUp, ListOrdered, Plus, Trash2 } from "lucide-react";
 import { AuthGate } from "@/components/auth/auth-gate";
 import { AdminBreadcrumb } from "@/components/admin/admin-breadcrumb";
 import { NoElection } from "@/components/admin/no-election";
+import { useDialog } from "@/components/dialog/dialog-provider";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -83,6 +84,7 @@ function Inner() {
 }
 
 function PositionsBody({ election }: { election: Doc<"elections"> }) {
+  const dialog = useDialog();
   const positions = useQuery(api.positions.list, { electionId: election._id });
   const add = useMutation(api.positions.add);
   const move = useMutation(api.positions.move);
@@ -112,13 +114,13 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
   });
 
   const onSeedDefaults = async () => {
-    if (
-      !window.confirm(
-        "Add the 9 default positions (President, 2 VPs, 6 Directors)? Duplicates will be inserted if names already exist.",
-      )
-    ) {
-      return;
-    }
+    const ok = await dialog.confirm({
+      title: "Seed default positions?",
+      description:
+        "Adds the 9 default positions (President, 2 VPs, 6 Directors). If a name already exists, a duplicate will be created — only run this on a fresh cycle.",
+      confirmText: "Seed defaults",
+    });
+    if (!ok) return;
     try {
       for (const name of DEFAULT_POSITIONS) {
         await add({
@@ -249,23 +251,30 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
                           isFirst={idx === 0}
                           isLast={idx === tierPositions.length - 1}
                           locked={lockedToSetup}
-                          onRemove={() => {
-                            if (
-                              !window.confirm(
-                                `Delete position "${p.name}"? This also unassigns it from any candidates.`,
-                              )
-                            )
-                              return;
-                            void remove({ positionId: p._id }).then(
-                              () => toast.success("Position deleted"),
-                              (err: unknown) => {
-                                const m =
-                                  err instanceof Error
-                                    ? err.message
-                                    : "Delete failed.";
-                                toast.error("Delete failed", { description: m });
-                              },
-                            );
+                          onRemove={async () => {
+                            const ok = await dialog.confirm({
+                              title: "Delete position?",
+                              description: (
+                                <>
+                                  Delete <strong>{p.name}</strong>? This also
+                                  unassigns it from every candidate that
+                                  listed it.
+                                </>
+                              ),
+                              confirmText: "Delete position",
+                              variant: "destructive",
+                            });
+                            if (!ok) return;
+                            try {
+                              await remove({ positionId: p._id });
+                              toast.success("Position deleted");
+                            } catch (err) {
+                              const m =
+                                err instanceof Error
+                                  ? err.message
+                                  : "Delete failed.";
+                              toast.error("Delete failed", { description: m });
+                            }
                           }}
                           onMove={(direction) =>
                             void move({ positionId: p._id, direction }).then(
