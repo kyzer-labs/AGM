@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { getConvexErrorMessage } from "@/lib/convex-error";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 
 const PHASE_LABELS: Record<string, string> = {
@@ -121,7 +122,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
       });
       toast.success("Moved to Results preview");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Transition failed.";
+      const m = getConvexErrorMessage(err, "Transition failed.");
       toast.error("Transition failed", { description: m });
     } finally {
       setBusy(false);
@@ -147,7 +148,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
       });
       toast.success("Results published");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Publish failed.";
+      const m = getConvexErrorMessage(err, "Publish failed.");
       toast.error("Publish failed", { description: m });
     } finally {
       setBusy(false);
@@ -167,7 +168,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
       await recompute({ positionId: row.positionId, reason });
       toast.success("Recomputed");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Recompute failed.";
+      const m = getConvexErrorMessage(err, "Recompute failed.");
       toast.error("Recompute failed", { description: m });
     } finally {
       setBusy(false);

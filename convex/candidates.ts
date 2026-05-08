@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
@@ -79,14 +79,14 @@ export const add = mutation({
     const fullName = args.fullName.trim();
     const matric = args.matric.trim();
     if (fullName.length < 2 || fullName.length > 120) {
-      throw new Error("Full name must be between 2 and 120 characters.");
+      throw new ConvexError("Full name must be between 2 and 120 characters.");
     }
     if (matric.length < 6 || matric.length > 20) {
-      throw new Error("Matric number must be between 6 and 20 characters.");
+      throw new ConvexError("Matric number must be between 6 and 20 characters.");
     }
     const bio = args.bio?.trim();
     if (bio !== undefined && bio.length > 1000) {
-      throw new Error("Bio must be at most 1000 characters.");
+      throw new ConvexError("Bio must be at most 1000 characters.");
     }
 
     const candidateId = await ctx.db.insert("candidates", {
@@ -102,7 +102,7 @@ export const add = mutation({
       for (const pa of args.positionAssignments) {
         const p = await ctx.db.get(pa.positionId);
         if (!p || p.electionId !== args.electionId) {
-          throw new Error("Position does not belong to this election.");
+          throw new ConvexError("Position does not belong to this election.");
         }
         await ctx.db.insert("candidatePositions", {
           candidateId,
@@ -136,7 +136,7 @@ export const update = mutation({
   handler: async (ctx, args) => {
     const { voter } = await requireAdmin(ctx);
     const c = await ctx.db.get(args.candidateId);
-    if (!c) throw new Error("Candidate not found.");
+    if (!c) throw new ConvexError("Candidate not found.");
     await requireSetupPhase(ctx, c.electionId);
 
     const patch: {
@@ -149,21 +149,21 @@ export const update = mutation({
     if (args.fullName !== undefined) {
       const v2 = args.fullName.trim();
       if (v2.length < 2 || v2.length > 120) {
-        throw new Error("Full name must be between 2 and 120 characters.");
+        throw new ConvexError("Full name must be between 2 and 120 characters.");
       }
       patch.fullName = v2;
     }
     if (args.matric !== undefined) {
       const v2 = args.matric.trim();
       if (v2.length < 6 || v2.length > 20) {
-        throw new Error("Matric number must be between 6 and 20 characters.");
+        throw new ConvexError("Matric number must be between 6 and 20 characters.");
       }
       patch.matric = v2;
     }
     if (args.bio !== undefined) {
       const v2 = args.bio.trim();
       if (v2.length > 1000) {
-        throw new Error("Bio must be at most 1000 characters.");
+        throw new ConvexError("Bio must be at most 1000 characters.");
       }
       patch.bio = v2.length === 0 ? undefined : v2;
     }
@@ -194,7 +194,7 @@ export const remove = mutation({
   handler: async (ctx, args) => {
     const { voter } = await requireAdmin(ctx);
     const c = await ctx.db.get(args.candidateId);
-    if (!c) throw new Error("Candidate not found.");
+    if (!c) throw new ConvexError("Candidate not found.");
     await requireSetupPhase(ctx, c.electionId);
 
     const links = await ctx.db
@@ -231,20 +231,20 @@ export const setPositionAssignments = mutation({
   handler: async (ctx, args) => {
     const { voter } = await requireAdmin(ctx);
     const c = await ctx.db.get(args.candidateId);
-    if (!c) throw new Error("Candidate not found.");
+    if (!c) throw new ConvexError("Candidate not found.");
     await requireSetupPhase(ctx, c.electionId);
 
     const seen = new Set<Id<"positions">>();
     for (const a of args.assignments) {
       if (seen.has(a.positionId)) {
-        throw new Error(
+        throw new ConvexError(
           "Each position can only be assigned once per candidate.",
         );
       }
       seen.add(a.positionId);
       const p = await ctx.db.get(a.positionId);
       if (!p || p.electionId !== c.electionId) {
-        throw new Error("Position does not belong to this election.");
+        throw new ConvexError("Position does not belong to this election.");
       }
     }
 

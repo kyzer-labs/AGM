@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import {
   isInInternalWhitelist,
@@ -35,15 +35,15 @@ export const cast = mutation({
     const voter = await requireCompletedProfile(ctx);
 
     const position = await ctx.db.get(args.positionId);
-    if (!position) throw new Error("Ballot not found.");
+    if (!position) throw new ConvexError("Ballot not found.");
     const election = await ctx.db.get(position.electionId);
-    if (!election) throw new Error("Election not found.");
+    if (!election) throw new ConvexError("Election not found.");
 
     if (election.phase !== "publicVoting") {
-      throw new Error("Public voting is not currently active.");
+      throw new ConvexError("Public voting is not currently active.");
     }
     if (position.sessionStatus !== "active") {
-      throw new Error("This ballot is not currently open.");
+      throw new ConvexError("This ballot is not currently open.");
     }
 
     const onWhitelist = await isInInternalWhitelist(
@@ -52,14 +52,14 @@ export const cast = mutation({
       voter.email,
     );
     if (onWhitelist) {
-      throw new Error(
+      throw new ConvexError(
         "Year 2 internal evaluators do not cast external public votes.",
       );
     }
 
     const candidate = await ctx.db.get(args.candidateId);
     if (!candidate || candidate.electionId !== election._id) {
-      throw new Error("Candidate is not part of this election.");
+      throw new ConvexError("Candidate is not part of this election.");
     }
 
     const link = await ctx.db
@@ -71,12 +71,12 @@ export const cast = mutation({
       )
       .unique();
     if (!link) {
-      throw new Error("That candidate is not running for this position.");
+      throw new ConvexError("That candidate is not running for this position.");
     }
 
     const winners = await getResolvedWinnerCandidateIds(ctx, election._id);
     if (winners.has(args.candidateId)) {
-      throw new Error(
+      throw new ConvexError(
         "That candidate already won an earlier position and is no longer on this ballot.",
       );
     }
@@ -88,7 +88,7 @@ export const cast = mutation({
       )
       .unique();
     if (existing) {
-      throw new Error("You have already voted for this position.");
+      throw new ConvexError("You have already voted for this position.");
     }
 
     await ctx.db.insert("publicVotes", {

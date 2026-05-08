@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
@@ -44,14 +44,14 @@ export const add = mutation({
     const { voter } = await requireAdmin(ctx);
     const e = await getElectionOrThrow(ctx, args.electionId);
     if (e.phase !== "setup" && e.phase !== "internalOpen") {
-      throw new Error(
+      throw new ConvexError(
         "Whitelist can only be edited during Setup or Internal Open phases.",
       );
     }
 
     const email = normalizeEmail(args.email);
     if (!validUsmEmail(email)) {
-      throw new Error("Whitelist emails must be @student.usm.my addresses.");
+      throw new ConvexError("Whitelist emails must be @student.usm.my addresses.");
     }
 
     const existing = await ctx.db
@@ -86,10 +86,10 @@ export const remove = mutation({
   handler: async (ctx, args) => {
     const { voter } = await requireAdmin(ctx);
     const row = await ctx.db.get(args.entryId);
-    if (!row) throw new Error("Whitelist entry not found.");
+    if (!row) throw new ConvexError("Whitelist entry not found.");
     const e = await getElectionOrThrow(ctx, row.electionId);
     if (e.phase !== "setup" && e.phase !== "internalOpen") {
-      throw new Error(
+      throw new ConvexError(
         "Whitelist can only be edited during Setup or Internal Open phases.",
       );
     }
@@ -120,7 +120,7 @@ export const bulkAdd = mutation({
     const { voter } = await requireAdmin(ctx);
     const e = await getElectionOrThrow(ctx, args.electionId);
     if (e.phase !== "setup" && e.phase !== "internalOpen") {
-      throw new Error(
+      throw new ConvexError(
         "Whitelist can only be edited during Setup or Internal Open phases.",
       );
     }

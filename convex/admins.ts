@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import {
   getAdminForVoter,
@@ -49,19 +49,22 @@ export const listAdmins = query({
     const admins = await ctx.db.query("admins").collect();
     const enriched = await Promise.all(
       admins.map(async (a) => {
-        const voter = await ctx.db.get(a.voterId);
+        const voter = a.voterId ? await ctx.db.get(a.voterId) : null;
         return {
           _id: a._id,
           email: a.email,
           role: a.role,
           fullName: voter?.fullName ?? null,
+          pending: a.voterId === undefined,
           createdAt: a.createdAt,
         };
       }),
     );
-    return enriched.sort((a, b) =>
-      a.role === b.role ? a.email.localeCompare(b.email) : a.role === "super" ? -1 : 1,
-    );
+    return enriched.sort((a, b) => {
+      if (a.role !== b.role) return a.role === "super" ? -1 : 1;
+      if (a.pending !== b.pending) return a.pending ? 1 : -1;
+      return a.email.localeCompare(b.email);
+    });
   },
 });
 
@@ -78,12 +81,12 @@ export const bootstrapSuperAdmin = mutation({
   handler: async (ctx, args) => {
     const expected = process.env.SUPER_ADMIN_BOOTSTRAP_TOKEN;
     if (!expected || expected.length < 16) {
-      throw new Error(
+      throw new ConvexError(
         "SUPER_ADMIN_BOOTSTRAP_TOKEN is not configured on the Convex deployment.",
       );
     }
     if (args.token !== expected) {
-      throw new Error("Invalid bootstrap token.");
+      throw new ConvexError("Invalid bootstrap token.");
     }
 
     const existingSuper = await ctx.db
@@ -91,7 +94,7 @@ export const bootstrapSuperAdmin = mutation({
       .filter((q) => q.eq(q.field("role"), "super"))
       .first();
     if (existingSuper) {
-      throw new Error(
+      throw new ConvexError(
         "A super admin already exists. Bootstrap is no longer available.",
       );
     }
@@ -116,6 +119,21 @@ export const bootstrapSuperAdmin = mutation({
   },
 });
 
+/**
+ * Grant admin access to a `@student.usm.my` email.
+ *
+ * Two cases:
+ *   - Target voter already exists (they have signed in at least once):
+ *     the new admin row is linked to that voter immediately.
+ *   - Target voter does not exist yet: the admin row is created as a
+ *     "pending invite" with `voterId` left undefined. The grant lies
+ *     dormant until that user signs in for the first time, at which
+ *     point `voters.ensureVoter` automatically attaches the voterId.
+ *
+ * Pending invites cannot actually do anything (they have no voterId,
+ * so `getAdminForVoter` won't find them); they only become active on
+ * first sign-in.
+ */
 export const grantAdmin = mutation({
   args: {
     email: v.string(),
@@ -126,7 +144,7 @@ export const grantAdmin = mutation({
 
     const targetEmail = args.email.trim().toLowerCase();
     if (!targetEmail.endsWith("@student.usm.my")) {
-      throw new Error("Admin email must be a @student.usm.my address.");
+      throw new ConvexError("Admin email must be a @student.usm.my address.");
     }
 
     const targetVoter = await ctx.db
@@ -134,43 +152,61 @@ export const grantAdmin = mutation({
       .withIndex("by_email", (q) => q.eq("email", targetEmail))
       .unique();
 
-    if (!targetVoter) {
-      throw new Error(
-        "That user has not signed in yet. Ask them to sign in once first.",
-      );
-    }
+    const existingByEmail = await ctx.db
+      .query("admins")
+      .withIndex("by_email", (q) => q.eq("email", targetEmail))
+      .unique();
 
-    const existing = await getAdminForVoter(ctx, targetVoter._id);
-    if (existing) {
-      if (existing.role === args.role) return existing._id;
-      await ctx.db.patch(existing._id, { role: args.role });
-      await audit(ctx, {
-        actor,
-        action: "admin.roleChanged",
-        entityType: "admins",
-        entityId: existing._id,
-        payload: { newRole: args.role },
-      });
-      return existing._id;
+    if (existingByEmail) {
+      const patch: {
+        role?: "super" | "admin";
+        voterId?: typeof existingByEmail.voterId;
+      } = {};
+      if (existingByEmail.role !== args.role) patch.role = args.role;
+      if (existingByEmail.voterId === undefined && targetVoter) {
+        patch.voterId = targetVoter._id;
+      }
+      if (Object.keys(patch).length > 0) {
+        await ctx.db.patch(existingByEmail._id, patch);
+        await audit(ctx, {
+          actor,
+          action: "admin.roleChanged",
+          entityType: "admins",
+          entityId: existingByEmail._id,
+          payload: {
+            newRole: args.role,
+            linkedVoter: patch.voterId !== undefined,
+          },
+        });
+      }
+      const stillPending =
+        existingByEmail.voterId === undefined && targetVoter === null;
+      return { adminId: existingByEmail._id, pending: stillPending };
     }
 
     const adminId = await ctx.db.insert("admins", {
-      voterId: targetVoter._id,
+      voterId: targetVoter?._id,
       email: targetEmail,
       role: args.role,
       createdByAdminId: actorAdmin._id,
       createdAt: Date.now(),
     });
 
+    const pending = targetVoter === null;
+
     await audit(ctx, {
       actor,
       action: "admin.granted",
       entityType: "admins",
       entityId: adminId,
-      payload: { role: args.role, targetEmail },
+      payload: {
+        role: args.role,
+        targetEmail,
+        pending,
+      },
     });
 
-    return adminId;
+    return { adminId, pending };
   },
 });
 
@@ -180,9 +216,9 @@ export const revokeAdmin = mutation({
     const { voter: actor, admin: actorAdmin } = await requireSuperAdmin(ctx);
 
     const target = await ctx.db.get(args.adminId);
-    if (!target) throw new Error("Admin not found.");
+    if (!target) throw new ConvexError("Admin not found.");
     if (target._id === actorAdmin._id) {
-      throw new Error("You cannot revoke your own admin access here.");
+      throw new ConvexError("You cannot revoke your own admin access here.");
     }
     if (target.role === "super") {
       const supers = await ctx.db
@@ -190,7 +226,7 @@ export const revokeAdmin = mutation({
         .filter((q) => q.eq(q.field("role"), "super"))
         .collect();
       if (supers.length <= 1) {
-        throw new Error("Cannot revoke the only remaining super admin.");
+        throw new ConvexError("Cannot revoke the only remaining super admin.");
       }
     }
 

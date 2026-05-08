@@ -20,7 +20,7 @@ export default defineSchema({
     .index("by_firebase_uid", ["firebaseUid"]),
 
   admins: defineTable({
-    voterId: v.id("voters"),
+    voterId: v.optional(v.id("voters")),
     email: v.string(),
     role: v.union(v.literal("super"), v.literal("admin")),
     createdByAdminId: v.optional(v.id("admins")),

@@ -32,6 +32,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { getConvexErrorMessage } from "@/lib/convex-error";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 
 export default function CandidatesPage() {
@@ -158,7 +159,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
             description: `${summary.inserted} added · ${summary.skipped} skipped · ${summary.errors.length} errors`,
           });
         } catch (err) {
-          const m = err instanceof Error ? err.message : "Import failed.";
+          const m = getConvexErrorMessage(err, "Import failed.");
           toast.error("Import failed", { description: m });
         } finally {
           setImporting(false);
@@ -279,7 +280,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
                   () => toast.success("Candidate removed"),
                   (err: unknown) => {
                     const m =
-                      err instanceof Error ? err.message : "Remove failed.";
+                      getConvexErrorMessage(err, "Remove failed.");
                     toast.error("Remove failed", { description: m });
                   },
                 );

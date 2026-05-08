@@ -31,6 +31,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { getConvexErrorMessage } from "@/lib/convex-error";
 import type { Id } from "@/convex/_generated/dataModel";
 
 const PHASE_LABELS: Record<string, string> = {
@@ -92,7 +93,7 @@ function Inner() {
       toast.success("Election created");
       form.reset({ name: "", year: new Date().getFullYear() });
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Could not create.";
+      const m = getConvexErrorMessage(err, "Could not create.");
       toast.error("Create failed", { description: m });
     }
   });
@@ -220,7 +221,7 @@ function ElectionCard({
       });
       toast.success(`Phase changed to ${PHASE_LABELS[toPhase]}`);
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Phase change failed.";
+      const m = getConvexErrorMessage(err, "Phase change failed.");
       toast.error("Phase change failed", { description: m });
     } finally {
       setBusy(false);
@@ -240,7 +241,7 @@ function ElectionCard({
       await remove({ electionId });
       toast.success("Election deleted");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Delete failed.";
+      const m = getConvexErrorMessage(err, "Delete failed.");
       toast.error("Delete failed", { description: m });
     } finally {
       setBusy(false);
@@ -254,7 +255,7 @@ function ElectionCard({
       toast.success("Renamed");
       setEditing(false);
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Rename failed.";
+      const m = getConvexErrorMessage(err, "Rename failed.");
       toast.error("Rename failed", { description: m });
     } finally {
       setBusy(false);

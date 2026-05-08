@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import {
   isInInternalWhitelist,
@@ -48,7 +48,7 @@ async function getOrCreateMyEvaluation(
     updatedAt: Date.now(),
   });
   const created = await ctx.db.get(id);
-  if (!created) throw new Error("Failed to create evaluation row.");
+  if (!created) throw new ConvexError("Failed to create evaluation row.");
   return created;
 }
 
@@ -144,11 +144,11 @@ export const saveScores = mutation({
   handler: async (ctx, args) => {
     const voter = await requireVoter(ctx);
     if (!voter.profileComplete) {
-      throw new Error("Complete your profile before scoring.");
+      throw new ConvexError("Complete your profile before scoring.");
     }
     const election = await getElectionOrThrow(ctx, args.electionId);
     if (election.phase !== "internalOpen") {
-      throw new Error(
+      throw new ConvexError(
         "Internal evaluation is not open. Scores cannot be saved.",
       );
     }
@@ -158,7 +158,7 @@ export const saveScores = mutation({
       voter.email,
     );
     if (!whitelisted) {
-      throw new Error(
+      throw new ConvexError(
         "You are not on the Year 2 internal whitelist for this election.",
       );
     }
@@ -166,11 +166,11 @@ export const saveScores = mutation({
     for (const s of args.scores) {
       const c = await ctx.db.get(s.candidateId);
       if (!c || c.electionId !== election._id) {
-        throw new Error("Score references a candidate from another election.");
+        throw new ConvexError("Score references a candidate from another election.");
       }
       for (const cat of RUBRIC_CATEGORIES) {
         if (!validScore(s[cat])) {
-          throw new Error(
+          throw new ConvexError(
             `Score for "${cat}" must be an integer between 1 and 5.`,
           );
         }
@@ -230,7 +230,7 @@ export const submit = mutation({
     const voter = await requireVoter(ctx);
     const election = await getElectionOrThrow(ctx, args.electionId);
     if (election.phase !== "internalOpen") {
-      throw new Error("Internal evaluation is not open.");
+      throw new ConvexError("Internal evaluation is not open.");
     }
     const whitelisted = await isInInternalWhitelist(
       ctx,
@@ -238,7 +238,7 @@ export const submit = mutation({
       voter.email,
     );
     if (!whitelisted) {
-      throw new Error(
+      throw new ConvexError(
         "You are not on the Year 2 internal whitelist for this election.",
       );
     }
@@ -250,7 +250,7 @@ export const submit = mutation({
       )
       .unique();
     if (!evaluation) {
-      throw new Error("Score every candidate first, then submit.");
+      throw new ConvexError("Score every candidate first, then submit.");
     }
 
     const candidates = await ctx.db
@@ -283,7 +283,7 @@ export const submit = mutation({
     }
 
     if (missing.length > 0) {
-      throw new Error(
+      throw new ConvexError(
         `Cannot submit — incomplete scores for: ${missing
           .slice(0, 5)
           .join(", ")}${missing.length > 5 ? " (and more)" : ""}.`,
@@ -312,7 +312,7 @@ export const unsubmit = mutation({
     const voter = await requireVoter(ctx);
     const election = await getElectionOrThrow(ctx, args.electionId);
     if (election.phase !== "internalOpen") {
-      throw new Error(
+      throw new ConvexError(
         "Internal evaluation is closed. You cannot edit a submitted evaluation now.",
       );
     }

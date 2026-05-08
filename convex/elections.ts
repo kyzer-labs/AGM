@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
@@ -28,10 +28,10 @@ export const create = mutation({
 
     const name = args.name.trim();
     if (name.length < 2 || name.length > 80) {
-      throw new Error("Election name must be between 2 and 80 characters.");
+      throw new ConvexError("Election name must be between 2 and 80 characters.");
     }
     if (!Number.isInteger(args.year) || args.year < 2024 || args.year > 2100) {
-      throw new Error("Year must be a four-digit integer.");
+      throw new ConvexError("Year must be a four-digit integer.");
     }
 
     const electionId = await ctx.db.insert("elections", {
@@ -65,7 +65,7 @@ export const rename = mutation({
 
     const name = args.name.trim();
     if (name.length < 2 || name.length > 80) {
-      throw new Error("Election name must be between 2 and 80 characters.");
+      throw new ConvexError("Election name must be between 2 and 80 characters.");
     }
 
     await ctx.db.patch(e._id, { name, updatedAt: Date.now() });
@@ -85,7 +85,7 @@ export const remove = mutation({
     const { voter } = await requireAdmin(ctx);
     const e = await getElectionOrThrow(ctx, args.electionId);
     if (e.phase !== "setup") {
-      throw new Error(
+      throw new ConvexError(
         "Elections can only be deleted while in Setup phase.",
       );
     }
@@ -141,7 +141,7 @@ export const transitionPhase = mutation({
     if (e.phase === args.toPhase) return;
 
     if (!canTransition(e.phase, args.toPhase)) {
-      throw new Error(
+      throw new ConvexError(
         `Cannot move from ${PHASE_LABEL[e.phase]} to ${PHASE_LABEL[args.toPhase]}.`,
       );
     }
@@ -149,7 +149,7 @@ export const transitionPhase = mutation({
     if (args.toPhase === "internalOpen") {
       const readiness = await computeSetupReadiness(ctx, e._id);
       if (!readiness.ready) {
-        throw new Error(
+        throw new ConvexError(
           `Setup is not complete: ${readiness.warnings.join(" ")}`,
         );
       }
@@ -162,7 +162,7 @@ export const transitionPhase = mutation({
         .collect();
       const open = positions.filter((p) => p.sessionStatus !== "closed");
       if (open.length > 0) {
-        throw new Error(
+        throw new ConvexError(
           `Close every ballot before moving to results preview. ${open.length} position(s) are still open or pending.`,
         );
       }
@@ -172,7 +172,7 @@ export const transitionPhase = mutation({
         .collect();
       const unresolved = results.filter((r) => r.winnerCandidateId === undefined);
       if (unresolved.length > 0) {
-        throw new Error(
+        throw new ConvexError(
           `Resolve all ties before moving to results preview. ${unresolved.length} unresolved.`,
         );
       }
@@ -184,11 +184,11 @@ export const transitionPhase = mutation({
         .withIndex("by_election", (q) => q.eq("electionId", e._id))
         .collect();
       if (results.length === 0) {
-        throw new Error("No results to publish.");
+        throw new ConvexError("No results to publish.");
       }
       const unresolved = results.filter((r) => r.winnerCandidateId === undefined);
       if (unresolved.length > 0) {
-        throw new Error(
+        throw new ConvexError(
           `${unresolved.length} unresolved tie(s) — resolve before publishing.`,
         );
       }

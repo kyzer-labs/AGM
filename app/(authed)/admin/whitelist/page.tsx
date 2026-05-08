@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { getConvexErrorMessage } from "@/lib/convex-error";
 import type { Doc } from "@/convex/_generated/dataModel";
 
 export default function WhitelistPage() {
@@ -68,7 +69,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
       toast.success("Email added");
       setSingle("");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Add failed.";
+      const m = getConvexErrorMessage(err, "Add failed.");
       toast.error("Add failed", { description: m });
     } finally {
       setBusy(false);
@@ -89,7 +90,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
       toast.success("Bulk import complete", { description: parts.join(" · ") });
       setBulk("");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Import failed.";
+      const m = getConvexErrorMessage(err, "Import failed.");
       toast.error("Import failed", { description: m });
     } finally {
       setBusy(false);
@@ -254,12 +255,11 @@ function Body({ election }: { election: Doc<"elections"> }) {
                         void remove({ entryId: row._id }).then(
                           () => toast.success("Removed"),
                           (err: unknown) => {
-                            const m =
-                              err instanceof Error
-                                ? err.message
-                                : "Remove failed.";
                             toast.error("Remove failed", {
-                              description: m,
+                              description: getConvexErrorMessage(
+                                err,
+                                "Remove failed.",
+                              ),
                             });
                           },
                         );

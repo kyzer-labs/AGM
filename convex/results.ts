@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAdmin, requireSuperAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
@@ -163,17 +163,17 @@ export const recompute = mutation({
     const { voter } = await requireSuperAdmin(ctx);
     const reason = args.reason.trim();
     if (reason.length < 3) {
-      throw new Error("Provide a recompute reason for the audit log.");
+      throw new ConvexError("Provide a recompute reason for the audit log.");
     }
 
     const position = await ctx.db.get(args.positionId);
-    if (!position) throw new Error("Position not found.");
+    if (!position) throw new ConvexError("Position not found.");
     const election = await getElectionOrThrow(ctx, position.electionId);
     if (
       election.phase !== "publicVoting" &&
       election.phase !== "resultsPreview"
     ) {
-      throw new Error(
+      throw new ConvexError(
         "Recompute is only available during publicVoting or resultsPreview.",
       );
     }

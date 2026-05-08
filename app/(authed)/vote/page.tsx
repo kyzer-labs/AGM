@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
+import { getConvexErrorMessage } from "@/lib/convex-error";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 
 export default function VotePage() {
@@ -259,7 +260,7 @@ function Ballot({ session }: { session: ActiveSession }) {
       await cast({ positionId: session.positionId, candidateId: selected });
       toast.success("Vote recorded");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Could not vote.";
+      const m = getConvexErrorMessage(err, "Could not vote.");
       toast.error("Vote failed", { description: m });
     } finally {
       setSubmitting(false);

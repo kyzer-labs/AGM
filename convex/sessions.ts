@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
@@ -135,7 +135,7 @@ export const previewCascade = query({
     await requireAdmin(ctx);
     const position = await ctx.db.get(args.positionId);
     if (!position || position.electionId !== args.electionId) {
-      throw new Error("Position not found in this election.");
+      throw new ConvexError("Position not found in this election.");
     }
 
     const winners = await getResolvedWinnerCandidateIds(
@@ -177,16 +177,16 @@ export const startSession = mutation({
   handler: async (ctx, args) => {
     const { voter } = await requireAdmin(ctx);
     const position = await ctx.db.get(args.positionId);
-    if (!position) throw new Error("Position not found.");
+    if (!position) throw new ConvexError("Position not found.");
 
     const election = await getElectionOrThrow(ctx, position.electionId);
     if (election.phase !== "publicVoting") {
-      throw new Error(
+      throw new ConvexError(
         "Public voting is not active. Move the cycle to publicVoting first.",
       );
     }
     if (position.sessionStatus !== "pending") {
-      throw new Error("This position has already been opened or closed.");
+      throw new ConvexError("This position has already been opened or closed.");
     }
 
     const otherActive = await ctx.db
@@ -196,14 +196,14 @@ export const startSession = mutation({
       )
       .first();
     if (otherActive) {
-      throw new Error(
+      throw new ConvexError(
         `Close "${otherActive.name}" before opening another ballot.`,
       );
     }
 
     const unresolved = await getUnresolvedTiePositionIds(ctx, election._id);
     if (unresolved.length > 0) {
-      throw new Error(
+      throw new ConvexError(
         "Resolve the previous position's tie before opening another ballot.",
       );
     }
@@ -215,7 +215,7 @@ export const startSession = mutation({
       .collect();
     const eligible = links.filter((l) => !winners.has(l.candidateId));
     if (eligible.length === 0) {
-      throw new Error(
+      throw new ConvexError(
         "No eligible candidates remain for this position after the cascade.",
       );
     }
@@ -240,9 +240,9 @@ export const closeSession = mutation({
   handler: async (ctx, args) => {
     const { voter } = await requireAdmin(ctx);
     const position = await ctx.db.get(args.positionId);
-    if (!position) throw new Error("Position not found.");
+    if (!position) throw new ConvexError("Position not found.");
     if (position.sessionStatus !== "active") {
-      throw new Error("This position is not currently active.");
+      throw new ConvexError("This position is not currently active.");
     }
     const election = await getElectionOrThrow(ctx, position.electionId);
 
@@ -313,11 +313,11 @@ export const resolveTie = mutation({
   handler: async (ctx, args) => {
     const { voter } = await requireAdmin(ctx);
     const position = await ctx.db.get(args.positionId);
-    if (!position) throw new Error("Position not found.");
+    if (!position) throw new ConvexError("Position not found.");
 
     const reason = args.reason.trim();
     if (reason.length < 3) {
-      throw new Error("Provide a tie-resolution reason for the audit log.");
+      throw new ConvexError("Provide a tie-resolution reason for the audit log.");
     }
 
     const result = await ctx.db
@@ -326,13 +326,13 @@ export const resolveTie = mutation({
         q.eq("electionId", position.electionId).eq("positionId", position._id),
       )
       .unique();
-    if (!result) throw new Error("No result row to resolve.");
+    if (!result) throw new ConvexError("No result row to resolve.");
 
     const inBreakdown = result.breakdown.find(
       (b) => b.candidateId === args.winnerCandidateId,
     );
     if (!inBreakdown) {
-      throw new Error("Selected candidate is not part of this position.");
+      throw new ConvexError("Selected candidate is not part of this position.");
     }
 
     await ctx.db.patch(result._id, {

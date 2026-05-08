@@ -26,6 +26,7 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { getConvexErrorMessage } from "@/lib/convex-error";
 import type { Doc } from "@/convex/_generated/dataModel";
 
 const TIER_LABELS: Record<number, string> = {
@@ -106,7 +107,7 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
       toast.success("Position added");
       form.reset({ name: "", tier: values.tier });
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Add failed.";
+      const m = getConvexErrorMessage(err, "Add failed.");
       toast.error("Add failed", { description: m });
     }
   });
@@ -129,7 +130,7 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
       }
       toast.success("Default positions added");
     } catch (err) {
-      const m = err instanceof Error ? err.message : "Seed failed.";
+      const m = getConvexErrorMessage(err, "Seed failed.");
       toast.error("Seed failed", { description: m });
     }
   };
@@ -259,11 +260,12 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
                             void remove({ positionId: p._id }).then(
                               () => toast.success("Position deleted"),
                               (err: unknown) => {
-                                const m =
-                                  err instanceof Error
-                                    ? err.message
-                                    : "Delete failed.";
-                                toast.error("Delete failed", { description: m });
+                                toast.error("Delete failed", {
+                                  description: getConvexErrorMessage(
+                                    err,
+                                    "Delete failed.",
+                                  ),
+                                });
                               },
                             );
                           }}
@@ -271,12 +273,11 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
                             void move({ positionId: p._id, direction }).then(
                               undefined,
                               (err: unknown) => {
-                                const m =
-                                  err instanceof Error
-                                    ? err.message
-                                    : "Reorder failed.";
                                 toast.error("Reorder failed", {
-                                  description: m,
+                                  description: getConvexErrorMessage(
+                                    err,
+                                    "Reorder failed.",
+                                  ),
                                 });
                               },
                             )
@@ -288,12 +289,11 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
                             }).then(
                               () => toast.success("Renamed"),
                               (err: unknown) => {
-                                const m =
-                                  err instanceof Error
-                                    ? err.message
-                                    : "Rename failed.";
                                 toast.error("Rename failed", {
-                                  description: m,
+                                  description: getConvexErrorMessage(
+                                    err,
+                                    "Rename failed.",
+                                  ),
                                 });
                               },
                             )

@@ -1,3 +1,4 @@
+import { ConvexError } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 
@@ -36,7 +37,7 @@ export async function requireIdentity(
 ): Promise<AuthIdentitySafe> {
   const id = await getIdentitySafeOrNull(ctx);
   if (!id) {
-    throw new Error(
+    throw new ConvexError(
       "Not signed in with a valid @student.usm.my account.",
     );
   }
@@ -59,7 +60,7 @@ export async function requireVoter(
 ): Promise<Doc<"voters">> {
   const voter = await getCurrentVoterOrNull(ctx);
   if (!voter) {
-    throw new Error(
+    throw new ConvexError(
       "Voter record not found. Sign in once so the system can create your profile.",
     );
   }
@@ -71,7 +72,7 @@ export async function requireCompletedProfile(
 ): Promise<Doc<"voters">> {
   const voter = await requireVoter(ctx);
   if (!voter.profileComplete) {
-    throw new Error(
+    throw new ConvexError(
       "Please complete your voter profile before continuing.",
     );
   }
@@ -94,7 +95,7 @@ export async function requireAdmin(
   const voter = await requireCompletedProfile(ctx);
   const admin = await getAdminForVoter(ctx, voter._id);
   if (!admin) {
-    throw new Error("Admin access required.");
+    throw new ConvexError("Admin access required.");
   }
   return { voter, admin };
 }
@@ -104,7 +105,7 @@ export async function requireSuperAdmin(
 ): Promise<{ voter: Doc<"voters">; admin: Doc<"admins"> }> {
   const result = await requireAdmin(ctx);
   if (result.admin.role !== "super") {
-    throw new Error("Super admin access required.");
+    throw new ConvexError("Super admin access required.");
   }
   return result;
 }
