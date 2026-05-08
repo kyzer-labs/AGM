@@ -36,6 +36,7 @@ export default function DashboardPage() {
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <DashboardTile
+          index={0}
           href="/internal"
           icon={<ClipboardCheck className="h-5 w-5" />}
           title="Internal evaluation"
@@ -43,6 +44,7 @@ export default function DashboardPage() {
           tone="brand"
         />
         <DashboardTile
+          index={1}
           href="/vote"
           icon={<Vote className="h-5 w-5" />}
           title="AGM live voting"
@@ -50,6 +52,7 @@ export default function DashboardPage() {
           tone="success"
         />
         <DashboardTile
+          index={2}
           href="/results"
           icon={<BarChart3 className="h-5 w-5" />}
           title="Published results"
@@ -58,6 +61,7 @@ export default function DashboardPage() {
         />
         {isAdmin ? (
           <DashboardTile
+            index={3}
             href="/admin"
             icon={<ShieldCheck className="h-5 w-5" />}
             title="Admin console"
@@ -70,35 +74,47 @@ export default function DashboardPage() {
   );
 }
 
-function DashboardTile({
-  href,
-  icon,
-  title,
-  description,
-  tone,
-}: {
+interface DashboardTileProps {
+  index: number;
   href: string;
   icon: React.ReactNode;
   title: string;
   description: string;
   tone: "brand" | "success" | "warning" | "muted";
-}) {
+}
+
+function DashboardTile({
+  index,
+  href,
+  icon,
+  title,
+  description,
+  tone,
+}: DashboardTileProps) {
+  const tileStyle = { "--index": index } as React.CSSProperties;
+
   return (
-    <Link href={href} className="group">
-      <Card className="h-full transition-colors group-hover:border-[var(--color-foreground)]/20">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="grid h-9 w-9 place-items-center rounded-md bg-[var(--color-secondary)]">
-              {icon}
+    <Link
+      href={href}
+      className="group tile-enter block h-full"
+      style={tileStyle}
+    >
+      <div className="h-full rounded-[1.5rem] bg-[var(--color-foreground)]/[0.04] p-1.5 ring-1 ring-[var(--color-foreground)]/5 transition-[box-shadow,background-color] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:bg-[var(--color-foreground)]/[0.06] group-hover:ring-[var(--color-foreground)]/10">
+        <Card className="h-full rounded-[calc(1.5rem-0.375rem)] shadow-none transition-colors group-hover:border-[var(--color-foreground)]/20">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="grid h-9 w-9 place-items-center rounded-md bg-[var(--color-secondary)] ring-1 ring-[var(--color-foreground)]/5">
+                {icon}
+              </div>
+              <Badge tone={tone}>Open</Badge>
             </div>
-            <Badge tone={tone}>Open</Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <CardTitle className="mb-1.5">{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent>
+            <CardTitle className="mb-1.5">{title}</CardTitle>
+            <CardDescription>{description}</CardDescription>
+          </CardContent>
+        </Card>
+      </div>
     </Link>
   );
 }
