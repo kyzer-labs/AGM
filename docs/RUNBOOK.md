@@ -134,3 +134,28 @@ Skim it once before the event, keep it open during.
 - [ ] At least one super admin has a backup email/laptop.
 - [ ] `SUPER_ADMIN_BOOTSTRAP_TOKEN` is rotated or removed from Convex env.
 - [ ] Spec test: a sample external voter can sign in and reach `/vote`.
+
+---
+
+## Appendix: CSV import formats
+
+### Candidates (`/admin/candidates` → "Import CSV")
+
+| Column | Required | Notes |
+| --- | --- | --- |
+| `fullName` | yes | Also accepted: `Full Name`, `name`, `Name`. 2–120 characters. |
+| `matric` | yes | Also accepted: `matricNumber`, `Matric`. 6–20 characters. Used for dedupe (case-insensitive). |
+| `bio` | no | Up to 1000 characters. Empty allowed. |
+| `positions` | no | `,` `;` or `\|`-separated list of position names. Names must match an existing position (case-insensitive). Position **order in the list = the candidate's preference order**, so the first one is their first choice. |
+
+Header row is required. Duplicate `matric` values across the CSV (or already in the database) are skipped — not overwritten — and reported in the toast summary as "skipped".
+
+A working sample lives at [docs/sample-candidates.csv](sample-candidates.csv). It uses the 15 candidates from the AGM 2025 selection sheet and lines up with the names produced by the **Seed default 9 positions** button on `/admin/positions`. Workflow:
+
+1. `/admin/election` → create cycle.
+2. `/admin/positions` → click "Seed default 9 positions".
+3. `/admin/candidates` → "Import CSV" → pick `docs/sample-candidates.csv`.
+
+### Internal whitelist (`/admin/whitelist` → "Upload CSV" / paste box)
+
+The whitelist accepts emails one per cell. Headers are optional — every cell is treated as a potential email. Anything that doesn't end in `@student.usm.my` lands in the "invalid" bucket of the import summary; duplicates land in "skipped". Both single emails and full sheets work.
