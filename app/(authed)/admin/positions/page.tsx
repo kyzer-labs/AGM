@@ -17,9 +17,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +24,7 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Modal } from "@/components/ui/modal";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { friendlyError } from "@/lib/errors";
 
@@ -92,6 +90,7 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
   const remove = useMutation(api.positions.remove);
   const updateName = useMutation(api.positions.updateName);
 
+  const [showAdd, setShowAdd] = useState(false);
   const form = useForm<AddForm>({
     resolver: zodResolver(addSchema),
     defaultValues: { name: "", tier: 1 },
@@ -108,6 +107,7 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
       });
       toast.success("Position added");
       form.reset({ name: "", tier: values.tier });
+      setShowAdd(false);
     } catch (err) {
       const m = friendlyError(err, "Add failed.");
       toast.error("Add failed", { description: m });
@@ -176,55 +176,65 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
         </div>
         {lockedToSetup ? (
           <Badge tone="warning">Locked — election not in Setup</Badge>
-        ) : null}
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              onClick={() => {
+                form.reset({ name: "", tier: 1 });
+                setShowAdd(true);
+              }}
+            >
+              <Plus className="h-4 w-4" /> Add position
+            </Button>
+            {positions.length === 0 ? (
+              <Button variant="outline" onClick={onSeedDefaults}>
+                <ListOrdered className="h-4 w-4" /> Seed defaults
+              </Button>
+            ) : null}
+          </div>
+        )}
       </header>
 
-      {!lockedToSetup ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Add a position</CardTitle>
-            <CardDescription>
-              Tier 1 = President, 2 = Vice Presidents, 3 = Directors. Use
-              higher tiers for any extra roles.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form
-              onSubmit={onAdd}
-              className="grid gap-3 sm:grid-cols-[1fr_180px_auto] sm:items-end"
+      <Modal
+        open={!lockedToSetup && showAdd}
+        onClose={() => setShowAdd(false)}
+        title="Add a position"
+        description="Tier 1 = President, 2 = Vice Presidents, 3 = Directors. Use higher tiers for any extra roles."
+        size="md"
+      >
+        <form onSubmit={onAdd} className="grid gap-4">
+          <div className="grid gap-1.5">
+            <Label htmlFor="pos-name">Name</Label>
+            <Input
+              id="pos-name"
+              placeholder="Director of Technical Department"
+              {...form.register("name")}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="pos-tier">Tier</Label>
+            <Select id="pos-tier" {...form.register("tier")}>
+              {[1, 2, 3, 4].map((t) => (
+                <option key={t} value={t}>
+                  {t} · {TIER_LABELS[t] ?? `Tier ${t}`}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="flex items-center justify-end gap-2 border-t pt-4">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setShowAdd(false)}
             >
-              <div className="grid gap-1.5">
-                <Label htmlFor="pos-name">Name</Label>
-                <Input
-                  id="pos-name"
-                  placeholder="Director of Technical Department"
-                  {...form.register("name")}
-                />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="pos-tier">Tier</Label>
-                <Select id="pos-tier" {...form.register("tier")}>
-                  {[1, 2, 3, 4].map((t) => (
-                    <option key={t} value={t}>
-                      {t} · {TIER_LABELS[t] ?? `Tier ${t}`}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <Button type="submit" loading={form.formState.isSubmitting}>
-                <Plus className="h-4 w-4" /> Add
-              </Button>
-            </form>
-            {positions.length === 0 ? (
-              <div className="mt-4">
-                <Button variant="outline" size="sm" onClick={onSeedDefaults}>
-                  <ListOrdered className="h-4 w-4" /> Seed default 9 positions
-                </Button>
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
-      ) : null}
+              Cancel
+            </Button>
+            <Button type="submit" loading={form.formState.isSubmitting}>
+              <Plus className="h-4 w-4" /> Add
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       {positions.length === 0 ? (
         <EmptyState

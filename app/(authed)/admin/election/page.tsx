@@ -30,7 +30,6 @@ import { useDialog } from "@/components/dialog/dialog-provider";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -40,6 +39,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Modal } from "@/components/ui/modal";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { friendlyError } from "@/lib/errors";
 
@@ -82,9 +82,22 @@ function Inner() {
   const elections = useQuery(api.elections.list);
   const createElection = useMutation(api.elections.create);
 
+  const [showCreate, setShowCreate] = useState(false);
   const form = useForm<CreateFormValues>({
     resolver: zodResolver(createSchema),
     defaultValues: { name: "", year: new Date().getFullYear() },
+  });
+
+  const onCreate = form.handleSubmit(async (values) => {
+    try {
+      await createElection(values);
+      toast.success("Election created");
+      form.reset({ name: "", year: new Date().getFullYear() });
+      setShowCreate(false);
+    } catch (err) {
+      const m = friendlyError(err, "Could not create.");
+      toast.error("Create failed", { description: m });
+    }
   });
 
   if (elections === undefined) {
@@ -96,75 +109,87 @@ function Inner() {
     );
   }
 
-  const onCreate = form.handleSubmit(async (values) => {
-    try {
-      await createElection(values);
-      toast.success("Election created");
-      form.reset({ name: "", year: new Date().getFullYear() });
-    } catch (err) {
-      const m = friendlyError(err, "Could not create.");
-      toast.error("Create failed", { description: m });
-    }
-  });
-
   return (
     <main className="container-wide py-10 space-y-8">
       <AdminBreadcrumb items={[{ label: "Election cycle" }]} />
 
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Election cycles
-        </h1>
-        <p className="text-sm text-[var(--color-muted-foreground)]">
-          Each cycle holds positions, candidates, the internal whitelist
-          (split across three voter classes), the rubric criteria, and the
-          weighted scoring configuration.
-        </p>
+      <header className="flex flex-wrap items-start gap-3">
+        <div className="flex-1">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Election cycles
+          </h1>
+          <p className="text-sm text-[var(--color-muted-foreground)]">
+            Each cycle holds positions, candidates, the internal whitelist
+            (split across three voter classes), the rubric criteria, and the
+            weighted scoring configuration.
+          </p>
+        </div>
+        <Button
+          onClick={() => {
+            form.reset({ name: "", year: new Date().getFullYear() });
+            setShowCreate(true);
+          }}
+        >
+          <CalendarPlus className="h-4 w-4" /> New cycle
+        </Button>
       </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">New cycle</CardTitle>
-          <CardDescription>
-            Create a fresh AGM cycle. It starts in <strong>Setup</strong>{" "}
-            phase with default weights (30% TC + 20% HE + 10% Y2 + 40%
-            Public) and the standard 5-criterion rubric. You can change
-            both before opening the internal evaluation.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form
-            onSubmit={onCreate}
-            className="grid gap-3 sm:grid-cols-[1fr_140px_auto] sm:items-end"
-          >
-            <div className="grid gap-1.5">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                placeholder="USM CSS AGM 2026"
-                {...form.register("name")}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="year">Year</Label>
-              <Input
-                id="year"
-                type="number"
-                {...form.register("year")}
-              />
-            </div>
+      <Modal
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        title="New election cycle"
+        description={
+          <>
+            Starts in <strong>Setup</strong> phase with default weights (30%
+            TC + 20% HE + 10% Y2 + 40% Public) and the standard 5-criterion
+            rubric. You can change both before opening internal evaluation.
+          </>
+        }
+        size="md"
+      >
+        <form onSubmit={onCreate} className="grid gap-4">
+          <div className="grid gap-1.5">
+            <Label htmlFor="name">Name</Label>
+            <Input
+              id="name"
+              placeholder="USM CSS AGM 2026"
+              {...form.register("name")}
+            />
+            {form.formState.errors.name ? (
+              <p className="text-xs text-[var(--color-destructive)]">
+                {form.formState.errors.name.message}
+              </p>
+            ) : null}
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="year">Year</Label>
+            <Input id="year" type="number" {...form.register("year")} />
+            {form.formState.errors.year ? (
+              <p className="text-xs text-[var(--color-destructive)]">
+                {form.formState.errors.year.message}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex items-center justify-end gap-2 border-t pt-4">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setShowCreate(false)}
+            >
+              Cancel
+            </Button>
             <Button type="submit" loading={form.formState.isSubmitting}>
               <CalendarPlus className="h-4 w-4" /> Create
             </Button>
-          </form>
-        </CardContent>
-      </Card>
+          </div>
+        </form>
+      </Modal>
 
       {elections.length === 0 ? (
         <EmptyState
           icon={<CalendarPlus className="h-5 w-5" aria-hidden />}
           title="No cycles yet"
-          description="Create the first one above."
+          description="Create the first one with the New cycle button above."
         />
       ) : (
         <div className="space-y-4">
@@ -774,6 +799,7 @@ function RubricCriteriaPanel({ election }: { election: Doc<"elections"> }) {
   const [newName, setNewName] = useState("");
   const [newMax, setNewMax] = useState<number>(5);
   const [busy, setBusy] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
 
   const onAdd = async () => {
     const name = newName.trim();
@@ -790,6 +816,7 @@ function RubricCriteriaPanel({ election }: { election: Doc<"elections"> }) {
       });
       setNewName("");
       setNewMax(5);
+      setShowAdd(false);
       toast.success("Criterion added");
     } catch (err) {
       const m = friendlyError(err, "Add failed.");
@@ -928,10 +955,22 @@ function RubricCriteriaPanel({ election }: { election: Doc<"elections"> }) {
 
   return (
     <section className="rounded-md border p-4">
-      <header className="mb-3 flex items-center gap-2">
+      <header className="mb-3 flex flex-wrap items-center gap-2">
         <ListChecks className="h-4 w-4" aria-hidden />
         <h2 className="text-sm font-semibold">Rubric criteria</h2>
         <Badge tone="muted">Setup only</Badge>
+        <div className="flex-1" />
+        <Button
+          size="sm"
+          onClick={() => {
+            setNewName("");
+            setNewMax(5);
+            setShowAdd(true);
+          }}
+          disabled={busy}
+        >
+          <Plus className="h-4 w-4" /> Add criterion
+        </Button>
       </header>
       <p className="mb-3 text-xs text-[var(--color-muted-foreground)]">
         Internal evaluators score every candidate on every criterion. Each
@@ -942,10 +981,9 @@ function RubricCriteriaPanel({ election }: { election: Doc<"elections"> }) {
       {criteria === undefined ? (
         <Skeleton className="h-20 w-full" />
       ) : criteria.length === 0 ? (
-        <div className="space-y-3">
+        <div className="space-y-3 rounded-md border border-dashed p-4 text-center">
           <p className="text-sm text-[var(--color-muted-foreground)]">
-            No criteria yet. Seed the default rubric to start, or add one
-            manually below.
+            No criteria yet. Seed the default rubric or add one manually.
           </p>
           <Button
             variant="outline"
@@ -957,11 +995,11 @@ function RubricCriteriaPanel({ election }: { election: Doc<"elections"> }) {
           </Button>
         </div>
       ) : (
-        <ul className="mb-3 divide-y rounded-md border">
+        <ul className="divide-y rounded-md border">
           {criteria.map((c, idx) => (
             <li
               key={c._id}
-              className="flex items-center gap-2 px-3 py-2 text-sm"
+              className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm"
             >
               <span className="w-6 text-xs text-[var(--color-muted-foreground)]">
                 {idx + 1}
@@ -1015,32 +1053,56 @@ function RubricCriteriaPanel({ election }: { election: Doc<"elections"> }) {
         </ul>
       )}
 
-      <div className="grid gap-2 sm:grid-cols-[1fr_120px_auto] sm:items-end">
-        <div className="grid gap-1.5">
-          <Label htmlFor="critName">Add new criterion</Label>
-          <Input
-            id="critName"
-            placeholder="e.g. Vision & Direction"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-          />
-        </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor="critMax">Max score</Label>
-          <Input
-            id="critMax"
-            type="number"
-            min={1}
-            max={20}
-            step={1}
-            value={newMax}
-            onChange={(e) => setNewMax(Number(e.target.value))}
-          />
-        </div>
-        <Button onClick={onAdd} size="sm" loading={busy}>
-          <Plus className="h-4 w-4" /> Add
-        </Button>
-      </div>
+      <Modal
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        title="Add rubric criterion"
+        description="Internal evaluators will score every candidate on this criterion."
+        size="md"
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void onAdd();
+          }}
+          className="grid gap-4"
+        >
+          <div className="grid gap-1.5">
+            <Label htmlFor="critName">Name</Label>
+            <Input
+              id="critName"
+              placeholder="e.g. Vision & Direction"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="critMax">Max score (1–20)</Label>
+            <Input
+              id="critMax"
+              type="number"
+              min={1}
+              max={20}
+              step={1}
+              value={newMax}
+              onChange={(e) => setNewMax(Number(e.target.value))}
+            />
+          </div>
+          <div className="flex items-center justify-end gap-2 border-t pt-4">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setShowAdd(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" loading={busy}>
+              <Plus className="h-4 w-4" /> Add
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </section>
   );
 }

@@ -15,7 +15,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -26,6 +25,7 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Modal } from "@/components/ui/modal";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { friendlyError } from "@/lib/errors";
 
@@ -83,6 +83,8 @@ function Body({ election }: { election: Doc<"elections"> }) {
   const [bulkDefaultClass, setBulkDefaultClass] = useState<VoterClass>("year2Committee");
   const [filterClass, setFilterClass] = useState<VoterClass | "all">("all");
   const [busy, setBusy] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [showBulk, setShowBulk] = useState(false);
 
   const editable =
     election.phase === "setup" || election.phase === "internalOpen";
@@ -116,6 +118,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
       });
       toast.success("Email added");
       setSingle("");
+      setShowAdd(false);
     } catch (err) {
       const m = friendlyError(err, "Add failed.");
       toast.error("Add failed", { description: m });
@@ -142,6 +145,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
         parts.push(`${summary.invalid.length} invalid`);
       toast.success("Bulk import complete", { description: parts.join(" · ") });
       setBulk("");
+      setShowBulk(false);
     } catch (err) {
       const m = friendlyError(err, "Import failed.");
       toast.error("Import failed", { description: m });
@@ -247,113 +251,139 @@ function Body({ election }: { election: Doc<"elections"> }) {
             scores.
           </p>
         </div>
-        <Badge tone={editable ? "muted" : "warning"}>
-          {editable ? "Editable" : "Locked"}
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          {editable ? (
+            <>
+              <Button onClick={() => setShowAdd(true)}>
+                <Plus className="h-4 w-4" /> Add evaluator
+              </Button>
+              <Button variant="outline" onClick={() => setShowBulk(true)}>
+                <Upload className="h-4 w-4" /> Bulk import
+              </Button>
+            </>
+          ) : (
+            <Badge tone="warning">Locked</Badge>
+          )}
+        </div>
       </header>
 
-      {editable ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Add one</CardTitle>
-              <CardDescription>
-                Email must end in <code>@student.usm.my</code>.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form
-                onSubmit={onAddSingle}
-                className="grid gap-3 sm:grid-cols-[1fr_180px_auto] sm:items-end"
-              >
-                <div className="grid gap-1.5">
-                  <Label htmlFor="wl-email">Student email</Label>
-                  <Input
-                    id="wl-email"
-                    type="email"
-                    autoComplete="off"
-                    placeholder="someone@student.usm.my"
-                    value={single}
-                    onChange={(e) => setSingle(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="wl-class">Class</Label>
-                  <Select
-                    id="wl-class"
-                    value={singleClass}
-                    onChange={(e) =>
-                      setSingleClass(e.target.value as VoterClass)
-                    }
-                  >
-                    {VOTER_CLASS_OPTIONS.map((c) => (
-                      <option key={c} value={c}>
-                        {VOTER_CLASS_LABEL[c]}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <Button type="submit" loading={busy}>
-                  <Plus className="h-4 w-4" /> Add
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+      <Modal
+        open={editable && showAdd}
+        onClose={() => setShowAdd(false)}
+        title="Add evaluator"
+        description={
+          <>
+            Email must end in <code>@student.usm.my</code>.
+          </>
+        }
+        size="md"
+      >
+        <form onSubmit={onAddSingle} className="grid gap-4">
+          <div className="grid gap-1.5">
+            <Label htmlFor="wl-email">Student email</Label>
+            <Input
+              id="wl-email"
+              type="email"
+              autoComplete="off"
+              placeholder="someone@student.usm.my"
+              value={single}
+              onChange={(e) => setSingle(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="wl-class">Class</Label>
+            <Select
+              id="wl-class"
+              value={singleClass}
+              onChange={(e) => setSingleClass(e.target.value as VoterClass)}
+            >
+              {VOTER_CLASS_OPTIONS.map((c) => (
+                <option key={c} value={c}>
+                  {VOTER_CLASS_LABEL[c]}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="flex items-center justify-end gap-2 border-t pt-4">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setShowAdd(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" loading={busy}>
+              <Plus className="h-4 w-4" /> Add
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Bulk import</CardTitle>
-              <CardDescription>
-                Paste comma/space/newline-separated emails, or upload a CSV
-                with <code>email</code> and optional <code>voterClass</code>{" "}
-                columns. Rows without a class fall back to the default below.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={onPasteSubmit} className="grid gap-3">
-                <Textarea
-                  rows={5}
-                  placeholder={"alice@student.usm.my\nbob@student.usm.my"}
-                  value={bulk}
-                  onChange={(e) => setBulk(e.target.value)}
-                />
-                <div className="grid gap-1.5">
-                  <Label htmlFor="wl-bulk-class">Default class</Label>
-                  <Select
-                    id="wl-bulk-class"
-                    value={bulkDefaultClass}
-                    onChange={(e) =>
-                      setBulkDefaultClass(e.target.value as VoterClass)
-                    }
-                  >
-                    {VOTER_CLASS_OPTIONS.map((c) => (
-                      <option key={c} value={c}>
-                        {VOTER_CLASS_LABEL[c]}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button type="submit" loading={busy}>
-                    Import pasted emails
-                  </Button>
-                  <label className="inline-flex">
-                    <input
-                      type="file"
-                      accept=".csv,text/csv"
-                      className="sr-only"
-                      onChange={onCsvUpload}
-                    />
-                    <span className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border bg-transparent px-4 text-sm font-medium hover:bg-[var(--color-muted)]">
-                      <Upload className="h-4 w-4" /> Upload CSV
-                    </span>
-                  </label>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      ) : null}
+      <Modal
+        open={editable && showBulk}
+        onClose={() => setShowBulk(false)}
+        title="Bulk import evaluators"
+        description={
+          <>
+            Paste comma/space/newline-separated emails, or upload a CSV with{" "}
+            <code>email</code> and optional <code>voterClass</code> columns.
+            Rows without a class fall back to the default below.
+          </>
+        }
+      >
+        <form onSubmit={onPasteSubmit} className="grid gap-4">
+          <div className="grid gap-1.5">
+            <Label htmlFor="wl-bulk">Emails</Label>
+            <Textarea
+              id="wl-bulk"
+              rows={6}
+              placeholder={"alice@student.usm.my\nbob@student.usm.my"}
+              value={bulk}
+              onChange={(e) => setBulk(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="wl-bulk-class">Default class</Label>
+            <Select
+              id="wl-bulk-class"
+              value={bulkDefaultClass}
+              onChange={(e) =>
+                setBulkDefaultClass(e.target.value as VoterClass)
+              }
+            >
+              {VOTER_CLASS_OPTIONS.map((c) => (
+                <option key={c} value={c}>
+                  {VOTER_CLASS_LABEL[c]}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 border-t pt-4">
+            <label className="inline-flex">
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="sr-only"
+                onChange={onCsvUpload}
+              />
+              <span className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border bg-transparent px-4 text-sm font-medium hover:bg-[var(--color-muted)]">
+                <Upload className="h-4 w-4" /> Upload CSV
+              </span>
+            </label>
+            <div className="flex-1" />
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setShowBulk(false)}
+            >
+              Close
+            </Button>
+            <Button type="submit" loading={busy} disabled={bulk.trim() === ""}>
+              Import pasted emails
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       <Card>
         <CardHeader>
