@@ -295,7 +295,8 @@ function Ballot({ session }: { session: ActiveSession }) {
               type="button"
               onClick={() => setSelected(c.candidateId)}
               className={cn(
-                "flex h-full flex-col items-start rounded-lg border bg-[var(--color-card)] p-4 text-left transition-colors",
+                "flex h-full flex-col items-start rounded-lg border bg-[var(--color-card)] p-4 text-left",
+                "transition-[transform,border-color,box-shadow] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.98]",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]",
                 isSelected
                   ? "border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]"
