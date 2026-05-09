@@ -1,184 +1,132 @@
 import Image from "next/image";
-import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { LandingBackdrop } from "@/components/landing/landing-backdrop";
+import { SignInCTA } from "@/components/landing/sign-in-cta";
 
-interface Rendition {
-  slug: string;
-  index: string;
-  name: string;
-  vibe: string;
-  description: string;
-  technique: string;
-  accent: "acid" | "teal" | "copper" | "ink";
-  keeper?: boolean;
-}
+// AGM cycle year. Lives here as a single named constant so next year's
+// committee changes one value and rebuilds. The brief allows either this
+// or a Convex-sourced value; a Convex query for one number that changes
+// once a year would be wasteful for a marketing surface that already
+// renders before any auth handshake has happened.
+const AGM_CYCLE_YEAR = 2026;
 
-const RENDITIONS: Rendition[] = [
-  {
-    slug: "plexus",
-    index: "01",
-    name: "Particle Plexus",
-    vibe: "Civic · networked",
-    description:
-      "70 ink nodes drift on a 2D canvas; pairs within range connect with teal threads. Cursor gently repels nearby nodes — the network breathes when you move.",
-    technique: "Canvas 2D · 70 nodes",
-    accent: "ink",
-    keeper: true,
-  },
-  {
-    slug: "marbled",
-    index: "02",
-    name: "Marbled Veins",
-    vibe: "Watercolor · flowing",
-    description:
-      "Sage-teal sheets drape from the side edges with visible marble bands inside. Golden sparkles drift through the flow and a warm acid glow sits under the centered CTA.",
-    technique: "OGL · marbled flow",
-    accent: "teal",
-  },
-  {
-    slug: "sumi-ink",
-    index: "03",
-    name: "Sumi-e Drift",
-    vibe: "Editorial · ink wash",
-    description:
-      "Diffuse charcoal ink-wash billows in opposite corners, threaded with long curling copper brushstrokes. A clean cream centre frames the headline and the rectangular CTA.",
-    technique: "OGL · sumi-e wash",
-    accent: "ink",
-  },
-  {
-    slug: "whisper-lines",
-    index: "04",
-    name: "Whisper Lines",
-    vibe: "Architectural · trace",
-    description:
-      "Domain-warped sine waves drawn in the faintest possible ink, layered over a near-imperceptible teal wash. Reads as a hint of motion, never as a graphic statement.",
-    technique: "OGL · curved hatch",
-    accent: "ink",
-  },
-];
-
-const ACCENT_BG: Record<Rendition["accent"], string> = {
-  acid: "bg-[var(--acid)]",
-  teal: "bg-[var(--teal)]",
-  copper: "bg-[var(--copper)]",
-  ink: "bg-[var(--ink)]",
-};
-
-const ACCENT_TEXT: Record<Rendition["accent"], string> = {
-  acid: "text-[var(--ink)]",
-  teal: "text-[var(--paper)]",
-  copper: "text-[var(--paper)]",
-  ink: "text-[var(--paper)]",
-};
-
-export default function RenditionPickerPage() {
+/**
+ * USM CSS AGM portal — locked landing.
+ *
+ * Implements docs/landing-rendition-brief.md. Single-viewport, symmetric
+ * centered layout. The backdrop is the visual anchor; the headline is
+ * the intellectual anchor; the CTA is the only meaningful action.
+ *
+ * Key brief commitments honored here:
+ *  - Sumi-e composition rendered as a static asset instead of a live
+ *    shader (decision recorded in the brief's "Decision update" section).
+ *  - Brand pill is solid-surface outlined, not glass (anti-goal:
+ *    no_glass_brand_pill).
+ *  - CTA reuses the shared SignInCTA, not a custom Microsoft-branded
+ *    button (anti-goal: no_microsoft_mark).
+ *  - No grain overlay anywhere in the tree (anti-goal: no_grain_overlay).
+ *  - prefers-reduced-motion is trivially satisfied: the backdrop is a
+ *    static image, no motion to reduce.
+ *  - WebGL-unavailable fallback is no longer a concern: there is no
+ *    WebGL. If the asset fails to load (slow conference WiFi),
+ *    next/image's own fallback shows transparent pixels; the cream
+ *    paper body background and the headline / CTA stay legible.
+ *  - Cycle year and eligibility are both visible above the fold so a
+ *    voter on AGM day knows which year and whether they qualify before
+ *    they tap.
+ *
+ * Server-rendered: no `use client` needed. The CTA inside is the only
+ * client component on this surface.
+ */
+export default function LandingPage() {
   return (
     <main className="relative min-h-dvh overflow-hidden">
-      <header className="container-wide flex items-center justify-between py-6">
-        <div className="surface-glass flex items-center gap-2.5 rounded-full px-4 py-2">
-          <Image
-            src="/logos/cs-soc-official.svg"
-            alt=""
-            width={22}
-            height={22}
-            priority
-            className="h-[22px] w-[22px]"
-            aria-hidden
-          />
-          <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--ink)]">
-            USM CSS AGM · rendition picker
-          </span>
-        </div>
-        <Link
-          href="/dashboard"
-          className="font-mono text-[11px] uppercase tracking-[0.22em] text-[var(--ink-muted)] underline-offset-4 transition-colors hover:text-[var(--ink)] hover:underline"
-        >
-          skip → dashboard
-        </Link>
-      </header>
+      <LandingBackdrop />
 
-      <section className="container-narrow pt-12 pb-10">
-        <span className="font-mono text-[11px] uppercase tracking-[0.32em] text-[var(--ink-muted)]">
-          design exploration · round 04 · 4 of 4
-        </span>
-        <h1 className="font-display mt-6 text-[clamp(2.5rem,7vw,5.5rem)] leading-[0.96] tracking-[-0.04em] text-[var(--ink)]">
-          Reference-led.
-          <br />
-          Three new takes.
-        </h1>
-        <p className="mt-6 max-w-[60ch] text-base leading-relaxed text-[var(--ink-muted)]">
-          Particle Plexus and Whisper Lines stay. Marbled Veins and Sumi-e
-          Drift have been tightened against the reference renders. Open each
-          and pick the one to graft onto <code className="font-mono text-[0.95em] text-[var(--ink)]">/</code>.
-        </p>
-      </section>
+      <div className="relative z-10 flex min-h-dvh flex-col">
+        <header className="flex justify-center px-6 pt-8 sm:pt-10">
+          <BrandPill year={AGM_CYCLE_YEAR} />
+        </header>
 
-      <section className="container-narrow pb-24">
-        <ul className="flex flex-col gap-4">
-          {RENDITIONS.map((r) => (
-            <li key={r.slug}>
-              <Link
-                href={`/preview/${r.slug}`}
-                className="group relative block overflow-hidden rounded-2xl border border-[var(--ink-line)] bg-[var(--paper)]/85 transition-[transform,box-shadow,border-color] duration-500 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-0.5 hover:border-[var(--ink)]/40 hover:shadow-[0_28px_60px_-30px_rgba(11,15,18,0.45)]"
-              >
-                <div
-                  aria-hidden
-                  className={`absolute left-0 top-0 h-full w-1.5 ${ACCENT_BG[r.accent]} transition-[width] duration-500 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] group-hover:w-2`}
-                />
+        <section className="flex flex-1 flex-col items-center justify-center px-6 pb-20 text-center">
+          <h1
+            className={[
+              "font-serif",
+              "text-[clamp(2rem,7.2vw,5.5rem)]",
+              "font-medium",
+              "leading-[1.02] sm:leading-[0.98]",
+              "tracking-[-0.012em]",
+              "text-[var(--ink)]",
+            ].join(" ")}
+          >
+            Elect the next
+            <br />
+            CSS committee.
+          </h1>
 
-                <div className="grid grid-cols-[auto_1fr_auto] items-center gap-6 px-7 py-7 pl-10 sm:gap-10 sm:px-10 sm:pl-14">
-                  <div className="font-display text-[clamp(2.25rem,4vw,3.5rem)] leading-none tracking-[-0.04em] text-[var(--ink)] sm:text-[3.5rem]">
-                    {r.index}
-                  </div>
+          <div className="mt-12">
+            <SignInCTA />
+          </div>
 
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1.5">
-                      <h2 className="font-display text-[clamp(1.35rem,2.4vw,2rem)] leading-tight tracking-[-0.025em] text-[var(--ink)]">
-                        {r.name}
-                      </h2>
-                      <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-[var(--ink-muted)]">
-                        {r.vibe}
-                      </span>
-                      {r.keeper && (
-                        <span className="rounded-full bg-[var(--ink)] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.24em] text-[var(--paper)]">
-                          keeper
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-3 max-w-[58ch] text-[14px] leading-relaxed text-[var(--ink-muted)]">
-                      {r.description}
-                    </p>
-                    <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[var(--ink-line)] bg-[var(--paper-2)]/60 px-3 py-1">
-                      <span
-                        aria-hidden
-                        className={`inline-block h-1.5 w-1.5 rounded-full ${ACCENT_BG[r.accent]}`}
-                      />
-                      <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--ink)]">
-                        {r.technique}
-                      </span>
-                    </div>
-                  </div>
+          <p
+            className={[
+              "mt-7",
+              "font-mono",
+              "text-[10.5px]",
+              "uppercase",
+              "tracking-[0.28em]",
+              "text-[var(--ink-muted)]",
+            ].join(" ")}
+          >
+            @student.usm.my accounts only
+          </p>
+        </section>
 
-                  <span
-                    className={`grid h-12 w-12 place-items-center rounded-full ${ACCENT_BG[r.accent]} ${ACCENT_TEXT[r.accent]} transition-transform duration-500 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-0.5`}
-                  >
-                    <ArrowUpRight className="h-5 w-5" strokeWidth={2.25} />
-                  </span>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <footer className="container-wide flex items-center justify-between pb-8">
-        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--ink-muted)]">
-          USM Computer Science Society
-        </p>
-        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--ink-muted)]">
-          internal · design preview only
-        </p>
-      </footer>
+        <footer className="flex items-end justify-between gap-4 px-6 pb-6 sm:px-8 sm:pb-8">
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.20em] text-[var(--ink-muted)]">
+            USM Computer Science Society
+          </p>
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.20em] text-[var(--ink-muted)]">
+            AGM {AGM_CYCLE_YEAR}
+          </p>
+        </footer>
+      </div>
     </main>
+  );
+}
+
+interface BrandPillProps {
+  year: number;
+}
+
+/**
+ * Top-center brand identity capsule. Outlined ink-on-paper at 88 percent
+ * opacity (no backdrop blur, no glass). Includes the cycle year inline
+ * because the brief makes the year part of canonical identity, not
+ * supporting metadata.
+ */
+function BrandPill({ year }: BrandPillProps) {
+  return (
+    <div
+      className={[
+        "inline-flex items-center gap-2.5",
+        "rounded-full",
+        "border border-[var(--ink)]",
+        "bg-[var(--paper)]/88",
+        "px-4 py-2",
+      ].join(" ")}
+    >
+      <Image
+        src="/logos/cs-soc-official.svg"
+        alt=""
+        width={20}
+        height={20}
+        priority
+        className="h-[20px] w-[20px]"
+        aria-hidden
+      />
+      <span className="font-mono text-[10.5px] font-medium uppercase tracking-[0.22em] text-[var(--ink)]">
+        USM CSS AGM <span className="text-[var(--copper)]">·</span> {year}
+      </span>
+    </div>
   );
 }

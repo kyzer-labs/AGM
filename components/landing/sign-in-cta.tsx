@@ -34,7 +34,7 @@ export function SignInCTA() {
       )}
     >
       <span className="font-display text-sm tracking-tight">
-        {loading ? "Signing in" : "Sign in with Microsoft"}
+        {loading ? "Signing in" : "Sign in with USM email"}
       </span>
       <span
         aria-hidden
