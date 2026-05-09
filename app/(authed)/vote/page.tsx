@@ -27,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { getConvexErrorMessage } from "@/lib/convex-error";
+import { getWeights, internalSharePercent } from "@/lib/weights";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 
 export default function VotePage() {
@@ -72,6 +73,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
   }
 
   if (internalStatus.isWhitelisted) {
+    const internalShare = internalSharePercent(getWeights(election));
     return (
       <main className="container-narrow py-12">
         <Card>
@@ -83,8 +85,8 @@ function Body({ election }: { election: Doc<"elections"> }) {
             <CardDescription>
               You are listed as a Year 2 internal evaluator for{" "}
               <strong>{election.name}</strong>. Your input flows through the
-              internal rubric (75% weight). Public voting is reserved for
-              external members.
+              internal rubric ({internalShare}% weight). Public voting is
+              reserved for external members.
             </CardDescription>
           </CardHeader>
         </Card>

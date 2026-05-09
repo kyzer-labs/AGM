@@ -115,7 +115,7 @@ function AdminPageInner() {
           />
           <Tile
             title="Results & publishing"
-            description="Preview combined 75/25 results, resolve ties, publish."
+            description="Preview combined results, resolve ties, and publish."
             href="/admin/results"
           />
           <Tile
