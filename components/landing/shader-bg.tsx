@@ -11,11 +11,12 @@ const VERTEX_SHADER = /* glsl */ `
 `;
 
 /**
- * Continuous topographic noise field — no positioned blobs, so there are
- * no visible "gradient roots" anywhere on the canvas. The full plane is a
- * uniform fbm field whose drift produces visibly animated contour lines
- * (major + minor bands) over a paper base, with a faint warm/cool tonal
- * wash. Standard Ashima 2D simplex noise inlined for portability.
+ * Domain-warped aurora field. Large flowing color zones (acid / teal /
+ * copper) drift across the canvas via a noise-driven warp, producing
+ * obviously animated organic shapes with no fixed origin or "root" edge.
+ * Bold ink isobars cut through the field at low frequency so motion is
+ * legible at a glance, and a slow sin-driven pulse periodically flares
+ * the brightest ridges — the shader reads as living, not still.
  */
 const FRAGMENT_SHADER = /* glsl */ `
   precision highp float;
@@ -73,30 +74,48 @@ const FRAGMENT_SHADER = /* glsl */ `
     float aspect = uResolution.x / uResolution.y;
     vec2 q = vec2(uv.x * aspect, uv.y);
 
-    float t = uTime * 0.10;
+    float t = uTime;
 
-    vec2 p1 = q * 1.6 + vec2(t * 0.6, t * 0.4);
-    vec2 p2 = q * 3.2 + vec2(-t * 0.9, t * 0.5);
-    float n = fbm(p1) + 0.5 * fbm(p2);
+    // Domain warp: each pixel samples noise at a position that itself
+    // flows through another noise field. No fixed roots, only flow.
+    vec2 w1 = vec2(
+      fbm(q * 0.85 + vec2(t * 0.10, 0.0)),
+      fbm(q * 0.85 + vec2(5.2, t * 0.10))
+    );
+    vec2 warpedQ = q + w1 * 0.65;
 
-    vec3 paper = vec3(0.965, 0.949, 0.918);
-    vec3 acid  = vec3(1.000, 0.894, 0.412);
-    vec3 teal  = vec3(0.059, 0.416, 0.416);
-    vec3 ink   = vec3(0.043, 0.059, 0.071);
+    // Big slow noise field — large shapes (~1/3 of viewport each).
+    float n = fbm(warpedQ * 0.55 + vec2(t * 0.07, t * 0.05));
 
-    float warm = smoothstep(0.05, 0.9, n);
-    float cool = smoothstep(-0.05, -0.9, n);
+    vec3 paper  = vec3(0.965, 0.949, 0.918);
+    vec3 acid   = vec3(1.000, 0.894, 0.412);
+    vec3 teal   = vec3(0.059, 0.416, 0.416);
+    vec3 copper = vec3(0.741, 0.557, 0.204);
+    vec3 ink    = vec3(0.043, 0.059, 0.071);
+
+    // Bold color zones driven by signed noise + bright ridges.
+    float warm  = smoothstep(0.00,  0.55, n);
+    float cool  = smoothstep(0.00, -0.55, n);
+    float spark = smoothstep(0.55,  0.95, n);
 
     vec3 color = paper;
-    color = mix(color, acid, warm * 0.32);
-    color = mix(color, teal, cool * 0.24);
+    color = mix(color, acid,   warm  * 0.55);
+    color = mix(color, teal,   cool  * 0.42);
+    color = mix(color, copper, spark * 0.22);
 
-    float major = abs(fract(n * 4.5 + 0.5) - 0.5);
-    float majorMask = 1.0 - smoothstep(0.020, 0.060, major);
+    // ~12s breathing pulse on the brightest ridges so motion is unmissable.
+    float pulse = 0.5 + 0.5 * sin(t * 0.5);
+    color = mix(color, acid, pulse * spark * 0.18);
+
+    // Major isobars: low frequency, clearly visible but not heavy enough
+    // to compete with foreground text.
+    float major = abs(fract(n * 2.5 + 0.5) - 0.5);
+    float majorMask = 1.0 - smoothstep(0.020, 0.090, major);
     color = mix(color, ink, majorMask * 0.42);
 
-    float minor = abs(fract(n * 11.0 + 0.5) - 0.5);
-    float minorMask = 1.0 - smoothstep(0.005, 0.022, minor);
+    // Minor isobars for fine grain detail.
+    float minor = abs(fract(n * 7.0 + 0.5) - 0.5);
+    float minorMask = 1.0 - smoothstep(0.005, 0.020, minor);
     color = mix(color, ink, minorMask * 0.14);
 
     gl_FragColor = vec4(color, 1.0);
@@ -171,7 +190,7 @@ export function ShaderBg() {
     };
 
     if (prefersReduced) {
-      program.uniforms.uTime.value = 12.0;
+      program.uniforms.uTime.value = 14.0;
       renderer.render({ scene: mesh });
     } else {
       rafId = requestAnimationFrame(loop);
@@ -195,7 +214,7 @@ export function ShaderBg() {
     <div
       ref={containerRef}
       aria-hidden
-      className="fixed inset-0 -z-10 overflow-hidden"
+      className="fixed inset-0 z-0 overflow-hidden"
       style={{ pointerEvents: "none" }}
     />
   );

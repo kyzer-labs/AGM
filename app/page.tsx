@@ -28,7 +28,7 @@ export default function LandingPage() {
       <ShaderBg />
       <GrainOverlay />
 
-      <div className="pointer-events-none absolute left-1/2 top-6 z-10 -translate-x-1/2">
+      <div className="pointer-events-none absolute left-1/2 top-6 z-20 -translate-x-1/2">
         <div className="surface-glass pointer-events-auto flex items-center gap-2.5 rounded-full px-4 py-2">
           <Image
             src="/logos/cs-soc-official.svg"
@@ -45,7 +45,7 @@ export default function LandingPage() {
         </div>
       </div>
 
-      <section className="container-narrow relative flex min-h-[100dvh] flex-col justify-center py-32">
+      <section className="container-narrow relative z-20 flex min-h-[100dvh] flex-col justify-center py-32">
         <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-[var(--ink-muted)]">
           USM CSS · annual general meeting
         </span>
@@ -60,7 +60,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <footer className="container-wide absolute inset-x-0 bottom-6 flex items-center justify-between">
+      <footer className="container-wide absolute inset-x-0 bottom-6 z-20 flex items-center justify-between">
         <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--ink-muted)]">
           USM Computer Science Society
         </p>
