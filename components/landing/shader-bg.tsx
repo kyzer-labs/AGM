@@ -88,16 +88,16 @@ const FRAGMENT_SHADER = /* glsl */ `
     float cool = smoothstep(-0.05, -0.9, n);
 
     vec3 color = paper;
-    color = mix(color, acid, warm * 0.22);
-    color = mix(color, teal, cool * 0.16);
+    color = mix(color, acid, warm * 0.32);
+    color = mix(color, teal, cool * 0.24);
 
     float major = abs(fract(n * 4.5 + 0.5) - 0.5);
     float majorMask = 1.0 - smoothstep(0.020, 0.060, major);
-    color = mix(color, ink, majorMask * 0.20);
+    color = mix(color, ink, majorMask * 0.42);
 
     float minor = abs(fract(n * 11.0 + 0.5) - 0.5);
     float minorMask = 1.0 - smoothstep(0.005, 0.022, minor);
-    color = mix(color, ink, minorMask * 0.07);
+    color = mix(color, ink, minorMask * 0.14);
 
     gl_FragColor = vec4(color, 1.0);
   }
