@@ -1,161 +1,183 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useConvexAuth } from "convex/react";
-import { Vote, ShieldCheck, BarChart3, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { SignInButton } from "@/components/auth/sign-in-button";
-import { useFirebaseAuth } from "@/lib/use-firebase-auth";
-import { Badge } from "@/components/ui/badge";
+import { ArrowUpRight } from "lucide-react";
 
-export default function LandingPage() {
-  const router = useRouter();
-  const { isLoading, isAuthenticated } = useConvexAuth();
-  const firebase = useFirebaseAuth();
+interface Rendition {
+  slug: string;
+  index: string;
+  name: string;
+  vibe: string;
+  description: string;
+  technique: string;
+  accent: "acid" | "teal" | "copper" | "ink";
+  keeper?: boolean;
+}
 
-  useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.replace("/dashboard");
-    }
-  }, [isLoading, isAuthenticated, router]);
+const RENDITIONS: Rendition[] = [
+  {
+    slug: "plexus",
+    index: "01",
+    name: "Particle Plexus",
+    vibe: "Civic · networked",
+    description:
+      "70 ink nodes drift on a 2D canvas; pairs within range connect with teal threads. Cursor gently repels nearby nodes — the network breathes when you move.",
+    technique: "Canvas 2D · 70 nodes",
+    accent: "ink",
+    keeper: true,
+  },
+  {
+    slug: "marbled",
+    index: "02",
+    name: "Marbled Veins",
+    vibe: "Watercolor · flowing",
+    description:
+      "Sage-teal sheets drape from the side edges with visible marble bands inside. Golden sparkles drift through the flow and a warm acid glow sits under the centered CTA.",
+    technique: "OGL · marbled flow",
+    accent: "teal",
+  },
+  {
+    slug: "sumi-ink",
+    index: "03",
+    name: "Sumi-e Drift",
+    vibe: "Editorial · ink wash",
+    description:
+      "Diffuse charcoal ink-wash billows in opposite corners, threaded with long curling copper brushstrokes. A clean cream centre frames the headline and the rectangular CTA.",
+    technique: "OGL · sumi-e wash",
+    accent: "ink",
+  },
+  {
+    slug: "whisper-lines",
+    index: "04",
+    name: "Whisper Lines",
+    vibe: "Architectural · trace",
+    description:
+      "Domain-warped sine waves drawn in the faintest possible ink, layered over a near-imperceptible teal wash. Reads as a hint of motion, never as a graphic statement.",
+    technique: "OGL · curved hatch",
+    accent: "ink",
+  },
+];
 
+const ACCENT_BG: Record<Rendition["accent"], string> = {
+  acid: "bg-[var(--acid)]",
+  teal: "bg-[var(--teal)]",
+  copper: "bg-[var(--copper)]",
+  ink: "bg-[var(--ink)]",
+};
+
+const ACCENT_TEXT: Record<Rendition["accent"], string> = {
+  acid: "text-[var(--ink)]",
+  teal: "text-[var(--paper)]",
+  copper: "text-[var(--paper)]",
+  ink: "text-[var(--paper)]",
+};
+
+export default function RenditionPickerPage() {
   return (
-    <main className="gradient-brand min-h-dvh">
-      <header className="container-wide flex h-16 items-center justify-between">
-        <div className="flex items-center gap-2 font-semibold tracking-tight">
+    <main className="relative min-h-dvh overflow-hidden">
+      <header className="container-wide flex items-center justify-between py-6">
+        <div className="surface-glass flex items-center gap-2.5 rounded-full px-4 py-2">
           <Image
             src="/logos/cs-soc-official.svg"
-            alt="USM CS Society"
-            width={40}
-            height={40}
+            alt=""
+            width={22}
+            height={22}
             priority
-            className="h-10 w-10"
+            className="h-[22px] w-[22px]"
+            aria-hidden
           />
-          <span>USM CSS AGM</span>
+          <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--ink)]">
+            USM CSS AGM · rendition picker
+          </span>
         </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href="#how"
-            className="hidden text-sm text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] sm:inline-block"
-          >
-            How it works
-          </Link>
-          <Link
-            href="#support"
-            className="hidden text-sm text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] sm:inline-block"
-          >
-            Support
-          </Link>
-        </div>
+        <Link
+          href="/dashboard"
+          className="font-mono text-[11px] uppercase tracking-[0.22em] text-[var(--ink-muted)] underline-offset-4 transition-colors hover:text-[var(--ink)] hover:underline"
+        >
+          skip → dashboard
+        </Link>
       </header>
 
-      <section className="container-narrow py-16 sm:py-24 text-center">
-        <Badge tone="muted" className="mb-5">
-          <Sparkles className="h-3 w-3" aria-hidden /> Official AGM portal
-        </Badge>
-        <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight text-balance">
-          Elect the next USM Computer Science Society committee.
+      <section className="container-narrow pt-12 pb-10">
+        <span className="font-mono text-[11px] uppercase tracking-[0.32em] text-[var(--ink-muted)]">
+          design exploration · round 04 · 4 of 4
+        </span>
+        <h1 className="font-display mt-6 text-[clamp(2.5rem,7vw,5.5rem)] leading-[0.96] tracking-[-0.04em] text-[var(--ink)]">
+          Reference-led.
+          <br />
+          Three new takes.
         </h1>
-        <p className="mt-5 text-lg text-[var(--color-muted-foreground)] text-balance">
-          Sign in with your <strong>@student.usm.my</strong> Microsoft account
-          to evaluate candidates internally, vote in the live AGM, and view
-          published results.
-        </p>
-
-        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          {firebase.isLoading ? (
-            <Button disabled loading size="lg">
-              Loading
-            </Button>
-          ) : isAuthenticated ? (
-            <Link href="/dashboard">
-              <Button size="lg">Go to dashboard</Button>
-            </Link>
-          ) : (
-            <SignInButton size="lg" />
-          )}
-          <Link href="#how">
-            <Button variant="outline" size="lg">
-              Learn more
-            </Button>
-          </Link>
-        </div>
-        <p className="mt-3 text-xs text-[var(--color-muted-foreground)]">
-          Only @student.usm.my accounts may sign in. Other Microsoft accounts
-          will be rejected automatically.
+        <p className="mt-6 max-w-[60ch] text-base leading-relaxed text-[var(--ink-muted)]">
+          Particle Plexus and Whisper Lines stay. Marbled Veins and Sumi-e
+          Drift have been tightened against the reference renders. Open each
+          and pick the one to graft onto <code className="font-mono text-[0.95em] text-[var(--ink)]">/</code>.
         </p>
       </section>
 
-      <section id="how" className="container-wide pb-20">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Card>
-            <CardContent className="flex flex-col gap-3 p-6">
-              <div className="grid h-10 w-10 place-items-center rounded-md bg-[var(--color-secondary)]">
-                <ShieldCheck
-                  className="h-5 w-5 text-[var(--color-brand)]"
+      <section className="container-narrow pb-24">
+        <ul className="flex flex-col gap-4">
+          {RENDITIONS.map((r) => (
+            <li key={r.slug}>
+              <Link
+                href={`/preview/${r.slug}`}
+                className="group relative block overflow-hidden rounded-2xl border border-[var(--ink-line)] bg-[var(--paper)]/85 transition-[transform,box-shadow,border-color] duration-500 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-0.5 hover:border-[var(--ink)]/40 hover:shadow-[0_28px_60px_-30px_rgba(11,15,18,0.45)]"
+              >
+                <div
                   aria-hidden
+                  className={`absolute left-0 top-0 h-full w-1.5 ${ACCENT_BG[r.accent]} transition-[width] duration-500 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] group-hover:w-2`}
                 />
-              </div>
-              <h2 className="text-lg font-semibold">Internal evaluation</h2>
-              <p className="text-sm text-[var(--color-muted-foreground)]">
-                Year 2 committee members on the whitelist score every
-                candidate using a 5-category rubric (Leadership, Teamwork &
-                Communication, Professionalism & Ethics, Commitment,
-                Personality) before AGM day.
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex flex-col gap-3 p-6">
-              <div className="grid h-10 w-10 place-items-center rounded-md bg-[var(--color-secondary)]">
-                <Vote
-                  className="h-5 w-5 text-[var(--color-brand)]"
-                  aria-hidden
-                />
-              </div>
-              <h2 className="text-lg font-semibold">Live AGM voting</h2>
-              <p className="text-sm text-[var(--color-muted-foreground)]">
-                During the AGM, eligible USM students vote one position at a
-                time. Candidates that already won a higher position are
-                automatically removed from later ballots.
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex flex-col gap-3 p-6">
-              <div className="grid h-10 w-10 place-items-center rounded-md bg-[var(--color-secondary)]">
-                <BarChart3
-                  className="h-5 w-5 text-[var(--color-brand)]"
-                  aria-hidden
-                />
-              </div>
-              <h2 className="text-lg font-semibold">75 / 25 results</h2>
-              <p className="text-sm text-[var(--color-muted-foreground)]">
-                Final scores combine internal evaluation (75%) and the public
-                AGM vote (25%) using normalized shares — turnout differences
-                between the two pools never distort the split.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+
+                <div className="grid grid-cols-[auto_1fr_auto] items-center gap-6 px-7 py-7 pl-10 sm:gap-10 sm:px-10 sm:pl-14">
+                  <div className="font-display text-[clamp(2.25rem,4vw,3.5rem)] leading-none tracking-[-0.04em] text-[var(--ink)] sm:text-[3.5rem]">
+                    {r.index}
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1.5">
+                      <h2 className="font-display text-[clamp(1.35rem,2.4vw,2rem)] leading-tight tracking-[-0.025em] text-[var(--ink)]">
+                        {r.name}
+                      </h2>
+                      <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-[var(--ink-muted)]">
+                        {r.vibe}
+                      </span>
+                      {r.keeper && (
+                        <span className="rounded-full bg-[var(--ink)] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.24em] text-[var(--paper)]">
+                          keeper
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-3 max-w-[58ch] text-[14px] leading-relaxed text-[var(--ink-muted)]">
+                      {r.description}
+                    </p>
+                    <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[var(--ink-line)] bg-[var(--paper-2)]/60 px-3 py-1">
+                      <span
+                        aria-hidden
+                        className={`inline-block h-1.5 w-1.5 rounded-full ${ACCENT_BG[r.accent]}`}
+                      />
+                      <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--ink)]">
+                        {r.technique}
+                      </span>
+                    </div>
+                  </div>
+
+                  <span
+                    className={`grid h-12 w-12 place-items-center rounded-full ${ACCENT_BG[r.accent]} ${ACCENT_TEXT[r.accent]} transition-transform duration-500 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-0.5`}
+                  >
+                    <ArrowUpRight className="h-5 w-5" strokeWidth={2.25} />
+                  </span>
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
       </section>
 
-      <footer
-        id="support"
-        className="border-t bg-[var(--color-background)]"
-      >
-        <div className="container-wide flex flex-col gap-2 py-8 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-[var(--color-muted-foreground)]">
-            For sign-in or eligibility questions, contact the AGM admin team.
-          </p>
-          <p className="text-xs text-[var(--color-muted-foreground)]">
-            USM Computer Science Society · AGM Election Portal
-          </p>
-        </div>
+      <footer className="container-wide flex items-center justify-between pb-8">
+        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--ink-muted)]">
+          USM Computer Science Society
+        </p>
+        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--ink-muted)]">
+          internal · design preview only
+        </p>
       </footer>
     </main>
   );

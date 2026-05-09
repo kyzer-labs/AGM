@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
@@ -27,8 +28,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { getConvexErrorMessage } from "@/lib/convex-error";
+import { getWeights, internalSharePercent } from "@/lib/weights";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
-
 
 export default function VotePage() {
   return (
@@ -60,11 +61,27 @@ function Inner() {
 }
 
 function Body({ election }: { election: Doc<"elections"> }) {
+  const router = useRouter();
+  const me = useQuery(api.voters.me);
   const internalStatus = useQuery(api.internal.myStatus, {
     electionId: election._id,
   });
 
-  if (internalStatus === undefined) {
+  const isAdmin = me?.role === "admin" || me?.role === "super";
+
+  useEffect(() => {
+    if (me === undefined || internalStatus === undefined) return;
+    if (isAdmin) return;
+    if (internalStatus.isWhitelisted) {
+      router.replace("/dashboard");
+      return;
+    }
+    if (election.phase !== "publicVoting") {
+      router.replace("/dashboard");
+    }
+  }, [me, internalStatus, isAdmin, election.phase, router]);
+
+  if (internalStatus === undefined || me === undefined) {
     return (
       <main className="container-narrow py-12">
         <Skeleton className="h-40 w-full" />
@@ -73,6 +90,14 @@ function Body({ election }: { election: Doc<"elections"> }) {
   }
 
   if (internalStatus.isWhitelisted) {
+    if (!isAdmin) {
+      return (
+        <main className="container-narrow py-12">
+          <Skeleton className="h-40 w-full" />
+        </main>
+      );
+    }
+    const internalShare = internalSharePercent(getWeights(election));
     return (
       <main className="container-narrow py-12">
         <Card>
@@ -84,8 +109,8 @@ function Body({ election }: { election: Doc<"elections"> }) {
             <CardDescription>
               You are listed as a Year 2 internal evaluator for{" "}
               <strong>{election.name}</strong>. Your input flows through the
-              internal rubric (75% weight). Public voting is reserved for
-              external members.
+              internal rubric ({internalShare}% weight). Public voting is
+              reserved for external members.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -98,6 +123,13 @@ function Body({ election }: { election: Doc<"elections"> }) {
     election.phase === "internalOpen" ||
     election.phase === "internalClosed"
   ) {
+    if (!isAdmin) {
+      return (
+        <main className="container-narrow py-12">
+          <Skeleton className="h-40 w-full" />
+        </main>
+      );
+    }
     return (
       <main className="container-narrow py-12">
         <Card>
@@ -121,6 +153,13 @@ function Body({ election }: { election: Doc<"elections"> }) {
     election.phase === "resultsPreview" ||
     election.phase === "published"
   ) {
+    if (!isAdmin) {
+      return (
+        <main className="container-narrow py-12">
+          <Skeleton className="h-40 w-full" />
+        </main>
+      );
+    }
     return (
       <main className="container-narrow py-12">
         <Card>
@@ -295,7 +334,8 @@ function Ballot({ session }: { session: ActiveSession }) {
               type="button"
               onClick={() => setSelected(c.candidateId)}
               className={cn(
-                "flex h-full flex-col items-start rounded-lg border bg-[var(--color-card)] p-4 text-left transition-colors",
+                "flex h-full flex-col items-start rounded-lg border bg-[var(--color-card)] p-4 text-left",
+                "transition-[transform,border-color,box-shadow] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.98]",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]",
                 isSelected
                   ? "border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]"
@@ -343,7 +383,7 @@ function Ballot({ session }: { session: ActiveSession }) {
         })}
       </div>
 
-      <div className="sticky bottom-4 z-20 flex flex-wrap items-center gap-2 rounded-lg border bg-[var(--color-card)]/95 px-4 py-3 shadow-lg backdrop-blur">
+      <div className="sticky bottom-4 z-20 flex flex-wrap items-center gap-2 rounded-lg border bg-[var(--color-card)]/95 px-4 py-3 shadow-[0_-12px_40px_-8px_rgba(15,106,106,0.18)] backdrop-blur">
         {chosen ? (
           <span className="text-sm">
             Selected:{" "}
