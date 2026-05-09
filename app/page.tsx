@@ -26,24 +26,24 @@ const RENDITIONS: Rendition[] = [
     keeper: true,
   },
   {
-    slug: "drift-mist",
+    slug: "marbled",
     index: "02",
-    name: "Drift Mist",
-    vibe: "Ambient · breathing",
+    name: "Marbled Veins",
+    vibe: "Watercolor · flowing",
     description:
-      "A single domain-warped low-frequency noise field maps to barely-there warm/cool tints over paper. No isobars, no shapes — just a quiet atmosphere that drifts behind the page.",
-    technique: "OGL · noise wash",
+      "Edge-weighted teal swathes pour in from the rim like watercolor on wet paper. Fine copper hairlines vein the noise isobars and sparse acid sparkles drift through. The headline area in the centre stays clean paper.",
+    technique: "OGL · marbled flow",
     accent: "teal",
   },
   {
-    slug: "soft-bokeh",
+    slug: "sumi-ink",
     index: "03",
-    name: "Soft Bokeh",
-    vibe: "Cinematic · out-of-focus",
+    name: "Sumi-e Drift",
+    vibe: "Editorial · ink wash",
     description:
-      "Five large blurred orbs drift in lazy circles, each tinted with a different palette accent. Wide squared-smoothstep falloff so there are no visible edges or hot centers.",
-    technique: "OGL · drifting orbs",
-    accent: "acid",
+      "Soft graphite ink shapes drift in from the corners with brush-hair line texture flowing inside them. Copper accent traces hold the boundary; sparse ink speckle plays at the edges. Negative space frames the headline.",
+    technique: "OGL · brushed ink",
+    accent: "ink",
   },
   {
     slug: "whisper-lines",
@@ -56,13 +56,13 @@ const RENDITIONS: Rendition[] = [
     accent: "ink",
   },
   {
-    slug: "iridescent",
+    slug: "night-topo",
     index: "05",
-    name: "Iridescent Sheen",
-    vibe: "Subtle · shifting",
+    name: "Night Topography",
+    vibe: "Technical · dark",
     description:
-      "Three palette tints (teal · copper · acid) cross-fade through a slow noise field — like oil on water or the inside of a shell. The page quietly catches a different light each time you load it.",
-    technique: "OGL · hue cross-fade",
+      "Dark navy-teal substrate. Cyan topographic contours sweep across the field, sparse copper accent traces drift through, and glowing particle dots travel along the contour lines. Faint orthogonal grid keeps it dashboard-true.",
+    technique: "OGL · dark contours",
     accent: "copper",
   },
 ];
@@ -109,18 +109,18 @@ export default function RenditionPickerPage() {
 
       <section className="container-narrow pt-12 pb-10">
         <span className="font-mono text-[11px] uppercase tracking-[0.32em] text-[var(--ink-muted)]">
-          design exploration · round 02 · 5 of 5
+          design exploration · round 03 · 5 of 5
         </span>
         <h1 className="font-display mt-6 text-[clamp(2.5rem,7vw,5.5rem)] leading-[0.96] tracking-[-0.04em] text-[var(--ink)]">
-          Quieter backgrounds.
+          Reference-led.
           <br />
-          Same door.
+          Three new takes.
         </h1>
         <p className="mt-6 max-w-[60ch] text-base leading-relaxed text-[var(--ink-muted)]">
-          Particle Plexus is the keeper from round one. Four new variants
-          treat the WebGL layer as scenery rather than spectacle &mdash;
-          smooth, peripheral, never competing with the headline. Open each
-          and pick the one to graft onto <code className="font-mono text-[0.95em] text-[var(--ink)]">/</code>.
+          Particle Plexus and Whisper Lines stay. Three slots have been
+          rebuilt against the new reference renders &mdash; marbled
+          watercolor, sumi-e ink wash, and a dark technical topography.
+          Open each and pick the one to graft onto <code className="font-mono text-[0.95em] text-[var(--ink)]">/</code>.
         </p>
       </section>
 
