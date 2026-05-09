@@ -343,7 +343,7 @@ function Ballot({ session }: { session: ActiveSession }) {
         })}
       </div>
 
-      <div className="sticky bottom-4 z-20 flex flex-wrap items-center gap-2 rounded-lg border bg-[var(--color-card)]/95 px-4 py-3 shadow-[0_-12px_40px_-8px_oklch(0.55_0.18_250/0.18)] backdrop-blur">
+      <div className="sticky bottom-4 z-20 flex flex-wrap items-center gap-2 rounded-lg border bg-[var(--color-card)]/95 px-4 py-3 shadow-[0_-12px_40px_-8px_rgba(15,106,106,0.18)] backdrop-blur">
         {chosen ? (
           <span className="text-sm">
             Selected:{" "}

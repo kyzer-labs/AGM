@@ -1,17 +1,19 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Unbounded, Azeret_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/app/providers";
 
-const fontSans = Geist({
+const fontDisplay = Unbounded({
   subsets: ["latin"],
-  variable: "--font-geist-sans",
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-unbounded",
   display: "swap",
 });
 
-const fontMono = Geist_Mono({
+const fontMono = Azeret_Mono({
   subsets: ["latin"],
-  variable: "--font-geist-mono",
+  weight: ["300", "400", "500", "600"],
+  variable: "--font-azeret-mono",
   display: "swap",
 });
 
@@ -27,7 +29,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${fontSans.variable} ${fontMono.variable} antialiased`}
+        className={`${fontDisplay.variable} ${fontMono.variable} antialiased`}
       >
         <Providers>{children}</Providers>
       </body>
