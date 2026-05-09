@@ -168,6 +168,17 @@ export const adminPreview = query({
   },
 });
 
+export const latestPublishedCycle = query({
+  args: {},
+  handler: async (ctx) => {
+    const all = await ctx.db.query("elections").collect();
+    const published = all
+      .filter((e) => e.phase === "published")
+      .sort((a, b) => b.createdAt - a.createdAt);
+    return published[0] ?? null;
+  },
+});
+
 export const publicPublished = query({
   args: { electionId: v.id("elections") },
   handler: async (ctx, args) => {

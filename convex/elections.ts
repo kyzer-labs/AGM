@@ -72,6 +72,16 @@ export const create = mutation({
       throw new ConvexError("Year must be a four-digit integer.");
     }
 
+    const dup = await ctx.db
+      .query("elections")
+      .withIndex("by_year", (q) => q.eq("year", args.year))
+      .first();
+    if (dup) {
+      throw new ConvexError(
+        `An election cycle for ${args.year} already exists ("${dup.name}"). AGM is annual — delete it from Setup phase if you want to recreate.`,
+      );
+    }
+
     const electionId = await ctx.db.insert("elections", {
       name,
       year: args.year,
