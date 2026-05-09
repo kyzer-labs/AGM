@@ -9,12 +9,14 @@ import { Badge } from "@/components/ui/badge";
 
 export function SiteHeader() {
   const me = useQuery(api.voters.me);
+  const isAdmin = me?.role === "admin" || me?.role === "super";
+  const brandHref = isAdmin ? "/admin" : "/dashboard";
 
   return (
     <header className="border-b bg-[var(--color-background)]/80 backdrop-blur sticky top-0 z-30">
       <div className="container-wide flex h-14 items-center justify-between gap-4">
         <Link
-          href="/dashboard"
+          href={brandHref}
           className="flex items-center gap-2 font-semibold tracking-tight"
         >
           <Image

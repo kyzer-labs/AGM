@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
@@ -75,11 +76,27 @@ function Inner() {
 }
 
 function Body({ election }: { election: Doc<"elections"> }) {
+  const router = useRouter();
+  const me = useQuery(api.voters.me);
   const status = useQuery(api.internal.myStatus, {
     electionId: election._id,
   });
 
-  if (status === undefined) {
+  const isAdmin = me?.role === "admin" || me?.role === "super";
+
+  useEffect(() => {
+    if (me === undefined || status === undefined) return;
+    if (isAdmin) return;
+    if (!status.isWhitelisted) {
+      router.replace("/dashboard");
+      return;
+    }
+    if (election.phase === "setup") {
+      router.replace("/dashboard");
+    }
+  }, [me, status, isAdmin, election.phase, router]);
+
+  if (status === undefined || me === undefined) {
     return (
       <main className="container-wide py-10">
         <Skeleton className="h-40 w-full" />
@@ -88,6 +105,13 @@ function Body({ election }: { election: Doc<"elections"> }) {
   }
 
   if (!status.isWhitelisted) {
+    if (!isAdmin) {
+      return (
+        <main className="container-wide py-10">
+          <Skeleton className="h-40 w-full" />
+        </main>
+      );
+    }
     return (
       <main className="container-narrow py-12">
         <Card>
@@ -112,6 +136,13 @@ function Body({ election }: { election: Doc<"elections"> }) {
   }
 
   if (election.phase === "setup") {
+    if (!isAdmin) {
+      return (
+        <main className="container-wide py-10">
+          <Skeleton className="h-40 w-full" />
+        </main>
+      );
+    }
     return (
       <PhaseInfo
         title="Internal evaluation hasn't opened yet"

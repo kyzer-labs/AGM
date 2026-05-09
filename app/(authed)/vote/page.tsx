@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
@@ -60,11 +61,27 @@ function Inner() {
 }
 
 function Body({ election }: { election: Doc<"elections"> }) {
+  const router = useRouter();
+  const me = useQuery(api.voters.me);
   const internalStatus = useQuery(api.internal.myStatus, {
     electionId: election._id,
   });
 
-  if (internalStatus === undefined) {
+  const isAdmin = me?.role === "admin" || me?.role === "super";
+
+  useEffect(() => {
+    if (me === undefined || internalStatus === undefined) return;
+    if (isAdmin) return;
+    if (internalStatus.isWhitelisted) {
+      router.replace("/dashboard");
+      return;
+    }
+    if (election.phase !== "publicVoting") {
+      router.replace("/dashboard");
+    }
+  }, [me, internalStatus, isAdmin, election.phase, router]);
+
+  if (internalStatus === undefined || me === undefined) {
     return (
       <main className="container-narrow py-12">
         <Skeleton className="h-40 w-full" />
@@ -73,6 +90,13 @@ function Body({ election }: { election: Doc<"elections"> }) {
   }
 
   if (internalStatus.isWhitelisted) {
+    if (!isAdmin) {
+      return (
+        <main className="container-narrow py-12">
+          <Skeleton className="h-40 w-full" />
+        </main>
+      );
+    }
     const internalShare = internalSharePercent(getWeights(election));
     return (
       <main className="container-narrow py-12">
@@ -99,6 +123,13 @@ function Body({ election }: { election: Doc<"elections"> }) {
     election.phase === "internalOpen" ||
     election.phase === "internalClosed"
   ) {
+    if (!isAdmin) {
+      return (
+        <main className="container-narrow py-12">
+          <Skeleton className="h-40 w-full" />
+        </main>
+      );
+    }
     return (
       <main className="container-narrow py-12">
         <Card>
@@ -122,6 +153,13 @@ function Body({ election }: { election: Doc<"elections"> }) {
     election.phase === "resultsPreview" ||
     election.phase === "published"
   ) {
+    if (!isAdmin) {
+      return (
+        <main className="container-narrow py-12">
+          <Skeleton className="h-40 w-full" />
+        </main>
+      );
+    }
     return (
       <main className="container-narrow py-12">
         <Card>
