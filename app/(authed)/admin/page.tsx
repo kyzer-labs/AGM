@@ -27,8 +27,10 @@ function AdminPageInner() {
   const me = useQuery(api.voters.me);
   const adminStatus = useQuery(api.admins.myAdminStatus);
   const superExists = useQuery(api.admins.superAdminExists);
+  const devConfig = useQuery(api.dev.config);
 
   const isAdmin = adminStatus?.role === "admin" || adminStatus?.role === "super";
+  const devEnabled = devConfig?.enabled === true;
 
   useEffect(() => {
     if (
@@ -128,6 +130,14 @@ function AdminPageInner() {
               title="Admins"
               description="Super admins manage the admin allowlist."
               href="/admin/admins"
+            />
+          ) : null}
+          {devEnabled ? (
+            <Tile
+              title="Dev seeder"
+              description="Synthetic voters/evaluations/votes for end-to-end testing without dozens of real accounts."
+              href="/admin/dev"
+              badge="Dev only"
             />
           ) : null}
         </section>

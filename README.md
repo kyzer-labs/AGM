@@ -17,6 +17,7 @@ internal Year-2 rubric evaluation before AGM day, live AGM-day public voting, an
 - Spec & user stories — [docs/AGM_USER_STORIES.md](docs/AGM_USER_STORIES.md)
 - **Setup guide (start here)** — [docs/SETUP.md](docs/SETUP.md)
 - **Operations runbook (during AGM)** — [docs/RUNBOOK.md](docs/RUNBOOK.md)
+- **Testing playbook (dev seeder + 2-account smoke test)** — [docs/TESTING.md](docs/TESTING.md)
 
 ## Status
 

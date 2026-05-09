@@ -10,6 +10,7 @@
 
 import type * as admins from "../admins.js";
 import type * as candidates from "../candidates.js";
+import type * as dev from "../dev.js";
 import type * as elections from "../elections.js";
 import type * as exports from "../exports.js";
 import type * as internal_ from "../internal.js";
@@ -36,6 +37,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   admins: typeof admins;
   candidates: typeof candidates;
+  dev: typeof dev;
   elections: typeof elections;
   exports: typeof exports;
   internal: typeof internal_;
