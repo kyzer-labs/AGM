@@ -11,9 +11,11 @@ const VERTEX_SHADER = /* glsl */ `
 `;
 
 /**
- * Paper base + two acid-yellow blobs (one drifting via low-frequency
- * snoise) and one teal blob in the upper-right. Drift speed ~0.06.
- * Standard Ashima 2D simplex noise inlined for portability.
+ * Continuous topographic noise field — no positioned blobs, so there are
+ * no visible "gradient roots" anywhere on the canvas. The full plane is a
+ * uniform fbm field whose drift produces visibly animated contour lines
+ * (major + minor bands) over a paper base, with a faint warm/cool tonal
+ * wash. Standard Ashima 2D simplex noise inlined for portability.
  */
 const FRAGMENT_SHADER = /* glsl */ `
   precision highp float;
@@ -55,37 +57,47 @@ const FRAGMENT_SHADER = /* glsl */ `
     return 130.0 * dot(m, g);
   }
 
+  float fbm(vec2 p) {
+    float v = 0.0;
+    float a = 0.5;
+    for (int i = 0; i < 3; i++) {
+      v += a * snoise(p);
+      p = p * 2.0 + vec2(100.0);
+      a *= 0.5;
+    }
+    return v;
+  }
+
   void main() {
     vec2 uv = gl_FragCoord.xy / uResolution.xy;
     float aspect = uResolution.x / uResolution.y;
     vec2 q = vec2(uv.x * aspect, uv.y);
 
-    float t = uTime * 0.06;
+    float t = uTime * 0.10;
 
-    vec2 c1 = vec2(0.18 * aspect, 0.85);
-    float d1 = length(q - c1);
-    float n1 = snoise(q * 1.4 + vec2(t, -t * 0.5)) * 0.18;
-    float a1 = smoothstep(0.55, 0.05, d1 + n1);
-
-    vec2 c2 = vec2((0.62 + 0.10 * sin(t)) * aspect,
-                   0.32 + 0.06 * cos(t * 0.7));
-    float d2 = length(q - c2);
-    float n2 = snoise(q * 1.1 - vec2(t, t * 0.7)) * 0.16;
-    float a2 = smoothstep(0.50, 0.02, d2 + n2);
-
-    vec2 c3 = vec2(1.05 * aspect, 0.78);
-    float d3 = length(q - c3);
-    float n3 = snoise(q * 1.6 + vec2(-t, t * 1.1)) * 0.15;
-    float a3 = smoothstep(0.65, 0.10, d3 + n3);
+    vec2 p1 = q * 1.6 + vec2(t * 0.6, t * 0.4);
+    vec2 p2 = q * 3.2 + vec2(-t * 0.9, t * 0.5);
+    float n = fbm(p1) + 0.5 * fbm(p2);
 
     vec3 paper = vec3(0.965, 0.949, 0.918);
     vec3 acid  = vec3(1.000, 0.894, 0.412);
     vec3 teal  = vec3(0.059, 0.416, 0.416);
+    vec3 ink   = vec3(0.043, 0.059, 0.071);
+
+    float warm = smoothstep(0.05, 0.9, n);
+    float cool = smoothstep(-0.05, -0.9, n);
 
     vec3 color = paper;
-    color = mix(color, acid, a1 * 0.55);
-    color = mix(color, acid, a2 * 0.45);
-    color = mix(color, teal, a3 * 0.32);
+    color = mix(color, acid, warm * 0.13);
+    color = mix(color, teal, cool * 0.10);
+
+    float major = abs(fract(n * 4.5 + 0.5) - 0.5);
+    float majorMask = 1.0 - smoothstep(0.020, 0.055, major);
+    color = mix(color, ink, majorMask * 0.09);
+
+    float minor = abs(fract(n * 11.0 + 0.5) - 0.5);
+    float minorMask = 1.0 - smoothstep(0.005, 0.020, minor);
+    color = mix(color, ink, minorMask * 0.035);
 
     gl_FragColor = vec4(color, 1.0);
   }
@@ -159,7 +171,7 @@ export function ShaderBg() {
     };
 
     if (prefersReduced) {
-      program.uniforms.uTime.value = 6.0;
+      program.uniforms.uTime.value = 12.0;
       renderer.render({ scene: mesh });
     } else {
       rafId = requestAnimationFrame(loop);

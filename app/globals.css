@@ -79,10 +79,7 @@
   body {
     min-height: 100dvh;
     color: var(--ink);
-    background:
-      radial-gradient(900px 620px at 14% 0%, rgba(255, 228, 105, 0.23), transparent 58%),
-      radial-gradient(820px 560px at 100% 20%, rgba(15, 106, 106, 0.22), transparent 55%),
-      linear-gradient(180deg, var(--paper), var(--paper-2));
+    background: linear-gradient(180deg, var(--paper), var(--paper-2));
   }
 
   body::before {
@@ -118,20 +115,6 @@
 }
 
 @layer utilities {
-  .gradient-brand {
-    background-image: radial-gradient(
-        900px 620px at 14% 0%,
-        rgba(255, 228, 105, 0.23) 0%,
-        transparent 58%
-      ),
-      radial-gradient(
-        820px 560px at 100% 20%,
-        rgba(15, 106, 106, 0.22) 0%,
-        transparent 55%
-      ),
-      linear-gradient(180deg, var(--paper), var(--paper-2));
-  }
-
   .surface-glass {
     background: linear-gradient(
       180deg,
