@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Unbounded, Azeret_Mono } from "next/font/google";
+import { Unbounded, Azeret_Mono, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/app/providers";
 
@@ -17,6 +17,13 @@ const fontMono = Azeret_Mono({
   display: "swap",
 });
 
+const fontSerif = Playfair_Display({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-playfair",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "USM CSS AGM Election",
   description:
@@ -29,7 +36,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${fontDisplay.variable} ${fontMono.variable} antialiased`}
+        className={`${fontDisplay.variable} ${fontMono.variable} ${fontSerif.variable} antialiased`}
       >
         <Providers>{children}</Providers>
       </body>

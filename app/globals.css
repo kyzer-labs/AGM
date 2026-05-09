@@ -17,6 +17,8 @@
     Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --font-sans: var(--font-azeret-mono), ui-monospace, SFMono-Regular, Menlo,
     Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-serif: var(--font-playfair), "Playfair Display", "Cormorant Garamond",
+    "EB Garamond", Georgia, "Times New Roman", Times, serif;
 
   --color-background: #f6f2ea;
   --color-foreground: #0b0f12;

@@ -31,7 +31,7 @@ const RENDITIONS: Rendition[] = [
     name: "Marbled Veins",
     vibe: "Watercolor · flowing",
     description:
-      "Edge-weighted teal swathes pour in from the rim like watercolor on wet paper. Fine copper hairlines vein the noise isobars and sparse acid sparkles drift through. The headline area in the centre stays clean paper.",
+      "Sage-teal sheets drape from the side edges with visible marble bands inside. Golden sparkles drift through the flow and a warm acid glow sits under the centered CTA.",
     technique: "OGL · marbled flow",
     accent: "teal",
   },
@@ -41,8 +41,8 @@ const RENDITIONS: Rendition[] = [
     name: "Sumi-e Drift",
     vibe: "Editorial · ink wash",
     description:
-      "Soft graphite ink shapes drift in from the corners with brush-hair line texture flowing inside them. Copper accent traces hold the boundary; sparse ink speckle plays at the edges. Negative space frames the headline.",
-    technique: "OGL · brushed ink",
+      "Diffuse charcoal ink-wash billows in opposite corners, threaded with long curling copper brushstrokes. A clean cream centre frames the headline and the rectangular CTA.",
+    technique: "OGL · sumi-e wash",
     accent: "ink",
   },
   {
@@ -54,16 +54,6 @@ const RENDITIONS: Rendition[] = [
       "Domain-warped sine waves drawn in the faintest possible ink, layered over a near-imperceptible teal wash. Reads as a hint of motion, never as a graphic statement.",
     technique: "OGL · curved hatch",
     accent: "ink",
-  },
-  {
-    slug: "night-topo",
-    index: "05",
-    name: "Night Topography",
-    vibe: "Technical · dark",
-    description:
-      "Dark navy-teal substrate. Cyan topographic contours sweep across the field, sparse copper accent traces drift through, and glowing particle dots travel along the contour lines. Faint orthogonal grid keeps it dashboard-true.",
-    technique: "OGL · dark contours",
-    accent: "copper",
   },
 ];
 
@@ -109,7 +99,7 @@ export default function RenditionPickerPage() {
 
       <section className="container-narrow pt-12 pb-10">
         <span className="font-mono text-[11px] uppercase tracking-[0.32em] text-[var(--ink-muted)]">
-          design exploration · round 03 · 5 of 5
+          design exploration · round 04 · 4 of 4
         </span>
         <h1 className="font-display mt-6 text-[clamp(2.5rem,7vw,5.5rem)] leading-[0.96] tracking-[-0.04em] text-[var(--ink)]">
           Reference-led.
@@ -117,10 +107,9 @@ export default function RenditionPickerPage() {
           Three new takes.
         </h1>
         <p className="mt-6 max-w-[60ch] text-base leading-relaxed text-[var(--ink-muted)]">
-          Particle Plexus and Whisper Lines stay. Three slots have been
-          rebuilt against the new reference renders &mdash; marbled
-          watercolor, sumi-e ink wash, and a dark technical topography.
-          Open each and pick the one to graft onto <code className="font-mono text-[0.95em] text-[var(--ink)]">/</code>.
+          Particle Plexus and Whisper Lines stay. Marbled Veins and Sumi-e
+          Drift have been tightened against the reference renders. Open each
+          and pick the one to graft onto <code className="font-mono text-[0.95em] text-[var(--ink)]">/</code>.
         </p>
       </section>
 
