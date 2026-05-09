@@ -10,57 +10,59 @@ interface Rendition {
   description: string;
   technique: string;
   accent: "acid" | "teal" | "copper" | "ink";
+  keeper?: boolean;
 }
 
 const RENDITIONS: Rendition[] = [
   {
-    slug: "aurora",
-    index: "01",
-    name: "Aurora Drift",
-    vibe: "Editorial premium",
-    description:
-      "Domain-warped acid / teal / copper aurora with low-frequency ink isobars. Left-aligned hero, brand pill top center.",
-    technique: "OGL · Domain Warp",
-    accent: "acid",
-  },
-  {
-    slug: "ribbons",
-    index: "02",
-    name: "Liquid Ribbons",
-    vibe: "Modern · kinetic",
-    description:
-      "Four horizontal silk bands fluttering across the canvas, displaced by stacked simplex noise. Centered display type with an italic teal turn.",
-    technique: "OGL · Sine + Noise",
-    accent: "teal",
-  },
-  {
     slug: "plexus",
-    index: "03",
+    index: "01",
     name: "Particle Plexus",
     vibe: "Civic · networked",
     description:
       "70 ink nodes drift on a 2D canvas; pairs within range connect with teal threads. Cursor gently repels nearby nodes — the network breathes when you move.",
     technique: "Canvas 2D · 70 nodes",
     accent: "ink",
+    keeper: true,
   },
   {
-    slug: "halftone",
+    slug: "drift-mist",
+    index: "02",
+    name: "Drift Mist",
+    vibe: "Ambient · breathing",
+    description:
+      "A single domain-warped low-frequency noise field maps to barely-there warm/cool tints over paper. No isobars, no shapes — just a quiet atmosphere that drifts behind the page.",
+    technique: "OGL · noise wash",
+    accent: "teal",
+  },
+  {
+    slug: "soft-bokeh",
+    index: "03",
+    name: "Soft Bokeh",
+    vibe: "Cinematic · out-of-focus",
+    description:
+      "Five large blurred orbs drift in lazy circles, each tinted with a different palette accent. Wide squared-smoothstep falloff so there are no visible edges or hot centers.",
+    technique: "OGL · drifting orbs",
+    accent: "acid",
+  },
+  {
+    slug: "whisper-lines",
     index: "04",
-    name: "Halftone Pulse",
-    vibe: "Newsprint · tactile",
+    name: "Whisper Lines",
+    vibe: "Architectural · trace",
     description:
-      "A 56-wide grid of dots whose radius is driven by a flowing noise field plus a diagonal traveling wave. Editorial split layout — content lives along the left rail.",
-    technique: "OGL · Halftone",
-    accent: "copper",
+      "Domain-warped sine waves drawn in the faintest possible ink, layered over a near-imperceptible teal wash. Reads as a hint of motion, never as a graphic statement.",
+    technique: "OGL · curved hatch",
+    accent: "ink",
   },
   {
-    slug: "beams",
+    slug: "iridescent",
     index: "05",
-    name: "Compass Beams",
-    vibe: "Ceremonial · focused",
+    name: "Iridescent Sheen",
+    vibe: "Subtle · shifting",
     description:
-      "Counter-rotating radial beams + concentric rings around a copper core. Tightly centered ceremonial composition with the AGM phase pipeline beneath the CTA.",
-    technique: "OGL · Polar Rays",
+      "Three palette tints (teal · copper · acid) cross-fade through a slow noise field — like oil on water or the inside of a shell. The page quietly catches a different light each time you load it.",
+    technique: "OGL · hue cross-fade",
     accent: "copper",
   },
 ];
@@ -107,17 +109,18 @@ export default function RenditionPickerPage() {
 
       <section className="container-narrow pt-12 pb-10">
         <span className="font-mono text-[11px] uppercase tracking-[0.32em] text-[var(--ink-muted)]">
-          design exploration · 5 of 5
+          design exploration · round 02 · 5 of 5
         </span>
         <h1 className="font-display mt-6 text-[clamp(2.5rem,7vw,5.5rem)] leading-[0.96] tracking-[-0.04em] text-[var(--ink)]">
-          Five directions
+          Quieter backgrounds.
           <br />
-          for the same door.
+          Same door.
         </h1>
         <p className="mt-6 max-w-[60ch] text-base leading-relaxed text-[var(--ink-muted)]">
-          Five complete landing renditions for the AGM portal &mdash; each
-          with its own layout, copy, and WebGL animation. Open them in turn
-          and pick the one that should become <code className="font-mono text-[0.95em] text-[var(--ink)]">/</code>.
+          Particle Plexus is the keeper from round one. Four new variants
+          treat the WebGL layer as scenery rather than spectacle &mdash;
+          smooth, peripheral, never competing with the headline. Open each
+          and pick the one to graft onto <code className="font-mono text-[0.95em] text-[var(--ink)]">/</code>.
         </p>
       </section>
 
@@ -147,6 +150,11 @@ export default function RenditionPickerPage() {
                       <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-[var(--ink-muted)]">
                         {r.vibe}
                       </span>
+                      {r.keeper && (
+                        <span className="rounded-full bg-[var(--ink)] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.24em] text-[var(--paper)]">
+                          keeper
+                        </span>
+                      )}
                     </div>
                     <p className="mt-3 max-w-[58ch] text-[14px] leading-relaxed text-[var(--ink-muted)]">
                       {r.description}

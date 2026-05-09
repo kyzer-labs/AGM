@@ -222,7 +222,7 @@ export function PlexusVariant() {
           USM Computer Science Society
         </p>
         <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--ink-muted)]">
-          rendition · 03 / particle plexus
+          rendition · 01 / particle plexus · keeper
         </p>
       </footer>
     </main>
