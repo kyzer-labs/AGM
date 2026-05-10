@@ -7,7 +7,6 @@ import Papa from "papaparse";
 import { toast } from "sonner";
 import {
   AlertTriangle,
-  FileWarning,
   Lock,
   Pencil,
   Plus,
@@ -19,6 +18,7 @@ import {
 
 import { AuthGate } from "@/components/auth/auth-gate";
 import { AdminBreadcrumb } from "@/components/admin/admin-breadcrumb";
+import { ImportSummaryStrip } from "@/components/admin/import-summary-strip";
 import { NoElection } from "@/components/admin/no-election";
 import { useDialog } from "@/components/dialog/dialog-provider";
 import {
@@ -434,78 +434,24 @@ function Body({ election }: { election: Doc<"elections"> }) {
       ) : null}
 
       {lastImport ? (
-        <NoticeStrip
+        <ImportSummaryStrip
           markerPrimary="Last CSV import"
           markerSecondary={lastImport.fileName}
-          markerIcon={
-            lastImport.errors.length > 0 ? (
-              <FileWarning
-                className="h-4 w-4 text-[var(--copper)]"
-                aria-hidden
-              />
-            ) : undefined
-          }
           headline={`${lastImport.inserted} of ${lastImport.attempted} ${
             lastImport.attempted === 1 ? "row" : "rows"
           } imported`}
+          stats={{
+            added: lastImport.inserted,
+            skipped: lastImport.skipped,
+            errors: lastImport.errors.length,
+          }}
+          errors={lastImport.errors.map((err) => ({
+            displayRow: `Row ${err.row}`,
+            reason: err.message,
+          }))}
           tone={lastImport.errors.length > 0 ? "copper" : "neutral"}
-        >
-          <dl className="grid grid-cols-3 gap-4 text-sm">
-            <div className="space-y-0.5">
-              <dt className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink-muted)]">
-                Added
-              </dt>
-              <dd className="font-display text-2xl font-medium tabular-nums text-[var(--ink)]">
-                {lastImport.inserted}
-              </dd>
-            </div>
-            <div className="space-y-0.5">
-              <dt className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink-muted)]">
-                Skipped
-              </dt>
-              <dd className="font-display text-2xl font-medium tabular-nums text-[var(--ink)]">
-                {lastImport.skipped}
-              </dd>
-            </div>
-            <div className="space-y-0.5">
-              <dt className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink-muted)]">
-                Errors
-              </dt>
-              <dd className="font-display text-2xl font-medium tabular-nums text-[var(--ink)]">
-                {lastImport.errors.length}
-              </dd>
-            </div>
-          </dl>
-          {lastImport.errors.length > 0 ? (
-            <div className="space-y-2">
-              <p className="text-sm leading-relaxed text-[var(--color-muted-foreground)]">
-                Each line below is a row from the CSV that did not import
-                cleanly. Row numbers match the CSV (the header is row 1).
-                Fix the source file and re-import; existing candidates are
-                not duplicated on the second pass.
-              </p>
-              <ul className="max-h-64 space-y-1.5 overflow-auto rounded-md border border-[var(--ink-line)] bg-[var(--paper)] p-3 font-mono text-xs">
-                {lastImport.errors.map((err, i) => (
-                  <li key={i} className="flex gap-2">
-                    <span className="shrink-0 tabular-nums text-[var(--ink-muted)]">
-                      Row {err.row}
-                    </span>
-                    <span className="text-[var(--ink)]">{err.message}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-          <div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setLastImport(null)}
-            >
-              Dismiss
-            </Button>
-          </div>
-        </NoticeStrip>
+          onDismiss={() => setLastImport(null)}
+        />
       ) : null}
 
       <Modal

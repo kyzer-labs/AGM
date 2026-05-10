@@ -12,18 +12,11 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Papa from "papaparse";
 import { toast } from "sonner";
-import {
-  AlertTriangle,
-  FileWarning,
-  Lock,
-  Plus,
-  Trash2,
-  Upload,
-  Users2,
-} from "lucide-react";
+import { Lock, Plus, Trash2, Upload, Users2 } from "lucide-react";
 
 import { AuthGate } from "@/components/auth/auth-gate";
 import { AdminBreadcrumb } from "@/components/admin/admin-breadcrumb";
+import { ImportSummaryStrip } from "@/components/admin/import-summary-strip";
 import { NoElection } from "@/components/admin/no-election";
 import { useDialog } from "@/components/dialog/dialog-provider";
 
@@ -279,7 +272,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
       ) : null}
 
       {lastImport ? (
-        <ImportSummaryStrip
+        <BulkImportSummary
           summary={lastImport}
           onDismiss={() => setLastImport(null)}
         />
@@ -983,7 +976,7 @@ function BulkImportModal({
   );
 }
 
-function ImportSummaryStrip({
+function BulkImportSummary({
   summary,
   onDismiss,
 }: {
@@ -992,96 +985,23 @@ function ImportSummaryStrip({
 }) {
   const totalIssues = summary.errors.length + summary.warnings.length;
   return (
-    <NoticeStrip
+    <ImportSummaryStrip
       markerPrimary="Last bulk import"
       markerSecondary={summary.sourceLabel}
-      markerIcon={
-        totalIssues > 0 ? (
-          <FileWarning
-            className="h-4 w-4 text-[var(--copper)]"
-            aria-hidden
-          />
-        ) : undefined
-      }
       headline={`${summary.inserted} of ${summary.attempted} ${
         summary.attempted === 1 ? "row" : "rows"
       } imported`}
+      stats={{
+        added: summary.inserted,
+        reclassified: summary.reclassified,
+        skipped: summary.skipped,
+        errors: summary.errors.length,
+        warnings: summary.warnings.length,
+      }}
+      errors={summary.errors}
+      warnings={summary.warnings}
       tone={totalIssues > 0 ? "copper" : "neutral"}
-    >
-      <dl className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-        <SummaryStat label="Added" value={summary.inserted} />
-        <SummaryStat label="Reclassified" value={summary.reclassified} />
-        <SummaryStat label="Skipped" value={summary.skipped} />
-        <SummaryStat label="Errors" value={summary.errors.length} />
-        <SummaryStat label="Warnings" value={summary.warnings.length} />
-      </dl>
-
-      {summary.errors.length > 0 ? (
-        <div className="space-y-2">
-          <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--copper)]">
-            <AlertTriangle
-              className="mr-1 inline-block h-3 w-3"
-              aria-hidden
-            />{" "}
-            Errors — these rows did not import
-          </p>
-          <ul className="max-h-48 space-y-1.5 overflow-auto rounded-md border border-[var(--ink-line)] bg-[var(--paper)] p-3 font-mono text-xs">
-            {summary.errors.map((err, i) => (
-              <li key={i} className="flex flex-wrap gap-2">
-                <span className="shrink-0 tabular-nums text-[var(--ink-muted)]">
-                  {err.displayRow}
-                </span>
-                <span className="text-[var(--ink)]">{err.email}</span>
-                <span className="text-[var(--copper)]">{err.reason}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {summary.warnings.length > 0 ? (
-        <div className="space-y-2">
-          <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink-muted)]">
-            Warnings — imported with a fallback
-          </p>
-          <ul className="max-h-48 space-y-1.5 overflow-auto rounded-md border border-[var(--ink-line)] bg-[var(--paper)] p-3 font-mono text-xs">
-            {summary.warnings.map((w, i) => (
-              <li key={i} className="flex flex-wrap gap-2">
-                <span className="shrink-0 tabular-nums text-[var(--ink-muted)]">
-                  {w.displayRow}
-                </span>
-                <span className="text-[var(--ink)]">{w.email}</span>
-                <span className="text-[var(--ink-muted)]">{w.reason}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      <div>
-        <Button variant="ghost" size="sm" onClick={onDismiss}>
-          Dismiss
-        </Button>
-      </div>
-    </NoticeStrip>
-  );
-}
-
-function SummaryStat({
-  label,
-  value,
-}: {
-  label: string;
-  value: number;
-}) {
-  return (
-    <div className="space-y-0.5">
-      <dt className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink-muted)]">
-        {label}
-      </dt>
-      <dd className="font-display text-2xl font-medium tabular-nums text-[var(--ink)]">
-        {value}
-      </dd>
-    </div>
+      onDismiss={onDismiss}
+    />
   );
 }
