@@ -32,6 +32,14 @@ import { VOTER_CLASSES, type VoterClass } from "./lib/cycle";
 const SEED_EMAIL_PREFIX = "seed-";
 const USM_DOMAIN = "@student.usm.my";
 
+/**
+ * Marker prefix written into the `bio` field of every fixture candidate
+ * inserted by `loadTestCandidates`. Wipes target only rows whose bio
+ * starts with this exact string so real candidate rows entered through
+ * `/admin/candidates` are never touched, even with the env flag on.
+ */
+const TEST_BIO_PREFIX = "[TEST_FIXTURE]";
+
 function isSeedEnabled(): boolean {
   return process.env.DEV_SEED_ALLOWED === "true";
 }
@@ -42,6 +50,10 @@ function requireSeedEnabled(): void {
       "Dev seeder is disabled on this deployment. Set DEV_SEED_ALLOWED=\"true\" in the Convex deployment env to enable.",
     );
   }
+}
+
+function isTestBio(bio: string | undefined | null): boolean {
+  return typeof bio === "string" && bio.startsWith(TEST_BIO_PREFIX);
 }
 
 // ---------- email helpers ----------
@@ -273,6 +285,7 @@ export const stats = query({
       .collect();
     let allVotes = 0;
     let seedVotes = 0;
+    const sessionCounts = { pending: 0, active: 0, closed: 0 };
     for (const p of positions) {
       const votes = await ctx.db
         .query("publicVotes")
@@ -283,7 +296,62 @@ export const stats = query({
         const voter = await ctx.db.get(vote.voterVoterId);
         if (voter && seedVoterEmails.has(voter.email)) seedVotes += 1;
       }
+      sessionCounts[p.sessionStatus] += 1;
     }
+
+    const candidates = await getCandidatesForElection(ctx, args.electionId);
+    const testCandidates = candidates.filter((c) => isTestBio(c.bio));
+    const realCandidates = candidates.length - testCandidates.length;
+
+    const candidatesByPosition = new Map<
+      string,
+      { _id: Id<"candidates">; fullName: string; isTest: boolean }[]
+    >();
+    for (const c of candidates) {
+      const links = await ctx.db
+        .query("candidatePositions")
+        .withIndex("by_candidate", (q) => q.eq("candidateId", c._id))
+        .collect();
+      for (const link of links) {
+        const arr = candidatesByPosition.get(link.positionId) ?? [];
+        arr.push({
+          _id: c._id,
+          fullName: c.fullName,
+          isTest: isTestBio(c.bio),
+        });
+        candidatesByPosition.set(link.positionId, arr);
+      }
+    }
+
+    const firstByPosition = positions
+      .slice()
+      .sort((a, b) =>
+        a.tier === b.tier ? a.order - b.order : a.tier - b.tier,
+      )
+      .map((p) => {
+        const cands = (candidatesByPosition.get(p._id) ?? [])
+          .slice()
+          .sort((a, b) => a._id.localeCompare(b._id));
+        return {
+          positionId: p._id,
+          positionName: p.name,
+          tier: p.tier,
+          order: p.order,
+          sessionStatus: p.sessionStatus,
+          candidatesAtPosition: cands.length,
+          favorFirstWinner: cands[0]
+            ? {
+                fullName: cands[0].fullName,
+                isTest: cands[0].isTest,
+              }
+            : null,
+        };
+      });
+
+    const results = await ctx.db
+      .query("results")
+      .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
+      .collect();
 
     return {
       shortElectionId: shortElectionId(args.electionId),
@@ -295,6 +363,15 @@ export const stats = query({
       seedEvaluationsSubmitted: seedSubmittedEvals.length,
       seedPublicVotes: seedVotes,
       totalPublicVotes: allVotes,
+      candidates: {
+        total: candidates.length,
+        test: testCandidates.length,
+        real: realCandidates,
+      },
+      positions: positions.length,
+      sessionCounts,
+      results: results.length,
+      firstByPosition,
     };
   },
 });
@@ -1067,6 +1144,363 @@ export const wipeSeedData = mutation({
       votesDeleted,
       resultsCleared,
       positionsReset,
+    };
+  },
+});
+
+// ---------- test candidate fixtures ----------
+
+interface TestCandidateSpec {
+  fullName: string;
+  matric: string;
+  positionTier: number;
+  positionOrder: number;
+}
+
+/**
+ * Eighteen seeded fixture candidates: two per position across the
+ * canonical Year 2 cycle. Position assignments are anchored to
+ * (tier, order) which is how `positions` is identified independent of
+ * its display name. A position whose seed defaults have been renamed
+ * still resolves correctly here because the (tier, order) coordinates
+ * survive renames.
+ */
+const TEST_CANDIDATES: ReadonlyArray<TestCandidateSpec> = [
+  // Tier 1 - President (1 position)
+  { fullName: "Aiman Hakimi Bin Razak", matric: "FIXT0001A", positionTier: 1, positionOrder: 0 },
+  { fullName: "Beatrice Lim Wei Ling", matric: "FIXT0001B", positionTier: 1, positionOrder: 0 },
+
+  // Tier 2 - Vice Presidents (2 positions)
+  { fullName: "Cheryl Tan Jia Hui", matric: "FIXT0002A", positionTier: 2, positionOrder: 0 },
+  { fullName: "Daniyal Bin Ismail", matric: "FIXT0002B", positionTier: 2, positionOrder: 0 },
+  { fullName: "Edmund Loh Chee Wei", matric: "FIXT0003A", positionTier: 2, positionOrder: 1 },
+  { fullName: "Farah Aziz Binti Hassan", matric: "FIXT0003B", positionTier: 2, positionOrder: 1 },
+
+  // Tier 3 - Directors (6 positions)
+  { fullName: "Gavin Wong Kar Mun", matric: "FIXT0004A", positionTier: 3, positionOrder: 0 },
+  { fullName: "Hannah Yeoh Sin Yee", matric: "FIXT0004B", positionTier: 3, positionOrder: 0 },
+  { fullName: "Iqbal Bin Mahmud", matric: "FIXT0005A", positionTier: 3, positionOrder: 1 },
+  { fullName: "Jacelyn Ng Pei Shan", matric: "FIXT0005B", positionTier: 3, positionOrder: 1 },
+  { fullName: "Khairul Anuar Bin Salleh", matric: "FIXT0006A", positionTier: 3, positionOrder: 2 },
+  { fullName: "Lily Chong Mei Lin", matric: "FIXT0006B", positionTier: 3, positionOrder: 2 },
+  { fullName: "Marcus Tan Boon Hwa", matric: "FIXT0007A", positionTier: 3, positionOrder: 3 },
+  { fullName: "Nadia Binti Razali", matric: "FIXT0007B", positionTier: 3, positionOrder: 3 },
+  { fullName: "Owen Lee Zhi Hao", matric: "FIXT0008A", positionTier: 3, positionOrder: 4 },
+  { fullName: "Priya Subramaniam", matric: "FIXT0008B", positionTier: 3, positionOrder: 4 },
+  { fullName: "Qaseh Aisyah Binti Hamid", matric: "FIXT0009A", positionTier: 3, positionOrder: 5 },
+  { fullName: "Rahman Bin Yusoff", matric: "FIXT0009B", positionTier: 3, positionOrder: 5 },
+];
+
+export const loadTestCandidates = mutation({
+  args: { electionId: v.id("elections") },
+  handler: async (ctx, args) => {
+    requireSeedEnabled();
+    const { voter: actor } = await requireAdmin(ctx);
+    const election = await getElectionOrThrow(ctx, args.electionId);
+    if (election.phase !== "setup") {
+      throw new ConvexError(
+        `Test candidates can only be loaded during the Setup phase. Current phase: ${election.phase}. Wipe and reset this cycle, or open /admin/candidates to add real candidates instead.`,
+      );
+    }
+
+    const positions = await ctx.db
+      .query("positions")
+      .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
+      .collect();
+    if (positions.length === 0) {
+      throw new ConvexError(
+        "No positions configured. Run \"Seed defaults\" on /admin/positions first, then load test candidates.",
+      );
+    }
+
+    const positionByKey = new Map<string, (typeof positions)[number]>();
+    for (const p of positions) {
+      positionByKey.set(`${p.tier}-${p.order}`, p);
+    }
+
+    const existingCandidates = await ctx.db
+      .query("candidates")
+      .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
+      .collect();
+    const existingTestNames = new Set(
+      existingCandidates
+        .filter((c) => isTestBio(c.bio))
+        .map((c) => c.fullName),
+    );
+
+    let inserted = 0;
+    let skipped = 0;
+    const missingPositions: string[] = [];
+
+    for (const spec of TEST_CANDIDATES) {
+      const position = positionByKey.get(
+        `${spec.positionTier}-${spec.positionOrder}`,
+      );
+      if (!position) {
+        missingPositions.push(
+          `tier=${spec.positionTier} order=${spec.positionOrder} (for "${spec.fullName}")`,
+        );
+        continue;
+      }
+      if (existingTestNames.has(spec.fullName)) {
+        skipped += 1;
+        continue;
+      }
+
+      const candidateId = await ctx.db.insert("candidates", {
+        electionId: args.electionId,
+        fullName: spec.fullName,
+        matric: spec.matric,
+        bio: `${TEST_BIO_PREFIX} Auto-loaded fixture for ${position.name} (tier ${spec.positionTier}, order ${spec.positionOrder}).`,
+        createdAt: Date.now(),
+      });
+      await ctx.db.insert("candidatePositions", {
+        candidateId,
+        positionId: position._id,
+        fallbackOrder: 0,
+      });
+      inserted += 1;
+    }
+
+    if (missingPositions.length > 0) {
+      throw new ConvexError(
+        `Some positions were not found in the current cycle. Run "Seed defaults" on /admin/positions first, then re-run this. Missing: ${missingPositions.join(", ")}`,
+      );
+    }
+
+    await audit(ctx, {
+      actor,
+      action: "dev.loadTestCandidates",
+      entityType: "elections",
+      entityId: args.electionId,
+      payload: {
+        inserted,
+        skipped,
+        totalSpec: TEST_CANDIDATES.length,
+      },
+    });
+
+    return {
+      inserted,
+      skipped,
+      totalSpec: TEST_CANDIDATES.length,
+    };
+  },
+});
+
+export const wipeTestCandidates = mutation({
+  args: { electionId: v.id("elections") },
+  handler: async (ctx, args) => {
+    requireSeedEnabled();
+    const { voter: actor } = await requireAdmin(ctx);
+    const election = await getElectionOrThrow(ctx, args.electionId);
+    if (election.phase === "published") {
+      throw new ConvexError(
+        "Cannot wipe candidates from a published cycle. Create a new cycle first.",
+      );
+    }
+
+    const candidates = await ctx.db
+      .query("candidates")
+      .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
+      .collect();
+    const testCandidates = candidates.filter((c) => isTestBio(c.bio));
+
+    let candidatesDeleted = 0;
+    let linksDeleted = 0;
+
+    for (const c of testCandidates) {
+      const links = await ctx.db
+        .query("candidatePositions")
+        .withIndex("by_candidate", (q) => q.eq("candidateId", c._id))
+        .collect();
+      for (const link of links) {
+        await ctx.db.delete(link._id);
+        linksDeleted += 1;
+      }
+      await ctx.db.delete(c._id);
+      candidatesDeleted += 1;
+    }
+
+    await audit(ctx, {
+      actor,
+      action: "dev.wipeTestCandidates",
+      entityType: "elections",
+      entityId: args.electionId,
+      payload: { candidatesDeleted, linksDeleted },
+    });
+
+    return { candidatesDeleted, linksDeleted };
+  },
+});
+
+/**
+ * One-shot teardown for an entire test cycle. Combines
+ * `wipeSeedData` (synthetic voters + their evaluations + their public
+ * votes + result rows + position session resets) and
+ * `wipeTestCandidates` (the [TEST_FIXTURE] candidate slate plus
+ * candidatePositions links). Real voters, real whitelist rows, real
+ * candidates, and the cycle/position/rubric configuration itself are
+ * all preserved. The cycle phase is unchanged.
+ */
+export const wipeAll = mutation({
+  args: { electionId: v.id("elections") },
+  handler: async (ctx, args): Promise<{
+    seed: {
+      votersDeleted: number;
+      whitelistDeleted: number;
+      evaluationsDeleted: number;
+      scoresDeleted: number;
+      votesDeleted: number;
+      resultsCleared: number;
+      positionsReset: number;
+    };
+    candidates: {
+      candidatesDeleted: number;
+      linksDeleted: number;
+    };
+  }> => {
+    requireSeedEnabled();
+    const { voter: actor } = await requireAdmin(ctx);
+    const election = await getElectionOrThrow(ctx, args.electionId);
+    if (election.phase === "published") {
+      throw new ConvexError(
+        "Cannot wipe a published cycle. Create a new cycle to start over.",
+      );
+    }
+
+    const seedVoters = await listSeedVotersForElection(ctx, args.electionId);
+    const seedVoterIds = new Set<Id<"voters">>(seedVoters.map((sv) => sv._id));
+
+    let votesDeleted = 0;
+    const positions = await ctx.db
+      .query("positions")
+      .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
+      .collect();
+    for (const p of positions) {
+      const votes = await ctx.db
+        .query("publicVotes")
+        .withIndex("by_position", (q) => q.eq("positionId", p._id))
+        .collect();
+      for (const vote of votes) {
+        if (seedVoterIds.has(vote.voterVoterId)) {
+          await ctx.db.delete(vote._id);
+          votesDeleted += 1;
+        }
+      }
+    }
+
+    let scoresDeleted = 0;
+    let evaluationsDeleted = 0;
+    const evals = await ctx.db
+      .query("internalEvaluations")
+      .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
+      .collect();
+    for (const e of evals) {
+      if (!seedVoterIds.has(e.evaluatorVoterId)) continue;
+      const scores = await ctx.db
+        .query("internalScores")
+        .withIndex("by_evaluation", (q) => q.eq("evaluationId", e._id))
+        .collect();
+      for (const s of scores) {
+        await ctx.db.delete(s._id);
+        scoresDeleted += 1;
+      }
+      await ctx.db.delete(e._id);
+      evaluationsDeleted += 1;
+    }
+
+    let whitelistDeleted = 0;
+    const whitelist = await ctx.db
+      .query("internalWhitelist")
+      .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
+      .collect();
+    for (const w of whitelist) {
+      if (!isSeedEmail(w.email)) continue;
+      await ctx.db.delete(w._id);
+      whitelistDeleted += 1;
+    }
+
+    let votersDeleted = 0;
+    for (const v2 of seedVoters) {
+      await ctx.db.delete(v2._id);
+      votersDeleted += 1;
+    }
+
+    let resultsCleared = 0;
+    const results = await ctx.db
+      .query("results")
+      .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
+      .collect();
+    for (const r of results) {
+      await ctx.db.delete(r._id);
+      resultsCleared += 1;
+    }
+
+    let positionsReset = 0;
+    for (const p of positions) {
+      if (p.sessionStatus !== "pending") {
+        await ctx.db.patch(p._id, {
+          sessionStatus: "pending",
+          sessionStartedAt: undefined,
+          sessionClosedAt: undefined,
+        });
+        positionsReset += 1;
+      }
+    }
+
+    const candidates = await ctx.db
+      .query("candidates")
+      .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
+      .collect();
+    const testCandidates = candidates.filter((c) => isTestBio(c.bio));
+    let candidatesDeleted = 0;
+    let candidateLinksDeleted = 0;
+    for (const c of testCandidates) {
+      const links = await ctx.db
+        .query("candidatePositions")
+        .withIndex("by_candidate", (q) => q.eq("candidateId", c._id))
+        .collect();
+      for (const link of links) {
+        await ctx.db.delete(link._id);
+        candidateLinksDeleted += 1;
+      }
+      await ctx.db.delete(c._id);
+      candidatesDeleted += 1;
+    }
+
+    await audit(ctx, {
+      actor,
+      action: "dev.wipeAll",
+      entityType: "elections",
+      entityId: args.electionId,
+      payload: {
+        votersDeleted,
+        whitelistDeleted,
+        evaluationsDeleted,
+        scoresDeleted,
+        votesDeleted,
+        resultsCleared,
+        positionsReset,
+        candidatesDeleted,
+        candidateLinksDeleted,
+      },
+    });
+
+    return {
+      seed: {
+        votersDeleted,
+        whitelistDeleted,
+        evaluationsDeleted,
+        scoresDeleted,
+        votesDeleted,
+        resultsCleared,
+        positionsReset,
+      },
+      candidates: {
+        candidatesDeleted,
+        linksDeleted: candidateLinksDeleted,
+      },
     };
   },
 });

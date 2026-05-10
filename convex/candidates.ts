@@ -271,7 +271,7 @@ export const remove = mutation({
       action: "candidate.removed",
       entityType: "candidates",
       entityId: c._id,
-      payload: { fullName: c.fullName, matric: c.matric ?? "—" },
+      payload: { fullName: c.fullName, matric: c.matric ?? "(none)" },
     });
   },
 });
@@ -464,7 +464,7 @@ export const csvImport = mutation({
             if (!p) {
               summary.errors.push({
                 row: i + 2,
-                message: `Unknown position "${name}" — candidate inserted without it.`,
+                message: `Unknown position "${name}". Candidate inserted without it.`,
               });
               continue;
             }

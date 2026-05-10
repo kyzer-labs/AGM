@@ -17,8 +17,8 @@
     Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --font-sans: var(--font-azeret-mono), ui-monospace, SFMono-Regular, Menlo,
     Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  --font-serif: var(--font-playfair), "Playfair Display", "Cormorant Garamond",
-    "EB Garamond", Georgia, "Times New Roman", Times, serif;
+  --font-serif: var(--font-spectral), "Spectral", "Source Serif 4",
+    "Source Serif Pro", Georgia, "Times New Roman", Times, serif;
 
   --color-background: #f6f2ea;
   --color-foreground: #0b0f12;
@@ -69,6 +69,7 @@
     background: var(--paper);
     color: var(--ink);
     scroll-behavior: smooth;
+    overflow-x: clip;
   }
 
   html,
@@ -198,5 +199,38 @@
     animation: none;
     opacity: 0.3;
     transform: scale(1.4);
+  }
+}
+
+/*
+ * Landing backdrop macro breath.
+ *
+ * The locked composite ships as a single image (composition fidelity
+ * was non-negotiable, see components/landing/landing-backdrop.tsx
+ * history). The whole image breathes gently as one unit — a 26s
+ * scale + opacity loop that gives the painting a sense of being
+ * alive without breaking the integrated composition. Composite-only
+ * properties (transform + opacity), no layout, no paint, idle GPU
+ * layer between frames. Trivial on Mali-G52-class budgets.
+ *
+ * Reduced-motion users see the painting completely still; the
+ * animation is gated behind prefers-reduced-motion: no-preference.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .breath-composite {
+    animation: breath-composite 26s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+    will-change: transform, opacity;
+  }
+}
+
+@keyframes breath-composite {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.97;
+  }
+  50% {
+    transform: scale(1.025);
+    opacity: 1;
   }
 }

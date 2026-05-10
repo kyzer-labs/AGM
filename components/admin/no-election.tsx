@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { CalendarPlus } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { LinkButton } from "@/components/ui/link-button";
 
 export function NoElection() {
   return (
@@ -11,9 +10,7 @@ export function NoElection() {
         title="No election cycle yet"
         description="Create the AGM election cycle first. Positions, candidates, and the internal whitelist all attach to a cycle."
         action={
-          <Link href="/admin/election">
-            <Button>Go to Election cycle</Button>
-          </Link>
+          <LinkButton href="/admin/election">Go to Election cycle</LinkButton>
         }
       />
     </main>

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Unbounded, Azeret_Mono, Playfair_Display } from "next/font/google";
+import { Unbounded, Azeret_Mono, Spectral } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/app/providers";
 
@@ -17,10 +17,17 @@ const fontMono = Azeret_Mono({
   display: "swap",
 });
 
-const fontSerif = Playfair_Display({
+// Spectral (Production Type for Google) carries the editorial-technical
+// serif role for ceremonial moments: landing headline, results-page
+// pull-quotes, candidate biographies. Picked over Playfair Display
+// because Playfair is on the brand register's reflex-reject list and
+// Spectral was commissioned for institutional long-form reading, which
+// matches the AGM portal's emotional outcome (ceremonial civic gravity).
+const fontSerif = Spectral({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
-  variable: "--font-playfair",
+  style: ["normal", "italic"],
+  variable: "--font-spectral",
   display: "swap",
 });
 

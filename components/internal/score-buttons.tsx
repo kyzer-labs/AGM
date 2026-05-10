@@ -34,11 +34,13 @@ export function ScoreButtons({
             aria-checked={selected}
             aria-label={`${s}`}
             className={cn(
-              "h-8 w-8 rounded-md border text-sm font-medium tabular-nums transition-colors",
+              "h-8 w-8 rounded-md border text-sm font-medium tabular-nums",
+              "transition-[colors,transform,border-color] duration-150 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]",
+              "active:scale-[0.94]",
               selected
                 ? "border-[var(--color-foreground)] bg-[var(--color-primary)] text-[var(--color-primary-foreground)]"
-                : "border-[var(--color-border)] bg-transparent hover:bg-[var(--color-muted)]",
+                : "border-[var(--color-border)] bg-transparent hover:border-[var(--color-foreground)]/40 hover:bg-[var(--color-muted)]",
               disabled && "cursor-not-allowed opacity-50",
             )}
           >

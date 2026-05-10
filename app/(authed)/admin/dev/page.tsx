@@ -6,8 +6,13 @@ import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
 import {
   Beaker,
+  CheckCircle2,
+  Circle,
   FlaskConical,
+  Flame,
+  PlayCircle,
   Trash2,
+  Users2,
   Wand2,
   Sparkles,
   AlertTriangle,
@@ -30,7 +35,8 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { EmptyState } from "@/components/ui/empty-state";
+import { NoticeStrip } from "@/components/ui/notice-strip";
+import { SectionMarker } from "@/components/ui/section-marker";
 import { getConvexErrorMessage } from "@/lib/convex-error";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 
@@ -39,7 +45,7 @@ type VoteTallyKind = "uniform" | "favorFirst";
 
 const DISTRIBUTION_LABEL: Record<Distribution, string> = {
   uniform: "Uniform random (seeded, deterministic)",
-  perfect: "Perfect — all max scores",
+  perfect: "Perfect: all max scores",
   favorFirst: "Favor first candidate (high vs low)",
 };
 
@@ -70,15 +76,30 @@ function Inner() {
   }
   if (!config.enabled) {
     return (
-      <main className="container-wide py-10 space-y-6">
+      <main className="container-wide space-y-8 py-12">
         <AdminBreadcrumb items={[{ label: "Dev seeder" }]} />
-        <EmptyState
-          icon={<AlertTriangle className="h-5 w-5" aria-hidden />}
-          title="Dev seeder disabled"
-          description={
-            "Set DEV_SEED_ALLOWED=\"true\" on your Convex deployment env to enable. Make sure this env var is NEVER set on production."
+        <NoticeStrip
+          markerPrimary="Dev seeder"
+          markerSecondary="Disabled"
+          markerIcon={
+            <AlertTriangle
+              className="h-4 w-4 text-[var(--copper)]"
+              aria-hidden
+            />
           }
-        />
+          headline="DEV_SEED_ALLOWED is not set on this deployment"
+          tone="copper"
+        >
+          <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+            Set <code>DEV_SEED_ALLOWED=&quot;true&quot;</code> on the
+            Convex deployment env to enable synthetic voters,
+            evaluations, and votes for end-to-end testing. This env var
+            must <strong className="font-semibold">never</strong> be set
+            on the production deployment; the seeder is gated server-side
+            so even an authenticated admin cannot insert seed rows when
+            the flag is absent.
+          </p>
+        </NoticeStrip>
       </main>
     );
   }
@@ -103,6 +124,9 @@ function DevBody({ election }: { election: Doc<"elections"> }) {
   const engineerTieAtPosition = useMutation(api.dev.engineerTieAtPosition);
   const wipeSeedData = useMutation(api.dev.wipeSeedData);
   const runHappyPathScenario = useMutation(api.dev.runHappyPathScenario);
+  const loadTestCandidates = useMutation(api.dev.loadTestCandidates);
+  const wipeTestCandidates = useMutation(api.dev.wipeTestCandidates);
+  const wipeAll = useMutation(api.dev.wipeAll);
 
   const [tcCount, setTcCount] = useState(4);
   const [heCount, setHeCount] = useState(3);
@@ -119,11 +143,15 @@ function DevBody({ election }: { election: Doc<"elections"> }) {
   const candidatesCount = candidates?.length ?? 0;
   const positionsCount = positions?.length ?? 0;
 
-  const wrap = async <T,>(label: string, fn: () => Promise<T>): Promise<void> => {
+  const wrap = async <T,>(
+    label: string,
+    fn: () => Promise<T>,
+    summarize?: (result: T) => string,
+  ): Promise<void> => {
     try {
       const result = await fn();
       toast.success(label, {
-        description: result ? JSON.stringify(result) : undefined,
+        description: summarize ? summarize(result) : undefined,
       });
     } catch (err) {
       toast.error(label, {
@@ -133,150 +161,437 @@ function DevBody({ election }: { election: Doc<"elections"> }) {
   };
 
   const onSeedEvaluators = () =>
-    wrap("Evaluator voters seeded", () =>
-      seedEvaluatorVoters({
-        electionId: election._id,
-        perClass: {
-          topCommittee: tcCount,
-          headExecutive: heCount,
-          year2Committee: y2Count,
-        },
-      }),
+    wrap(
+      "Evaluator voters seeded",
+      () =>
+        seedEvaluatorVoters({
+          electionId: election._id,
+          perClass: {
+            topCommittee: tcCount,
+            headExecutive: heCount,
+            year2Committee: y2Count,
+          },
+        }),
+      (r) =>
+        `${r.votersInserted} voters added, ${r.votersReused} reused, ${r.whitelistInserted} whitelisted, ${r.whitelistReused} whitelist rows already in place.`,
     );
 
   const onSeedExternal = () =>
-    wrap("External voters seeded", () =>
-      seedExternalVoters({
-        electionId: election._id,
-        count: externalCount,
-      }),
+    wrap(
+      "External voters seeded",
+      () =>
+        seedExternalVoters({
+          electionId: election._id,
+          count: externalCount,
+        }),
+      (r) =>
+        `${r.inserted} new external voters added, ${r.reused} reused.`,
     );
 
   const onSeedEvaluations = () =>
-    wrap("Internal evaluations seeded", () =>
-      seedInternalEvaluations({
-        electionId: election._id,
-        distribution,
-        submitted: submittedToggle,
-      }),
+    wrap(
+      "Internal evaluations seeded",
+      () =>
+        seedInternalEvaluations({
+          electionId: election._id,
+          distribution,
+          submitted: submittedToggle,
+        }),
+      (r) =>
+        `${r.evaluatorsTouched} evaluators, ${r.scoresWritten} scores, ${r.evaluationsSubmitted} submitted.`,
     );
 
   const onSeedVotes = () =>
-    wrap("Public votes seeded", () =>
-      seedPublicVotes({
-        electionId: election._id,
-        totalVotesPerPosition: voteTotal,
-        kind: voteKind,
-      }),
+    wrap(
+      "Public votes seeded",
+      () =>
+        seedPublicVotes({
+          electionId: election._id,
+          totalVotesPerPosition: voteTotal,
+          kind: voteKind,
+        }),
+      (r) =>
+        `${r.positionsTouched} positions touched, ${r.votesInserted} new votes, ${r.externalVotersUsed} unique external voters used.`,
     );
 
   const onEngineerTie = async () => {
     if (!tiePositionId) {
-      toast.error("Pick a position first.");
+      toast.error("Pick a position first.", {
+        description:
+          "Choose the position to engineer the tie at from the dropdown above.",
+      });
       return;
     }
-    await wrap("Tie engineered", () =>
-      engineerTieAtPosition({
-        positionId: tiePositionId,
-        votesPerTopCandidate: tiePerCandidate,
-      }),
+    await wrap(
+      "Tie engineered",
+      () =>
+        engineerTieAtPosition({
+          positionId: tiePositionId,
+          votesPerTopCandidate: tiePerCandidate,
+        }),
+      (r) =>
+        `${r.votesInserted} new votes inserted, ${r.scoresWritten} rubric scores written across ${r.topCandidateIds.length} top candidates.`,
     );
   };
 
   const onHappyPath = () =>
-    wrap("Happy path scenario complete", () =>
-      runHappyPathScenario({
-        electionId: election._id,
-        perClass: {
-          topCommittee: tcCount,
-          headExecutive: heCount,
-          year2Committee: y2Count,
-        },
-        externalVoters: externalCount,
-        distribution,
-      }),
+    wrap(
+      "Happy path scenario complete",
+      () =>
+        runHappyPathScenario({
+          electionId: election._id,
+          perClass: {
+            topCommittee: tcCount,
+            headExecutive: heCount,
+            year2Committee: y2Count,
+          },
+          externalVoters: externalCount,
+          distribution,
+        }),
+      (r) =>
+        `${r.votersInserted} evaluators added, ${r.externalInserted} external voters added, ${r.evaluationsSubmitted} evaluations submitted with ${r.distribution} distribution.`,
     );
 
   const onWipe = async () => {
     const ok = await dialog.confirm({
-      title: "Wipe all seeded data?",
+      title: "Wipe all seeded voters and votes?",
       description: (
         <>
           This deletes every <code>seed-*</code> voter, whitelist entry,
           evaluation, score, public vote, and result row scoped to{" "}
-          <strong>{election.name}</strong>. Real data is untouched. Position
-          session statuses also reset to <code>pending</code>.
+          <strong>{election.name}</strong>. Real data is untouched. Test
+          candidates and their position links are kept; use &ldquo;Wipe
+          everything&rdquo; below if you want a one-shot teardown. Position
+          session statuses reset to <code>pending</code>.
         </>
       ),
       confirmText: "Wipe seed data",
       variant: "destructive",
     });
     if (!ok) return;
-    await wrap("Seed data wiped", () =>
-      wipeSeedData({ electionId: election._id }),
+    await wrap(
+      "Seed data wiped",
+      () => wipeSeedData({ electionId: election._id }),
+      (r) =>
+        `${r.votersDeleted} voters, ${r.whitelistDeleted} whitelist rows, ${r.evaluationsDeleted} evaluations, ${r.scoresDeleted} scores, ${r.votesDeleted} votes, and ${r.resultsCleared} result rows removed; ${r.positionsReset} positions reset to pending.`,
+    );
+  };
+
+  const onLoadTestCandidates = () =>
+    wrap(
+      "Test candidates loaded",
+      () => loadTestCandidates({ electionId: election._id }),
+      (r) =>
+        `${r.inserted} fixture candidates inserted, ${r.skipped} already in place. Total spec: ${r.totalSpec}.`,
+    );
+
+  const onWipeTestCandidates = async () => {
+    const ok = await dialog.confirm({
+      title: "Wipe test candidates?",
+      description: (
+        <>
+          This removes every <code>[TEST_FIXTURE]</code> candidate (and its
+          position links) scoped to <strong>{election.name}</strong>.
+          Synthetic voters, evaluations, votes, and real candidates are
+          kept. You can re-load the fixture set anytime in the Setup phase.
+        </>
+      ),
+      confirmText: "Wipe test candidates",
+      variant: "destructive",
+    });
+    if (!ok) return;
+    await wrap(
+      "Test candidates wiped",
+      () => wipeTestCandidates({ electionId: election._id }),
+      (r) =>
+        `${r.candidatesDeleted} fixture candidates removed (${r.linksDeleted} position links).`,
+    );
+  };
+
+  const onWipeAll = async () => {
+    const ok = await dialog.confirm({
+      title: "Wipe everything seeded for this cycle?",
+      description: (
+        <>
+          One-shot teardown: every <code>seed-*</code> voter and downstream
+          row, every <code>[TEST_FIXTURE]</code> candidate, all results,
+          and every position&apos;s session status reset to{" "}
+          <code>pending</code>, scoped to <strong>{election.name}</strong>.
+          Real voters, real whitelist rows, real candidates, the cycle
+          itself, positions, and rubric criteria are all kept. Use this
+          between full end-to-end runs.
+        </>
+      ),
+      confirmText: "Wipe everything",
+      variant: "destructive",
+    });
+    if (!ok) return;
+    await wrap(
+      "Test data fully wiped",
+      () => wipeAll({ electionId: election._id }),
+      (r) =>
+        `Voters: ${r.seed.votersDeleted}, whitelist: ${r.seed.whitelistDeleted}, evals: ${r.seed.evaluationsDeleted}, scores: ${r.seed.scoresDeleted}, votes: ${r.seed.votesDeleted}, results: ${r.seed.resultsCleared}, positions reset: ${r.seed.positionsReset}, fixture candidates: ${r.candidates.candidatesDeleted} (${r.candidates.linksDeleted} links).`,
     );
   };
 
   return (
-    <main className="container-wide py-10 space-y-8">
+    <main className="container-wide space-y-10 py-12">
       <AdminBreadcrumb items={[{ label: "Dev seeder" }]} />
 
-      <header className="flex flex-wrap items-start gap-4">
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">Dev seeder</h1>
-            <Badge tone="warning">
-              <Beaker className="h-3 w-3" aria-hidden /> Dev only
-            </Badge>
-          </div>
-          <p className="text-sm text-[var(--color-muted-foreground)]">
-            Populate synthetic voters, evaluations, and votes so the scoring
-            math, cascade, and tie ladder can be exercised without dozens of
-            real <code>@student.usm.my</code> accounts. Disabled in production.
-          </p>
+      <header className="space-y-5">
+        <SectionMarker
+          primary="Dev seeder"
+          secondary={election.name}
+        />
+        <div className="flex flex-wrap items-start gap-3">
+          <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
+            Synthetic data for end-to-end testing
+          </h1>
+          <Badge tone="warning">
+            <Beaker className="h-3 w-3" aria-hidden /> Dev only
+          </Badge>
         </div>
-        <Badge tone="muted">Phase: {phase}</Badge>
+        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+          Populate synthetic voters, evaluations, and votes so the scoring
+          math, cascade, and tie ladder can be exercised without dozens of
+          real <code>@student.usm.my</code> accounts. Every seed mutation
+          checks <code>DEV_SEED_ALLOWED</code> server-side; this page is
+          gated behind the same flag.
+        </p>
+        <div>
+          <Badge tone="muted">
+            Phase: <span className="tabular-nums">{phase}</span>
+          </Badge>
+        </div>
       </header>
 
       {stats === null ? null : stats === undefined ? (
         <Skeleton className="h-32 w-full" />
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Seed inventory</CardTitle>
-            <CardDescription>
-              Election shard <code>{stats.shortElectionId}</code>. Seed-only
-              counts; real entries are listed alongside for context.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat
-              title="Seed voters"
-              value={stats.seedVoters}
-              footer={`Real voters: ${stats.totalRealVoters}`}
-            />
-            <Stat
-              title="Seed whitelist"
-              value={
-                stats.seedWhitelistByClass.topCommittee +
-                stats.seedWhitelistByClass.headExecutive +
-                stats.seedWhitelistByClass.year2Committee
-              }
-              footer={`TC ${stats.seedWhitelistByClass.topCommittee} · HE ${stats.seedWhitelistByClass.headExecutive} · Y2 ${stats.seedWhitelistByClass.year2Committee} · real ${stats.realWhitelist}`}
-            />
-            <Stat
-              title="Seed evaluations"
-              value={stats.seedEvaluationsSubmitted}
-              footer={`Drafts: ${stats.seedEvaluationsTotal - stats.seedEvaluationsSubmitted}`}
-            />
-            <Stat
-              title="Seed public votes"
-              value={stats.seedPublicVotes}
-              footer={`All position votes: ${stats.totalPublicVotes}`}
-            />
-          </CardContent>
-        </Card>
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Seed inventory</CardTitle>
+              <CardDescription>
+                Election shard <code>{stats.shortElectionId}</code>. Live
+                snapshot of synthetic vs. real rows. Updates as you act.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Stat
+                title="Seed voters"
+                value={stats.seedVoters}
+                footer={`Real voters: ${stats.totalRealVoters}`}
+              />
+              <Stat
+                title="Seed whitelist"
+                value={
+                  stats.seedWhitelistByClass.topCommittee +
+                  stats.seedWhitelistByClass.headExecutive +
+                  stats.seedWhitelistByClass.year2Committee
+                }
+                footer={`TC ${stats.seedWhitelistByClass.topCommittee} · HE ${stats.seedWhitelistByClass.headExecutive} · Y2 ${stats.seedWhitelistByClass.year2Committee} · real ${stats.realWhitelist}`}
+              />
+              <Stat
+                title="Seed evaluations"
+                value={stats.seedEvaluationsSubmitted}
+                footer={`Drafts: ${stats.seedEvaluationsTotal - stats.seedEvaluationsSubmitted}`}
+              />
+              <Stat
+                title="Seed public votes"
+                value={stats.seedPublicVotes}
+                footer={`All position votes: ${stats.totalPublicVotes}`}
+              />
+              <Stat
+                title="Test candidates"
+                value={stats.candidates.test}
+                footer={`Real candidates: ${stats.candidates.real} · positions: ${stats.positions}`}
+              />
+              <Stat
+                title="Position sessions"
+                value={
+                  stats.sessionCounts.pending +
+                  stats.sessionCounts.active +
+                  stats.sessionCounts.closed
+                }
+                footer={`Pending ${stats.sessionCounts.pending} · Active ${stats.sessionCounts.active} · Closed ${stats.sessionCounts.closed}`}
+              />
+              <Stat
+                title="Results computed"
+                value={stats.results}
+                footer={`After all positions close, this matches ${stats.positions}.`}
+              />
+              <Stat
+                title="Cycle phase"
+                value={
+                  ({
+                    setup: 1,
+                    internalOpen: 2,
+                    internalClosed: 3,
+                    publicVoting: 4,
+                    resultsPreview: 5,
+                    published: 6,
+                  } as const)[phase]
+                }
+                footer={`Phase: ${phase}`}
+              />
+            </CardContent>
+          </Card>
+        </>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Test candidate fixtures</CardTitle>
+          <CardDescription>
+            Load eighteen <code>[TEST_FIXTURE]</code> candidates (two per
+            position across all three tiers) so the rubric, ballot ops, and
+            tie-break ladder can be exercised without typing real names. Only
+            available during the Setup phase. Wipes here remove only fixtures;
+            real candidates entered through{" "}
+            <code>/admin/candidates</code> are never touched.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              onClick={onLoadTestCandidates}
+              disabled={phase !== "setup"}
+            >
+              <Users2 className="h-4 w-4" /> Load test candidates
+            </Button>
+            <Button
+              variant="outline"
+              onClick={onWipeTestCandidates}
+              disabled={phase === "published" || stats?.candidates.test === 0}
+            >
+              <Trash2 className="h-4 w-4" /> Wipe test candidates
+            </Button>
+            {stats !== undefined && stats !== null ? (
+              <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
+                Currently {stats.candidates.test} of {18} fixtures loaded
+              </span>
+            ) : null}
+          </div>
+
+          {stats !== undefined &&
+          stats !== null &&
+          stats.firstByPosition.length > 0 ? (
+            <details className="rounded-md border border-[var(--ink-line)] bg-[var(--paper)]">
+              <summary className="cursor-pointer px-4 py-3 font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--ink-muted)] hover:text-[var(--ink)]">
+                First-by-position breakdown ({stats.firstByPosition.length}{" "}
+                positions)
+              </summary>
+              <div className="border-t border-[var(--ink-line)] px-4 py-3">
+                <p className="mb-3 text-xs leading-relaxed text-[var(--color-muted-foreground)]">
+                  Under the <code>favorFirst</code> evaluation distribution
+                  and the <code>favorFirst</code> public vote tally, the
+                  candidate listed below for each position is the predicted
+                  winner once results are computed. Useful for verifying the
+                  scoring math after a happy-path run.
+                </p>
+                <ol className="grid gap-1.5">
+                  {stats.firstByPosition.map((row) => (
+                    <li
+                      key={row.positionId}
+                      className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
+                    >
+                      <span className="font-mono text-[10.5px] tabular-nums text-[var(--ink-muted)]">
+                        T{row.tier}.{String(row.order).padStart(2, "0")}
+                      </span>
+                      <span className="font-medium text-[var(--ink)]">
+                        {row.positionName}
+                      </span>
+                      <span aria-hidden className="text-[var(--copper)]">
+                        ·
+                      </span>
+                      <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
+                        {row.candidatesAtPosition} candidates
+                      </span>
+                      <span aria-hidden className="text-[var(--copper)]">
+                        ·
+                      </span>
+                      <SessionBadge status={row.sessionStatus} />
+                      <span className="ml-auto flex items-center gap-2 font-mono text-xs text-[var(--ink)]">
+                        {row.favorFirstWinner ? (
+                          <>
+                            <CheckCircle2
+                              className="h-3 w-3 text-[var(--teal)]"
+                              aria-hidden
+                            />
+                            <span>{row.favorFirstWinner.fullName}</span>
+                            {row.favorFirstWinner.isTest ? (
+                              <Badge tone="muted" className="text-[9px]">
+                                fixture
+                              </Badge>
+                            ) : null}
+                          </>
+                        ) : (
+                          <span className="italic text-[var(--ink-muted)]">
+                            no candidates
+                          </span>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </details>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Phase quick-jump</CardTitle>
+          <CardDescription>
+            Where to go to drive the cycle through each phase. Open these
+            in another tab and watch this page&apos;s inventory update live.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <PhaseLink
+            href="/admin/election"
+            label="Cycle controls"
+            hint="Open / close internal evaluation, advance to public voting, publish."
+          />
+          <PhaseLink
+            href="/admin/positions"
+            label="Positions"
+            hint="Seed defaults, ballot order, rubric weights."
+          />
+          <PhaseLink
+            href="/admin/candidates"
+            label="Candidates"
+            hint="Add real candidates here. Test candidates load via this page only."
+          />
+          <PhaseLink
+            href="/admin/whitelist"
+            label="Internal whitelist"
+            hint="Real evaluators are added here. Seed evaluators are added via this page."
+          />
+          <PhaseLink
+            href="/admin/internal"
+            label="Internal status"
+            hint="Watch class submission progress and aggregate scores live."
+          />
+          <PhaseLink
+            href="/admin/public"
+            label="Live ballot ops"
+            hint="Open / monitor / close each position one at a time."
+          />
+          <PhaseLink
+            href="/admin/results"
+            label="Results"
+            hint="Compute, resolve ties, publish the final breakdown."
+          />
+          <PhaseLink
+            href="/admin/exports"
+            label="Exports"
+            hint="CSV downloads of voters, evaluations, and the audit log."
+          />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -330,7 +645,7 @@ function DevBody({ election }: { election: Doc<"elections"> }) {
           <CardTitle className="text-base">Internal evaluations</CardTitle>
           <CardDescription>
             Writes a full N evaluators × M candidates × K criteria score
-            matrix. Idempotent — re-running with the same seed voters
+            matrix. Idempotent: re-running with the same seed voters
             overwrites their scores. Requires{" "}
             {candidatesCount === 0 ? (
               <em>candidates first.</em>
@@ -486,7 +801,8 @@ function DevBody({ election }: { election: Doc<"elections"> }) {
             Removes every <code>seed-*</code> row scoped to this cycle plus
             existing result rows, and resets every position&apos;s session
             status to <code>pending</code>. Real voter rows, real whitelist
-            entries, and the cycle/positions/candidates themselves are kept.
+            entries, real candidates, and{" "}
+            <code>[TEST_FIXTURE]</code> candidates are kept.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -495,7 +811,75 @@ function DevBody({ election }: { election: Doc<"elections"> }) {
           </Button>
         </CardContent>
       </Card>
+
+      <Card className="border-[var(--color-destructive)]">
+        <CardHeader>
+          <CardTitle className="text-base">Wipe everything</CardTitle>
+          <CardDescription>
+            One-shot teardown for the entire test setup: every{" "}
+            <code>seed-*</code> voter and downstream row, every{" "}
+            <code>[TEST_FIXTURE]</code> candidate, all results, and every
+            position session reset to <code>pending</code>. Real data is
+            untouched. Use this between full end-to-end runs.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="destructive" onClick={onWipeAll}>
+            <Flame className="h-4 w-4" /> Wipe everything
+          </Button>
+        </CardContent>
+      </Card>
     </main>
+  );
+}
+
+function SessionBadge({
+  status,
+}: {
+  status: "pending" | "active" | "closed";
+}) {
+  if (status === "active") {
+    return (
+      <Badge tone="brand" className="text-[9px]">
+        <PlayCircle className="h-2.5 w-2.5" aria-hidden /> Active
+      </Badge>
+    );
+  }
+  if (status === "closed") {
+    return (
+      <Badge tone="success" className="text-[9px]">
+        <CheckCircle2 className="h-2.5 w-2.5" aria-hidden /> Closed
+      </Badge>
+    );
+  }
+  return (
+    <Badge tone="muted" className="text-[9px]">
+      <Circle className="h-2.5 w-2.5" aria-hidden /> Pending
+    </Badge>
+  );
+}
+
+function PhaseLink({
+  href,
+  label,
+  hint,
+}: {
+  href: string;
+  label: string;
+  hint: string;
+}) {
+  return (
+    <a
+      href={href}
+      className="group block rounded-md border border-[var(--ink-line)] bg-[var(--paper)] p-3 transition-colors duration-200 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] hover:border-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
+    >
+      <div className="font-medium text-[var(--ink)] transition-colors group-hover:text-[var(--teal)]">
+        {label}
+      </div>
+      <p className="mt-1 text-xs leading-relaxed text-[var(--color-muted-foreground)]">
+        {hint}
+      </p>
+    </a>
   );
 }
 

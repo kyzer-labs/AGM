@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 type Tone =
   | "neutral"
   | "brand"
+  | "copper"
   | "success"
   | "warning"
   | "destructive"
@@ -13,6 +14,8 @@ const tones: Record<Tone, string> = {
   neutral:
     "bg-[var(--color-secondary)] text-[var(--color-secondary-foreground)] border-transparent",
   brand: "bg-[var(--color-brand)] text-[var(--color-brand-foreground)] border-transparent",
+  copper:
+    "bg-[var(--color-accent)] text-[var(--color-accent-foreground)] border-transparent",
   success:
     "bg-[var(--color-success)] text-[var(--color-success-foreground)] border-transparent",
   warning:

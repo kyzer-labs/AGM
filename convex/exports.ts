@@ -533,13 +533,13 @@ export const emergencyVoterAudit = mutation({
     return {
       target: {
         email: target.email,
-        fullName: target.fullName ?? "—",
-        matric: target.matric ?? "—",
+        fullName: target.fullName ?? "",
+        matric: target.matric ?? "",
         profileComplete: target.profileComplete,
-        createdAt: new Date(target.createdAt).toISOString(),
+        createdAt: target.createdAt,
       },
       auditEntries: auditEntries.slice(0, 1000).map((a) => ({
-        createdAt: new Date(a.createdAt).toISOString(),
+        createdAt: a.createdAt,
         action: a.action,
         entityType: a.entityType ?? "",
         entityId: a.entityId ?? "",
