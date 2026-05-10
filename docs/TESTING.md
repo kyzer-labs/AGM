@@ -1,14 +1,16 @@
 # AGM Testing Playbook
 
-Strategy for verifying the end-to-end election flow when you only have a
-small number of real `@student.usm.my` accounts. Three layers, in order
-of cost and time:
+Strategy for verifying the end-to-end election flow when you only have
+a small number of real `@student.usm.my` accounts. Everything is driven
+from `/admin/dev` in the browser; there are no shell scripts. Three
+layers, in order of cost and time:
 
 1. **Layer 1 — Convex dev seeder.** Server-side seed mutations in
    `convex/dev.ts`, exposed in the admin UI at `/admin/dev`. Populates
-   synthetic voters, whitelist rows, internal evaluations, and public
-   votes so the scoring math, cascade, and tie-break ladder can be
-   exercised at scale.
+   synthetic voters, the eighteen-candidate fixture slate, whitelist
+   rows, internal evaluations, and public votes so the scoring math,
+   cascade, and tie-break ladder can be exercised at scale. The page's
+   live inventory replaces every previous status check command.
 2. **Layer 2 — Pre-baked scenarios.** Buttons in the dev seeder for
    common deterministic setups: "happy path", "engineered tie".
 3. **Layer 3 — Real-account smoke test.** Two `@student.usm.my`
@@ -77,13 +79,37 @@ bottom:
 
 | Card | Mutation | What it does |
 | --- | --- | --- |
+| Test candidate fixtures | `dev.loadTestCandidates` / `dev.wipeTestCandidates` | Loads the eighteen `[TEST_FIXTURE]` candidates (two per position across all three tiers). Wipe removes only fixtures; real candidates from `/admin/candidates` are kept. |
 | Voter pools — evaluators | `dev.seedEvaluatorVoters` | Creates seed `voters` rows + adds them to the internal whitelist with the correct class |
 | Voter pools — external | `dev.seedExternalVoters` | Creates seed `voters` rows that are **not** whitelisted; used as the pool for public votes |
 | Internal evaluations | `dev.seedInternalEvaluations` | Writes the full N×M×K rubric matrix for every seeded evaluator. Distributions: `uniform` (seeded random), `perfect` (all max), `favorFirst` (first candidate wins per `_id` sort) |
 | Public votes | `dev.seedPublicVotes` | Allocates `totalVotes` to candidates per position. `kind: "uniform"` for even split, `"favorFirst"` for ~70/30 |
 | Engineered tie | `dev.engineerTieAtPosition` | Equalises class shares **and** vote counts between the position's top two candidates so the ladder bottoms out at `manual` |
 | Happy path scenario | `dev.runHappyPathScenario` | One-shot: voters + whitelist + submitted evaluations using the chosen distribution |
-| Wipe seed data | `dev.wipeSeedData` | Deletes seed-only rows scoped to this cycle. Resets every position's session status to `pending` and clears the `results` table |
+| Wipe seed data | `dev.wipeSeedData` | Deletes seed-only rows scoped to this cycle. Resets every position's session status to `pending` and clears the `results` table. Does **not** touch `[TEST_FIXTURE]` candidates. |
+| Wipe everything | `dev.wipeAll` | One-shot teardown: every `seed-*` row plus every `[TEST_FIXTURE]` candidate, scoped to this cycle. Real data and the cycle/positions/rubric configuration are preserved. |
+
+### Live inventory
+
+The "Seed inventory" panel at the top of `/admin/dev` is reactive: it
+re-renders any time a seed mutation completes. Use it as the source of
+truth for "is the test setup ready" — there is no longer a status
+script. The panel shows seed voters, seed whitelist (broken down by
+class), seed evaluations / drafts, seed public votes, fixture
+candidates vs real candidates, position session status counts, and
+results computed so far.
+
+The "Test candidate fixtures" card has an expandable
+**First-by-position breakdown** that lists, for each position:
+
+- Which candidate would win under `favorFirst` evaluation distribution
+  combined with `favorFirst` public votes (the predictable winner).
+- Whether that candidate is a fixture (`[TEST_FIXTURE]`) or a real
+  candidate.
+- Each position's current session status (pending / active / closed).
+
+Use it to verify scoring math after a happy-path run without leaving
+the page.
 
 ### Phase requirements
 
@@ -92,15 +118,21 @@ contradict the runbook's expectations:
 
 | Operation | Allowed phases |
 | --- | --- |
+| Load test candidates | `setup` |
+| Wipe test candidates | any except `published` |
 | Seed evaluator voters | `setup`, `internalOpen` |
 | Seed internal evaluations | `setup`, `internalOpen`, `internalClosed` |
 | Seed external voters | any except `published` |
 | Seed public votes | any except `published`, but only meaningful in `publicVoting` (closing a ballot is what runs the math) |
 | Engineered tie | any except `published` |
 | Wipe seed data | any except `published` |
+| Wipe everything | any except `published` |
 
 Use the existing `/admin/election` page to advance phases between
-seed steps — the seeder does not move phases for you.
+seed steps — the seeder does not move phases for you. The
+`/admin/dev` page also has a **Phase quick-jump** card that links to
+every admin surface so you can drive the cycle in another tab while
+this page's inventory updates live.
 
 ---
 
@@ -277,10 +309,14 @@ imported (real photos + bios), rubric configured, weights configured.
 
 After the smoke test:
 
-1. **Account A** runs **Wipe seed data** at `/admin/dev`. This
-   removes the seeded TC/HE/Y2/EXT voters and their votes/scores, plus
-   the cycle's `results` rows, and resets every position's session
-   status. Cycle stays as-is.
+1. **Account A** chooses one wipe mode at `/admin/dev`:
+   - **Wipe seed data** keeps the test candidate fixtures and real
+     candidates, and removes only `seed-*` voters and their downstream
+     rows. Use this when you want to re-run a different distribution
+     against the same candidate slate.
+   - **Wipe everything** removes the seeded voters and the
+     `[TEST_FIXTURE]` candidate slate in one shot. Use this when
+     you're starting from a fresh fixture slate.
 2. Decide whether to keep this cycle as your dev/staging rehearsal
    data or `/admin/election` → delete (Setup phase only) and start
    over for the next rehearsal.
