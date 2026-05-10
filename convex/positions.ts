@@ -18,6 +18,43 @@ export const list = query({
   },
 });
 
+/**
+ * Per-position impact counts for destructive confirm copy. Returns the
+ * number of candidates currently listing this position in their
+ * preferences and the number of public votes already cast against this
+ * position. Lets the admin see "deleting Director of Technical: this
+ * unassigns 4 candidates and discards 0 votes" instead of a generic
+ * "this also unassigns it from every candidate" warning.
+ */
+export const positionImpact = query({
+  args: { positionId: v.id("positions") },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const p = await ctx.db.get(args.positionId);
+    if (!p) return null;
+
+    const links = await ctx.db
+      .query("candidatePositions")
+      .withIndex("by_position", (q) => q.eq("positionId", args.positionId))
+      .collect();
+
+    const votes = await ctx.db
+      .query("publicVotes")
+      .withIndex("by_position", (q) => q.eq("positionId", args.positionId))
+      .collect();
+
+    return {
+      positionId: p._id,
+      name: p.name,
+      tier: p.tier,
+      order: p.order,
+      sessionStatus: p.sessionStatus,
+      candidateCount: links.length,
+      voteCount: votes.length,
+    };
+  },
+});
+
 export const add = mutation({
   args: {
     electionId: v.id("elections"),
