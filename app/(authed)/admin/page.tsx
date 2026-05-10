@@ -155,7 +155,7 @@ function AdminPageInner() {
       };
 
   return (
-    <main className="container-narrow space-y-12 py-12 sm:py-16">
+    <main className="container-wide space-y-12 py-12 sm:py-16">
       <header className="space-y-4">
         <SectionMarker
           primary="Admin console"
@@ -172,7 +172,10 @@ function AdminPageInner() {
       <BootstrapPanel />
 
       {isAdmin ? (
-        <ol className="space-y-0" aria-label="Admin operations">
+        <ol
+          className="grid grid-cols-1 md:grid-cols-2 md:gap-x-12"
+          aria-label="Admin operations"
+        >
           {tiles.map((tile, index) => (
             <li key={tile.href}>
               <AdminIndexItem tile={tile} index={index} />
