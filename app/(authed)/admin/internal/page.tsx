@@ -14,16 +14,13 @@ import {
 import { AuthGate } from "@/components/auth/auth-gate";
 import { AdminBreadcrumb } from "@/components/admin/admin-breadcrumb";
 import { NoElection } from "@/components/admin/no-election";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { LinkButton } from "@/components/ui/link-button";
+import { Meta, MetaGroup } from "@/components/ui/meta";
+import { SectionMarker } from "@/components/ui/section-marker";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatMYT } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Doc } from "@/convex/_generated/dataModel";
 
@@ -35,9 +32,9 @@ const VOTER_CLASS_LABEL: Record<VoterClass, string> = {
   year2Committee: "Year 2 Committee",
 };
 
-const VOTER_CLASS_TONE: Record<VoterClass, "brand" | "warning" | "muted"> = {
+const VOTER_CLASS_TONE: Record<VoterClass, "brand" | "copper" | "muted"> = {
   topCommittee: "brand",
-  headExecutive: "warning",
+  headExecutive: "copper",
   year2Committee: "muted",
 };
 
@@ -47,13 +44,27 @@ const VOTER_CLASSES: VoterClass[] = [
   "year2Committee",
 ];
 
-const PHASE_LABELS: Record<string, string> = {
+type Phase = Doc<"elections">["phase"];
+
+const PHASE_LABELS: Record<Phase, string> = {
   setup: "Setup",
-  internalOpen: "Internal evaluation OPEN",
-  internalClosed: "Internal evaluation CLOSED",
-  publicVoting: "Public voting",
+  internalOpen: "Internal evaluation open",
+  internalClosed: "Internal evaluation closed",
+  publicVoting: "Public AGM voting",
   resultsPreview: "Results preview",
   published: "Published",
+};
+
+const PHASE_TONE: Record<
+  Phase,
+  "brand" | "success" | "warning" | "muted" | "copper"
+> = {
+  setup: "muted",
+  internalOpen: "brand",
+  internalClosed: "muted",
+  publicVoting: "brand",
+  resultsPreview: "copper",
+  published: "success",
 };
 
 export default function AdminInternalPage() {
@@ -66,14 +77,20 @@ export default function AdminInternalPage() {
 
 function Inner() {
   const election = useQuery(api.elections.getCurrent);
-  if (election === undefined)
-    return (
-      <main className="container-wide py-10">
-        <Skeleton className="h-40 w-full" />
-      </main>
-    );
+  if (election === undefined) return <PageSkeleton />;
   if (election === null) return <NoElection />;
   return <Body election={election} />;
+}
+
+function PageSkeleton() {
+  return (
+    <main className="container-wide space-y-6 py-12">
+      <Skeleton className="h-3 w-44" />
+      <Skeleton className="h-10 w-2/3" />
+      <Skeleton className="h-4 w-1/2" />
+      <Skeleton className="h-32 w-full" />
+    </main>
+  );
 }
 
 function Body({ election }: { election: Doc<"elections"> }) {
@@ -87,11 +104,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
   const [activeTab, setActiveTab] = useState<VoterClass | "all">("all");
 
   if (completion === undefined || aggregate === undefined) {
-    return (
-      <main className="container-wide py-10">
-        <Skeleton className="h-40 w-full" />
-      </main>
-    );
+    return <PageSkeleton />;
   }
 
   const submittedCount = completion.filter(
@@ -113,68 +126,89 @@ function Body({ election }: { election: Doc<"elections"> }) {
       ? completion
       : completion.filter((c) => c.voterClass === activeTab);
 
+  const countsByClass: Record<VoterClass, number> = {
+    topCommittee: 0,
+    headExecutive: 0,
+    year2Committee: 0,
+  };
+  for (const row of completion) countsByClass[row.voterClass] += 1;
+
   return (
-    <main className="container-wide py-10 space-y-8">
+    <main className="container-wide space-y-12 py-12">
       <AdminBreadcrumb items={[{ label: "Internal evaluation" }]} />
 
-      <header className="flex flex-wrap items-start gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Internal evaluation
-          </h1>
-          <p className="text-sm text-[var(--color-muted-foreground)]">
-            Class-aware completion + aggregate scores for{" "}
-            <strong>{election.name}</strong>. Open or close the internal
-            window from the{" "}
-            <a className="underline" href="/admin/election">
-              Election cycle
-            </a>{" "}
-            page.
-          </p>
+      <header className="space-y-5">
+        <SectionMarker
+          primary="Internal evaluation"
+          secondary={election.name}
+        />
+        <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
+          Class-aware completion and aggregate scores
+        </h1>
+        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+          Tracks which Year 2 evaluators have submitted, broken down by
+          class. Class shares feed the weighted final score; drafts are
+          ignored until the evaluator submits. Open or close the internal
+          window from the{" "}
+          <LinkButton
+            href="/admin/election"
+            variant="link"
+            size="sm"
+            className="h-auto p-0 text-sm"
+          >
+            Election cycle
+          </LinkButton>{" "}
+          page.
+        </p>
+        <MetaGroup className="grid-cols-2 sm:grid-cols-4">
+          <Meta label="Cycle phase" value={PHASE_LABELS[election.phase]} />
+          <Meta label="On whitelist" value={completion.length} />
+          <Meta label="Submitted" value={submittedCount} />
+          <Meta label="Pending" value={draftCount + notStartedCount} />
+        </MetaGroup>
+        <div>
+          <Badge tone={PHASE_TONE[election.phase]}>
+            {PHASE_LABELS[election.phase]}
+          </Badge>
         </div>
-        <Badge
-          tone={
-            election.phase === "internalOpen"
-              ? "brand"
-              : election.phase === "internalClosed" ||
-                  election.phase === "publicVoting" ||
-                  election.phase === "resultsPreview" ||
-                  election.phase === "published"
-                ? "success"
-                : "muted"
-          }
-        >
-          {PHASE_LABELS[election.phase] ?? election.phase}
-        </Badge>
       </header>
 
-      <section className="grid gap-3 sm:grid-cols-3">
+      <section
+        aria-label="Submission status counts"
+        className="grid gap-3 sm:grid-cols-3"
+      >
         <Stat
           label="Submitted"
-          value={String(submittedCount)}
+          value={submittedCount}
           tone="success"
           icon={<CheckCircle2 className="h-4 w-4" aria-hidden />}
+          hint="Counted in the weighted aggregate."
         />
         <Stat
           label="Draft only"
-          value={String(draftCount)}
+          value={draftCount}
           tone="warning"
           icon={<PenLine className="h-4 w-4" aria-hidden />}
+          hint="Saved but not submitted; not in the aggregate."
         />
         <Stat
           label="Not started"
-          value={String(notStartedCount)}
+          value={notStartedCount}
           tone="muted"
           icon={<Circle className="h-4 w-4" aria-hidden />}
+          hint="No draft yet, or evaluator has not signed in."
         />
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-3">
+      <section
+        aria-label="Class submission progress"
+        className="grid gap-3 sm:grid-cols-3"
+      >
         {VOTER_CLASSES.map((cls) => {
-          const submitted = aggregate.evaluatorsByClass.find(
-            (r) => r.voterClass === cls,
-          )?.submitted ?? 0;
-          const total = completion.filter((r) => r.voterClass === cls).length;
+          const submitted =
+            aggregate.evaluatorsByClass.find((r) => r.voterClass === cls)
+              ?.submitted ?? 0;
+          const total = countsByClass[cls];
           const weight = classWeightLookup.get(cls) ?? 0;
           const pct = total > 0 ? Math.round((submitted / total) * 100) : 0;
           return (
@@ -190,114 +224,133 @@ function Body({ election }: { election: Doc<"elections"> }) {
         })}
       </section>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center gap-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Users className="h-4 w-4" aria-hidden />
-              Whitelist completion
-            </CardTitle>
-            <div className="flex-1" />
-            <div className="flex flex-wrap items-center gap-1">
-              <TabPill
-                label="All"
-                active={activeTab === "all"}
-                onClick={() => setActiveTab("all")}
-                count={completion.length}
-              />
-              {VOTER_CLASSES.map((cls) => (
-                <TabPill
-                  key={cls}
-                  label={VOTER_CLASS_LABEL[cls]}
-                  active={activeTab === cls}
-                  onClick={() => setActiveTab(cls)}
-                  count={completion.filter((c) => c.voterClass === cls).length}
-                />
-              ))}
-            </div>
-          </div>
-          <CardDescription>
-            Per-evaluator status. Voters who haven&apos;t signed in yet show
-            as &quot;Not signed in&quot;.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {filteredCompletion.length === 0 ? (
-            <EmptyState
-              icon={<Users className="h-5 w-5" aria-hidden />}
-              title="Whitelist is empty"
-              description="Add evaluators on the Whitelist page first."
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-[var(--color-muted)]/40 text-left">
-                    <th className="px-3 py-2 font-medium">Email</th>
-                    <th className="px-3 py-2 font-medium">Class</th>
-                    <th className="px-3 py-2 font-medium">Name</th>
-                    <th className="px-3 py-2 font-medium">Status</th>
-                    <th className="px-3 py-2 font-medium">Updated</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCompletion.map((row) => (
-                    <tr key={row.email} className="border-b last:border-b-0">
-                      <td className="px-3 py-2">{row.email}</td>
-                      <td className="px-3 py-2">
-                        <Badge tone={VOTER_CLASS_TONE[row.voterClass]}>
-                          {VOTER_CLASS_LABEL[row.voterClass]}
-                        </Badge>
-                      </td>
-                      <td className="px-3 py-2 text-[var(--color-muted-foreground)]">
-                        {row.fullName ?? (
-                          <span className="italic">Not signed in</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        <StatusBadge status={row.status} />
-                      </td>
-                      <td className="px-3 py-2 text-xs text-[var(--color-muted-foreground)]">
-                        {row.submittedAt
-                          ? `Submitted ${new Date(row.submittedAt).toLocaleString()}`
-                          : row.updatedAt
-                            ? new Date(row.updatedAt).toLocaleString()
-                            : "-"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <section
+        aria-label="Whitelist completion"
+        className="space-y-4"
+      >
+        <header className="flex flex-wrap items-center gap-3">
+          <SectionMarker
+            primary="Whitelist completion"
+            secondary={`${completion.length} ${completion.length === 1 ? "evaluator" : "evaluators"}`}
+          />
+          <FilterChips
+            current={activeTab}
+            counts={countsByClass}
+            total={completion.length}
+            onChange={setActiveTab}
+          />
+        </header>
+        <p className="max-w-[68ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+          Per-evaluator status. Voters who have not signed in yet show as
+          <em> Not signed in</em>; their evaluation status falls back to
+          <em> Not started</em>.
+        </p>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <ClipboardCheck className="h-4 w-4" aria-hidden />
-            Aggregate scores by class (submitted only)
-          </CardTitle>
-          <CardDescription>
-            Sum-of-totals share per class. Drafts are not counted. The class
-            share is the candidate&apos;s rubric total divided by the total
-            awarded by all evaluators of that class.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {aggregate.candidates.length === 0 ||
-          aggregate.criteria.length === 0 ? (
-            <EmptyState
-              icon={<ClipboardCheck className="h-5 w-5" aria-hidden />}
-              title="No data yet"
-              description="Add candidates and configure rubric criteria first."
+        {filteredCompletion.length === 0 ? (
+          <EmptyState
+            icon={<Users className="h-5 w-5" aria-hidden />}
+            title={
+              activeTab === "all"
+                ? "Whitelist is empty"
+                : `No evaluators in ${VOTER_CLASS_LABEL[activeTab]}`
+            }
+            description={
+              activeTab === "all"
+                ? "Internal evaluation cannot start until at least one evaluator is on the whitelist. Add them on the Whitelist page."
+                : "Add evaluators with this class on the Whitelist page, or change the filter above to All classes."
+            }
+          />
+        ) : (
+          <div className="overflow-x-auto rounded-md border border-[var(--ink-line)] bg-[var(--paper)]">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[var(--ink-line)] bg-[var(--paper-2)] text-left">
+                  <th className="px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
+                    Email
+                  </th>
+                  <th className="px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
+                    Class
+                  </th>
+                  <th className="px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
+                    Name
+                  </th>
+                  <th className="px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
+                    Status
+                  </th>
+                  <th className="px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
+                    Last update (MYT)
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCompletion.map((row) => (
+                  <tr
+                    key={row.email}
+                    className="border-b border-[var(--ink-line)] last:border-b-0"
+                  >
+                    <td className="px-3 py-2 font-mono text-xs tabular-nums text-[var(--ink)]">
+                      {row.email}
+                    </td>
+                    <td className="px-3 py-2">
+                      <Badge tone={VOTER_CLASS_TONE[row.voterClass]}>
+                        {VOTER_CLASS_LABEL[row.voterClass]}
+                      </Badge>
+                    </td>
+                    <td className="px-3 py-2 text-[var(--ink)]">
+                      {row.fullName ?? (
+                        <span className="italic text-[var(--ink-muted)]">
+                          Not signed in
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <StatusBadge status={row.status} />
+                    </td>
+                    <td className="px-3 py-2 font-mono text-xs tabular-nums text-[var(--ink-muted)]">
+                      {row.submittedAt
+                        ? `Submitted ${formatMYT(row.submittedAt)}`
+                        : row.updatedAt
+                          ? formatMYT(row.updatedAt)
+                          : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section aria-label="Aggregate scores by class" className="space-y-4">
+        <header className="space-y-2">
+          <SectionMarker
+            primary="Aggregate scores"
+            secondary="Submitted only"
+          />
+          <h2 className="font-display text-xl font-medium tracking-[-0.01em] text-[var(--ink)] sm:text-2xl">
+            <ClipboardCheck
+              className="mr-2 inline-block h-5 w-5 text-[var(--ink-muted)]"
+              aria-hidden
             />
-          ) : (
-            <ClassAggregateTable aggregate={aggregate} activeTab={activeTab} />
-          )}
-        </CardContent>
-      </Card>
+            Class share by candidate
+          </h2>
+          <p className="max-w-[68ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+            Sum of totals share per class. Drafts are not counted. The
+            class share is the candidate&apos;s rubric total divided by
+            the total awarded by every submitted evaluator of that class.
+          </p>
+        </header>
+        {aggregate.candidates.length === 0 ||
+        aggregate.criteria.length === 0 ? (
+          <EmptyState
+            icon={<ClipboardCheck className="h-5 w-5" aria-hidden />}
+            title="No data yet"
+            description="Add candidates and configure rubric criteria first. Once internal evaluators submit, this table fills in."
+          />
+        ) : (
+          <ClassAggregateTable aggregate={aggregate} activeTab={activeTab} />
+        )}
+      </section>
     </main>
   );
 }
@@ -327,7 +380,7 @@ function ClassAggregateTable({
   }, [aggregate]);
 
   return (
-    <div className="space-y-6 p-4">
+    <div className="space-y-8">
       {visibleClasses.map((cls) => {
         const grandTotal = grandTotalsByClass[cls];
         const weight =
@@ -354,75 +407,95 @@ function ClassAggregateTable({
           .sort((a, b) => b.share - a.share);
 
         return (
-          <div key={cls} className="overflow-x-auto">
-            <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
+          <div key={cls} className="space-y-3">
+            <div className="flex flex-wrap items-baseline gap-2 text-sm">
               <Badge tone={VOTER_CLASS_TONE[cls]}>
                 {VOTER_CLASS_LABEL[cls]}
               </Badge>
-              <span className="text-[var(--color-muted-foreground)]">
-                weight {weight}% · {evaluators} submitted ·{" "}
-                {grandTotal} total points
+              <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink-muted)]">
+                weight{" "}
+                <span className="tabular-nums">{weight}%</span>
+                <span aria-hidden className="px-1 text-[var(--copper)]">
+                  ·
+                </span>
+                <span className="tabular-nums">{evaluators}</span> submitted
+                <span aria-hidden className="px-1 text-[var(--copper)]">
+                  ·
+                </span>
+                <span className="tabular-nums">{grandTotal}</span> total points
               </span>
             </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-[var(--color-muted)]/40 text-left">
-                  <th className="px-3 py-2 font-medium">Candidate</th>
-                  <th className="px-3 py-2 font-medium text-right">N</th>
-                  <th className="px-3 py-2 font-medium text-right">Sum</th>
-                  {aggregate.criteria.map((cr) => (
-                    <th
-                      key={cr._id}
-                      className="px-3 py-2 font-medium text-right whitespace-nowrap"
-                    >
-                      {cr.name}
+            <div className="overflow-x-auto rounded-md border border-[var(--ink-line)] bg-[var(--paper)]">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--ink-line)] bg-[var(--paper-2)] text-left">
+                    <th className="px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
+                      Candidate
                     </th>
-                  ))}
-                  <th className="px-3 py-2 font-medium text-right">Share</th>
-                </tr>
-              </thead>
-              <tbody>
-                {candidateRows.map((row) => (
-                  <tr
-                    key={row.candidateId}
-                    className="border-b last:border-b-0"
-                  >
-                    <td className="px-3 py-2">
-                      <div className="font-medium">{row.fullName}</div>
-                      {row.matric && !row.matric.startsWith("auto-") ? (
-                        <div className="text-xs text-[var(--color-muted-foreground)]">
-                          {row.matric}
-                        </div>
-                      ) : null}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {row.evaluatorCount}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {row.totalSum}
-                    </td>
-                    {aggregate.criteria.map((cr) => {
-                      const cell = row.perCriterion.find(
-                        (p) => p.criterionId === cr._id,
-                      );
-                      return (
-                        <td
-                          key={cr._id}
-                          className="px-3 py-2 text-right tabular-nums"
-                        >
-                          {cell && cell.count > 0
-                            ? cell.average.toFixed(2)
-                            : "-"}
-                        </td>
-                      );
-                    })}
-                    <td className="px-3 py-2 text-right font-medium tabular-nums">
-                      {(row.share * 100).toFixed(1)}%
-                    </td>
+                    <th className="px-3 py-2 text-right font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
+                      Evaluators
+                    </th>
+                    <th className="px-3 py-2 text-right font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
+                      Sum
+                    </th>
+                    {aggregate.criteria.map((cr) => (
+                      <th
+                        key={cr._id}
+                        className="px-3 py-2 text-right font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)] whitespace-nowrap"
+                      >
+                        {cr.name}
+                      </th>
+                    ))}
+                    <th className="px-3 py-2 text-right font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
+                      Share
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {candidateRows.map((row) => (
+                    <tr
+                      key={row.candidateId}
+                      className="border-b border-[var(--ink-line)] last:border-b-0"
+                    >
+                      <td className="px-3 py-2">
+                        <div className="font-medium text-[var(--ink)]">
+                          {row.fullName}
+                        </div>
+                        {row.matric && !row.matric.startsWith("auto-") ? (
+                          <div className="font-mono text-xs tabular-nums text-[var(--ink-muted)]">
+                            {row.matric}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink)]">
+                        {row.evaluatorCount}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink)]">
+                        {row.totalSum}
+                      </td>
+                      {aggregate.criteria.map((cr) => {
+                        const cell = row.perCriterion.find(
+                          (p) => p.criterionId === cr._id,
+                        );
+                        return (
+                          <td
+                            key={cr._id}
+                            className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink-muted)]"
+                          >
+                            {cell && cell.count > 0
+                              ? cell.average.toFixed(2)
+                              : "—"}
+                          </td>
+                        );
+                      })}
+                      <td className="px-3 py-2 text-right font-mono font-medium tabular-nums text-[var(--ink)]">
+                        {(row.share * 100).toFixed(1)}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         );
       })}
@@ -444,68 +517,100 @@ function ClassStatCard({
   pct: number;
 }) {
   return (
-    <div className="rounded-md border p-3">
+    <div className="space-y-2 rounded-md border border-[var(--ink-line)] bg-[var(--paper)] p-4">
       <div className="flex items-center justify-between">
         <Badge tone={VOTER_CLASS_TONE[voterClass]}>
           {VOTER_CLASS_LABEL[voterClass]}
         </Badge>
-        <span className="text-xs text-[var(--color-muted-foreground)]">
+        <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
           {weight}% weight
         </span>
       </div>
-      <div className="mt-2 text-2xl font-semibold tabular-nums">
+      <div className="font-display text-2xl font-medium tabular-nums text-[var(--ink)]">
         {submitted}
-        <span className="text-base font-normal text-[var(--color-muted-foreground)]">
+        <span className="text-base font-normal text-[var(--ink-muted)]">
           {" "}
           / {total}
         </span>
       </div>
-      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--color-muted)]">
+      <div
+        className="h-1.5 overflow-hidden rounded-full bg-[var(--paper-2)]"
+        role="progressbar"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`${VOTER_CLASS_LABEL[voterClass]} submission progress`}
+      >
         <div
-          className="h-full bg-[var(--color-primary)]"
+          className="h-full bg-[var(--copper)]"
           style={{ width: `${pct}%` }}
         />
       </div>
-      <div className="mt-1 text-xs text-[var(--color-muted-foreground)]">
+      <div className="font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
         {pct}% submitted
       </div>
     </div>
   );
 }
 
-function TabPill({
-  label,
-  count,
-  active,
-  onClick,
+function FilterChips({
+  current,
+  counts,
+  total,
+  onChange,
 }: {
-  label: string;
-  count: number;
-  active: boolean;
-  onClick: () => void;
+  current: VoterClass | "all";
+  counts: Record<VoterClass, number>;
+  total: number;
+  onChange: (cls: VoterClass | "all") => void;
 }) {
+  const chips: { value: VoterClass | "all"; label: string; count: number }[] =
+    [
+      { value: "all", label: "All classes", count: total },
+      {
+        value: "topCommittee",
+        label: VOTER_CLASS_LABEL.topCommittee,
+        count: counts.topCommittee,
+      },
+      {
+        value: "headExecutive",
+        label: VOTER_CLASS_LABEL.headExecutive,
+        count: counts.headExecutive,
+      },
+      {
+        value: "year2Committee",
+        label: VOTER_CLASS_LABEL.year2Committee,
+        count: counts.year2Committee,
+      },
+    ];
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-full border px-3 py-1 text-xs transition-colors",
-        active
-          ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-primary-foreground)]"
-          : "hover:bg-[var(--color-muted)]",
-      )}
+    <div
+      role="radiogroup"
+      aria-label="Filter by class"
+      className="flex flex-wrap items-center gap-1.5"
     >
-      {label}{" "}
-      <span
-        className={cn(
-          active
-            ? "text-[var(--color-primary-foreground)]/70"
-            : "text-[var(--color-muted-foreground)]",
-        )}
-      >
-        ({count})
-      </span>
-    </button>
+      {chips.map((c) => {
+        const active = current === c.value;
+        return (
+          <button
+            key={c.value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(c.value)}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-[10.5px] uppercase tracking-[0.18em]",
+              active
+                ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]"
+                : "border-[var(--ink-line)] text-[var(--ink-muted)] hover:text-[var(--ink)]",
+            )}
+          >
+            <span>{c.label}</span>
+            <span className="tabular-nums">{c.count}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -514,21 +619,28 @@ function Stat({
   value,
   tone,
   icon,
+  hint,
 }: {
   label: string;
-  value: string;
+  value: number;
   tone: "success" | "warning" | "muted";
   icon: React.ReactNode;
+  hint: string;
 }) {
   return (
-    <div className="rounded-md border p-3">
+    <div className="space-y-2 rounded-md border border-[var(--ink-line)] bg-[var(--paper)] p-4">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-[var(--color-muted-foreground)]">
+        <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink-muted)]">
           {label}
         </span>
         <Badge tone={tone}>{icon}</Badge>
       </div>
-      <div className="mt-1 text-2xl font-semibold">{value}</div>
+      <div className="font-display text-2xl font-medium tabular-nums text-[var(--ink)]">
+        {value}
+      </div>
+      <p className="text-[11px] leading-relaxed text-[var(--ink-muted)]">
+        {hint}
+      </p>
     </div>
   );
 }
