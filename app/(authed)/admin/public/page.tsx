@@ -32,6 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Label } from "@/components/ui/label";
+import { LinkButton } from "@/components/ui/link-button";
 import { Meta, MetaGroup } from "@/components/ui/meta";
 import { SectionMarker } from "@/components/ui/section-marker";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -171,9 +172,9 @@ function Body({ election }: { election: Doc<"elections"> }) {
           title="No positions configured"
           description="Configure the AGM ballot before any position can be opened."
           action={
-            <Link href="/admin/positions">
-              <Button>Configure positions</Button>
-            </Link>
+            <LinkButton href="/admin/positions">
+              Configure positions
+            </LinkButton>
           }
         />
       ) : (

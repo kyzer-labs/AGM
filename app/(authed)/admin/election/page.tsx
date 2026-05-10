@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -39,6 +38,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { LinkButton } from "@/components/ui/link-button";
 import { Modal } from "@/components/ui/modal";
 import { getConvexErrorMessage } from "@/lib/convex-error";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
@@ -416,21 +416,15 @@ function ElectionCard({ election }: { election: Doc<"elections"> }) {
         {showRubric ? <RubricCriteriaPanel election={election} /> : null}
 
         <div className="flex flex-wrap items-center gap-2">
-          <Link href="/admin/positions">
-            <Button variant="outline" size="sm">
-              Positions
-            </Button>
-          </Link>
-          <Link href="/admin/candidates">
-            <Button variant="outline" size="sm">
-              Candidates
-            </Button>
-          </Link>
-          <Link href="/admin/whitelist">
-            <Button variant="outline" size="sm">
-              Whitelist
-            </Button>
-          </Link>
+          <LinkButton href="/admin/positions" variant="outline" size="sm">
+            Positions
+          </LinkButton>
+          <LinkButton href="/admin/candidates" variant="outline" size="sm">
+            Candidates
+          </LinkButton>
+          <LinkButton href="/admin/whitelist" variant="outline" size="sm">
+            Whitelist
+          </LinkButton>
           <div className="flex-1" />
           <PhaseButtons
             phase={election.phase}
