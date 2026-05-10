@@ -3,12 +3,12 @@
 import { initializeApp, getApp, getApps, type FirebaseApp } from "firebase/app";
 import {
   getAuth,
+  getRedirectResult,
   OAuthProvider,
-  browserLocalPersistence,
-  setPersistence,
-  signInWithPopup,
+  signInWithRedirect,
   signOut,
   type Auth,
+  type UserCredential,
 } from "firebase/auth";
 
 const config = {
@@ -47,10 +47,43 @@ export function buildMicrosoftProvider(): OAuthProvider {
   return provider;
 }
 
-export async function signInWithMicrosoft(): Promise<void> {
-  const auth = getFirebaseAuth();
-  await setPersistence(auth, browserLocalPersistence);
-  await signInWithPopup(auth, buildMicrosoftProvider());
+/**
+ * Sign in with Microsoft via Firebase's redirect flow.
+ *
+ * Why redirect rather than popup:
+ *   - `signInWithPopup` requires reliable cross-window postMessage to
+ *     return the credential to the parent tab. Strict popup blockers,
+ *     embedded webviews (Cursor IDE Browser, in-app webviews), and
+ *     Cross-Origin-Opener-Policy headers regularly break that channel,
+ *     producing a phantom `auth/popup-blocked` error AFTER the user has
+ *     already authenticated in the popup. The result is a stranded popup
+ *     and a confusing failure UX.
+ *   - The redirect flow takes the entire tab to Microsoft, comes back to
+ *     `https://<project>.firebaseapp.com/__/auth/handler` to exchange
+ *     the OAuth code, and lands the user on the original origin where
+ *     `processRedirectResult` (mounted in `Providers`) consumes the
+ *     credential and `onIdTokenChanged` fires the rest of the app.
+ *   - Modern Firebase guidance (v9+) treats redirect as the recommended
+ *     web flow precisely because of these failure modes. The UX cost
+ *     for a once-per-session AGM sign-in is negligible.
+ *
+ * `signInWithRedirect` returns a never-resolving promise because the
+ * tab navigates away before resolution; we type the return as `never`.
+ */
+export async function signInWithMicrosoft(): Promise<never> {
+  await signInWithRedirect(getFirebaseAuth(), buildMicrosoftProvider());
+  throw new Error("signInWithRedirect did not navigate the page.");
+}
+
+/**
+ * Consume the pending redirect-flow sign-in result on app mount.
+ * Returns the credential when there is one to process, `null` otherwise.
+ * Errors thrown here originate from the Microsoft side of the redirect
+ * (e.g. user cancelled, account disabled) and should be surfaced to the
+ * user via toast.
+ */
+export async function processRedirectResult(): Promise<UserCredential | null> {
+  return await getRedirectResult(getFirebaseAuth());
 }
 
 export async function signOutFirebase(): Promise<void> {
