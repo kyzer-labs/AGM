@@ -214,7 +214,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
               </label>
             </>
           ) : (
-            <Badge tone="warning">Locked — election not in Setup</Badge>
+            <Badge tone="warning">Locked: election not in Setup</Badge>
           )}
         </div>
       </header>

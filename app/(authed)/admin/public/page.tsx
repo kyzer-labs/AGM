@@ -230,8 +230,8 @@ function SessionRowCard({
         });
       } else {
         const winnerName = result.winnerCandidateId
-          ? candidateNameById.get(result.winnerCandidateId) ?? "—"
-          : "—";
+          ? candidateNameById.get(result.winnerCandidateId) ?? "-"
+          : "-";
         toast.success(`Closed. Winner: ${winnerName}`);
       }
     } catch (err) {
@@ -250,7 +250,7 @@ function SessionRowCard({
   })();
 
   const statusLabel = (() => {
-    if (row.hasUnresolvedTie) return "Tie — resolve";
+    if (row.hasUnresolvedTie) return "Tie: resolve";
     if (row.sessionStatus === "active") return "Open";
     if (row.sessionStatus === "closed") return "Closed";
     return "Pending";
@@ -336,7 +336,7 @@ function SessionRowCard({
             <Trophy className="h-4 w-4 text-[var(--color-success)]" aria-hidden />
             Winner:{" "}
             <strong>
-              {candidateNameById.get(row.winnerCandidateId) ?? "—"}
+              {candidateNameById.get(row.winnerCandidateId) ?? "-"}
             </strong>
           </div>
         ) : null}

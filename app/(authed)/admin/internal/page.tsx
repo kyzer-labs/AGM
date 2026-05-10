@@ -262,7 +262,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
                           ? `Submitted ${new Date(row.submittedAt).toLocaleString()}`
                           : row.updatedAt
                             ? new Date(row.updatedAt).toLocaleString()
-                            : "—"}
+                            : "-"}
                       </td>
                     </tr>
                   ))}
@@ -412,7 +412,7 @@ function ClassAggregateTable({
                         >
                           {cell && cell.count > 0
                             ? cell.average.toFixed(2)
-                            : "—"}
+                            : "-"}
                         </td>
                       );
                     })}

@@ -119,7 +119,7 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
     const ok = await dialog.confirm({
       title: "Seed default positions?",
       description:
-        "Adds the 9 default positions (President, 2 VPs, 6 Directors). If a name already exists, a duplicate will be created — only run this on a fresh cycle.",
+        "Adds the 9 default positions (President, 2 VPs, 6 Directors). If a name already exists, a duplicate will be created. Only run this on a fresh cycle.",
       confirmText: "Seed defaults",
     });
     if (!ok) return;
@@ -176,7 +176,7 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
           </p>
         </div>
         {lockedToSetup ? (
-          <Badge tone="warning">Locked — election not in Setup</Badge>
+          <Badge tone="warning">Locked: election not in Setup</Badge>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
             <Button

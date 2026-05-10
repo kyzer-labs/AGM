@@ -89,7 +89,7 @@ function Inner() {
       if (result.pending) {
         toast.success("Invite created", {
           description:
-            "They have not signed in yet — admin access will activate automatically the first time they sign in.",
+            "They have not signed in yet. Admin access will activate automatically the first time they sign in.",
         });
       } else {
         toast.success("Admin access granted");
@@ -114,7 +114,7 @@ function Inner() {
           </h1>
           <p className="text-sm text-[var(--color-muted-foreground)]">
             Super admins manage who else can run the AGM. You can invite
-            someone before they sign in — their access will activate the
+            someone before they sign in, and their access will activate the
             first time they sign in with their @student.usm.my account.
           </p>
         </div>

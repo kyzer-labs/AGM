@@ -289,7 +289,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
                 <Textarea
                   id="em-reason"
                   rows={2}
-                  placeholder="e.g. user reported their account was used without consent — investigation #42"
+                  placeholder="e.g. user reported their account was used without consent, investigation #42"
                   value={emReason}
                   onChange={(e) => setEmReason(e.target.value)}
                   required

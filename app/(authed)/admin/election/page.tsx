@@ -407,7 +407,7 @@ function ElectionCard({ election }: { election: Doc<"elections"> }) {
         ) : readiness?.ready ? (
           <div className="flex items-center gap-2 rounded-md border border-[var(--color-success)]/40 bg-[var(--color-success)]/10 p-3 text-sm">
             <CheckCircle2 className="h-4 w-4 text-[var(--color-success)]" />
-            Setup complete — ready to open the internal evaluation window.
+            Setup complete. Ready to open the internal evaluation window.
           </div>
         ) : null}
 
@@ -697,7 +697,7 @@ function ScheduledWindowPanel({ election }: { election: Doc<"elections"> }) {
     const ok = await dialog.confirm({
       title: "Clear scheduled window?",
       description:
-        "Cancels any pending open/close jobs. The phase stays where it is — you'll need to transition it manually.",
+        "Cancels any pending open/close jobs. The phase stays where it is, so you'll need to transition it manually.",
       confirmText: "Clear schedule",
       variant: "destructive",
     });

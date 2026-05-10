@@ -39,7 +39,7 @@ type VoteTallyKind = "uniform" | "favorFirst";
 
 const DISTRIBUTION_LABEL: Record<Distribution, string> = {
   uniform: "Uniform random (seeded, deterministic)",
-  perfect: "Perfect — all max scores",
+  perfect: "Perfect: all max scores",
   favorFirst: "Favor first candidate (high vs low)",
 };
 
@@ -330,7 +330,7 @@ function DevBody({ election }: { election: Doc<"elections"> }) {
           <CardTitle className="text-base">Internal evaluations</CardTitle>
           <CardDescription>
             Writes a full N evaluators × M candidates × K criteria score
-            matrix. Idempotent — re-running with the same seed voters
+            matrix. Idempotent: re-running with the same seed voters
             overwrites their scores. Requires{" "}
             {candidatesCount === 0 ? (
               <em>candidates first.</em>

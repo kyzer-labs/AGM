@@ -247,7 +247,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
           <p className="text-sm text-[var(--color-muted-foreground)]">
             Committee members who can submit internal evaluations for{" "}
             <strong>{election.name}</strong>. Each evaluator is assigned to a
-            class — Top Committee, Head Executive, or Year 2 Committee — and
+            class (Top Committee, Head Executive, or Year 2 Committee), and
             their class&apos;s configured weight applies to their submitted
             scores.
           </p>

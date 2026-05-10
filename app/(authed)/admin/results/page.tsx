@@ -231,7 +231,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
           <p className="text-sm text-[var(--color-muted-foreground)]">
             Combined internal (60%) + public (40%) scoring for{" "}
             <strong>{election.name}</strong>, normalised by the configured
-            class weights. Review every position before publishing — once
+            class weights. Review every position before publishing. Once
             you publish, voters can see results on{" "}
             <a className="underline" href="/results">
               the results page
@@ -399,7 +399,7 @@ function ResultCard({
       <CardContent className="space-y-3">
         {row.breakdown.length === 0 ? (
           <p className="text-xs text-[var(--color-muted-foreground)]">
-            No breakdown yet — this position hasn&apos;t been closed.
+            No breakdown yet. This position hasn&apos;t been closed.
           </p>
         ) : (
           <div className="overflow-x-auto">
