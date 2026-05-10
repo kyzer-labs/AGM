@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { LandingBackdrop } from "@/components/landing/landing-backdrop";
+import { LandingRedirect } from "@/components/landing/landing-redirect";
 import { SignInCTA } from "@/components/landing/sign-in-cta";
 
 // AGM cycle year. Lives here as a single named constant so next year's
@@ -34,12 +35,17 @@ const AGM_CYCLE_YEAR = 2026;
  *    voter on AGM day knows which year and whether they qualify before
  *    they tap.
  *
- * Server-rendered: no `use client` needed. The CTA inside is the only
- * client component on this surface.
+ * Server-rendered: no `use client` needed. The CTA and the
+ * `LandingRedirect` side-effect are the only client components on this
+ * surface. `LandingRedirect` watches Firebase auth state and punts any
+ * already-authenticated visitor (revisit, refresh, or just-completed
+ * sign-in popup) to `/dashboard`, which encodes the role-aware and
+ * phase-aware routing for every downstream surface.
  */
 export default function LandingPage() {
   return (
     <main className="relative min-h-dvh overflow-hidden">
+      <LandingRedirect />
       <LandingBackdrop />
 
       <div className="relative z-10 flex min-h-dvh flex-col">
