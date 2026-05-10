@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Meta, MetaGroup } from "@/components/ui/meta";
 import { SectionMarker } from "@/components/ui/section-marker";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Standby as StandbyBlock } from "@/components/ui/standby";
 import { ScoreButtons } from "@/components/internal/score-buttons";
 import { RubricHelp } from "@/components/internal/rubric-help";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
@@ -158,17 +159,12 @@ function Standby({
   body: string;
 }) {
   return (
-    <main className="container-narrow py-20 sm:py-24">
-      <header className="space-y-4">
-        <SectionMarker primary="Internal evaluation" secondary={phase} />
-        <h1 className="text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
-          {cycleName ?? "No active AGM cycle"}
-        </h1>
-        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
-          {body}
-        </p>
-      </header>
-    </main>
+    <StandbyBlock
+      markerPrimary="Internal evaluation"
+      markerSecondary={phase}
+      cycleName={cycleName}
+      body={body}
+    />
   );
 }
 

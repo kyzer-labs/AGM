@@ -9,6 +9,7 @@ import { AuthGate } from "@/components/auth/auth-gate";
 import { Button } from "@/components/ui/button";
 import { SectionMarker } from "@/components/ui/section-marker";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Standby as StandbyBlock } from "@/components/ui/standby";
 import { cn } from "@/lib/utils";
 import { formatMYT } from "@/lib/format";
 import { internalSharePercent } from "@/lib/weights";
@@ -323,17 +324,12 @@ function Standby({
   body: string;
 }) {
   return (
-    <main className="container-narrow py-20 sm:py-24">
-      <header className="space-y-4">
-        <SectionMarker primary="Final results" secondary={phase} />
-        <h1 className="text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
-          {cycleName ?? "No active AGM cycle"}
-        </h1>
-        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
-          {body}
-        </p>
-      </header>
-    </main>
+    <StandbyBlock
+      markerPrimary="Final results"
+      markerSecondary={phase}
+      cycleName={cycleName}
+      body={body}
+    />
   );
 }
 

@@ -6,8 +6,8 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { AuthGate } from "@/components/auth/auth-gate";
 import { Meta, MetaGroup } from "@/components/ui/meta";
-import { SectionMarker } from "@/components/ui/section-marker";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Standby as StandbyBlock } from "@/components/ui/standby";
 import { formatMYT } from "@/lib/format";
 
 type RedirectHref = "/admin" | "/internal" | "/vote" | "/results";
@@ -183,17 +183,12 @@ function Stage() {
 
 function Standby({ copy }: { copy: StandbyCopy }) {
   return (
-    <main className="container-narrow py-20 sm:py-24">
-      <header className="space-y-4">
-        <SectionMarker primary="Standby" secondary={PHASE_LABEL[copy.phase]} />
-        <h1 className="text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
-          {copy.cycleName ?? "No active AGM cycle"}
-        </h1>
-        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
-          {copy.body}
-        </p>
-      </header>
-
+    <StandbyBlock
+      markerPrimary="Standby"
+      markerSecondary={PHASE_LABEL[copy.phase]}
+      cycleName={copy.cycleName}
+      body={copy.body}
+    >
       {copy.scheduledStartAt || copy.scheduledEndAt ? (
         <MetaGroup className="mt-12 pt-8 sm:grid-cols-2">
           {copy.scheduledStartAt ? (
@@ -217,7 +212,7 @@ function Standby({ copy }: { copy: StandbyCopy }) {
           Live. Auto-updates the moment the phase changes.
         </p>
       </div>
-    </main>
+    </StandbyBlock>
   );
 }
 
