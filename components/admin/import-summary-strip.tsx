@@ -33,13 +33,10 @@ import { NoticeStrip } from "@/components/ui/notice-strip";
  * - A trailing ghost-button "Dismiss" matches the placement of both
  *   inlined originals.
  *
- * The Errors and Warnings list section labels currently render with
- * em dashes ("Errors — these rows did not import" / "Warnings —
- * imported with a fallback"). These are byte-equivalent to the
- * existing inlined strings and are preserved here intentionally so
- * this extract pass does not change visible behavior. The DESIGN.md
- * em-dash ban is a separate copy concern; sweeping these labels is
- * scoped for a future copy-only commit.
+ * The Errors and Warnings list section labels render with colons
+ * ("Errors: these rows did not import" / "Warnings: imported with a
+ * fallback"), per the DESIGN.md em-dash ban. The closeout copy sweep
+ * resolved the previously-deferred em-dash variant.
  */
 
 export interface ImportSummaryEntry {
@@ -150,7 +147,7 @@ export function ImportSummaryStrip({
               className="mr-1 inline-block h-3 w-3"
               aria-hidden
             />{" "}
-            Errors — these rows did not import
+            Errors: these rows did not import
           </p>
           <IssueList entries={errors!} reasonClass="text-[var(--copper)]" />
         </div>
@@ -159,7 +156,7 @@ export function ImportSummaryStrip({
       {warningCount > 0 ? (
         <div className="space-y-2">
           <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink-muted)]">
-            Warnings — imported with a fallback
+            Warnings: imported with a fallback
           </p>
           <IssueList
             entries={warnings!}

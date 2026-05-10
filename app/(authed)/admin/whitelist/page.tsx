@@ -912,7 +912,7 @@ function BulkImportModal({
           >
             One email per line is easiest. Comma- or semicolon-separated
             lists work too. Per-row class overrides aren&apos;t supported
-            in pasted input — use CSV for that.
+            in pasted input. Use CSV for that.
           </p>
         </div>
         <div className="grid gap-1.5">

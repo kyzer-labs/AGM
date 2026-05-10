@@ -311,7 +311,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
                         ? `Submitted ${formatMYT(row.submittedAt)}`
                         : row.updatedAt
                           ? formatMYT(row.updatedAt)
-                          : "—"}
+                          : "Not yet"}
                     </td>
                   </tr>
                 ))}
@@ -484,7 +484,7 @@ function ClassAggregateTable({
                           >
                             {cell && cell.count > 0
                               ? cell.average.toFixed(2)
-                              : "—"}
+                              : "-"}
                           </td>
                         );
                       })}

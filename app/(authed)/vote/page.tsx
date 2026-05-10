@@ -210,7 +210,7 @@ function Ballot({ session }: { session: ActiveSession }) {
             aria-hidden
           />
           <p className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--ink-muted)]">
-            Recorded {formatMYT(Date.now())}
+            Recorded {formatMYT(myVote.votedAt)}
           </p>
         </div>
       </main>
