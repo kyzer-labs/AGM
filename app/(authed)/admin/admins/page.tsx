@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -8,27 +8,33 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Clock3, ShieldCheck, ShieldOff, Trash2, UserPlus } from "lucide-react";
-import { getConvexErrorMessage } from "@/lib/convex-error";
+import {
+  AlertTriangle,
+  Clock3,
+  ShieldCheck,
+  ShieldOff,
+  Trash2,
+  UserPlus,
+} from "lucide-react";
 
 import { AuthGate } from "@/components/auth/auth-gate";
 import { AdminBreadcrumb } from "@/components/admin/admin-breadcrumb";
 import { useDialog } from "@/components/dialog/dialog-provider";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { EmptyState } from "@/components/ui/empty-state";
+import { Meta, MetaGroup } from "@/components/ui/meta";
 import { Modal } from "@/components/ui/modal";
+import { NoticeStrip } from "@/components/ui/notice-strip";
+import { SectionMarker } from "@/components/ui/section-marker";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 
+import { formatMYT } from "@/lib/format";
+import { getConvexErrorMessage } from "@/lib/convex-error";
+import type { Id } from "@/convex/_generated/dataModel";
 
 const grantSchema = z.object({
   email: z
@@ -44,6 +50,18 @@ const grantSchema = z.object({
 });
 type GrantValues = z.infer<typeof grantSchema>;
 
+const ROLE_LABEL: Record<"super" | "admin", string> = {
+  super: "Super admin",
+  admin: "Admin",
+};
+
+const ROLE_DESCRIPTION: Record<"super" | "admin", string> = {
+  super:
+    "Everything the admin role can do, plus managing the admin allowlist, resolving manual ties, and running the emergency voter-audit lookup.",
+  admin:
+    "Configure the cycle, run live ballots, monitor counts, and publish results. Cannot manage admins or run emergency audits.",
+};
+
 export default function AdminsPage() {
   return (
     <AuthGate mode="profileComplete">
@@ -54,11 +72,9 @@ export default function AdminsPage() {
 
 function Inner() {
   const router = useRouter();
-  const dialog = useDialog();
+  const me = useQuery(api.voters.me);
   const adminStatus = useQuery(api.admins.myAdminStatus);
   const list = useQuery(api.admins.listAdmins);
-  const grant = useMutation(api.admins.grantAdmin);
-  const revoke = useMutation(api.admins.revokeAdmin);
 
   const isSuper = adminStatus?.role === "super";
 
@@ -67,32 +83,79 @@ function Inner() {
     if (!isSuper) router.replace("/admin");
   }, [adminStatus, isSuper, router]);
 
+  if (
+    adminStatus === undefined ||
+    list === undefined ||
+    me === undefined
+  ) {
+    return <PageSkeleton />;
+  }
+
+  if (!isSuper || me === null) return null;
+
+  return <Body actorEmail={me.email} list={list} />;
+}
+
+function PageSkeleton() {
+  return (
+    <main className="container-wide space-y-6 py-12">
+      <Skeleton className="h-3 w-44" />
+      <Skeleton className="h-10 w-2/3" />
+      <Skeleton className="h-4 w-1/2" />
+      <Skeleton className="h-32 w-full" />
+    </main>
+  );
+}
+
+interface AdminListEntry {
+  _id: Id<"admins">;
+  email: string;
+  role: "super" | "admin";
+  fullName: string | null;
+  pending: boolean;
+  createdAt: number;
+}
+
+function Body({
+  actorEmail,
+  list,
+}: {
+  actorEmail: string;
+  list: AdminListEntry[];
+}) {
+  const grant = useMutation(api.admins.grantAdmin);
   const [showGrant, setShowGrant] = useState(false);
+
   const form = useForm<GrantValues>({
     resolver: zodResolver(grantSchema),
     defaultValues: { email: "", role: "admin" },
   });
 
-  if (adminStatus === undefined || list === undefined) {
-    return (
-      <main className="container-wide py-10">
-        <Skeleton className="h-40 w-full" />
-      </main>
-    );
-  }
+  const counts = useMemo(() => {
+    let supers = 0;
+    let admins = 0;
+    let pending = 0;
+    for (const a of list) {
+      if (a.role === "super") supers += 1;
+      else admins += 1;
+      if (a.pending) pending += 1;
+    }
+    return { supers, admins, pending, total: list.length };
+  }, [list]);
 
-  if (!isSuper) return null;
+  const onlyOneSuper = counts.supers === 1;
 
   const onGrant = form.handleSubmit(async (values) => {
     try {
       const result = await grant(values);
       if (result.pending) {
-        toast.success("Invite created", {
-          description:
-            "They have not signed in yet. Admin access will activate automatically the first time they sign in.",
+        toast.success("Grant queued: pending sign-in", {
+          description: `${values.email} becomes ${ROLE_LABEL[values.role].toLowerCase()} the first time they sign in with their @student.usm.my account.`,
         });
       } else {
-        toast.success("Admin access granted");
+        toast.success(`${ROLE_LABEL[values.role]} access granted`, {
+          description: `${values.email} can now use the admin tree.`,
+        });
       }
       form.reset({ email: "", role: "admin" });
       setShowGrant(false);
@@ -104,171 +167,301 @@ function Inner() {
   });
 
   return (
-    <main className="container-wide py-10 space-y-8">
+    <main className="container-wide space-y-10 py-12">
       <AdminBreadcrumb items={[{ label: "Admins" }]} />
 
-      <header className="flex flex-wrap items-start gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Admin allowlist
-          </h1>
-          <p className="text-sm text-[var(--color-muted-foreground)]">
-            Super admins manage who else can run the AGM. You can invite
-            someone before they sign in, and their access will activate the
-            first time they sign in with their @student.usm.my account.
-          </p>
+      <header className="space-y-5">
+        <SectionMarker
+          primary="Admin allowlist"
+          secondary="Super admin only"
+        />
+        <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
+          Manage who can run the AGM
+        </h1>
+        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+          Grant or revoke admin access by USM student email. Grants for
+          accounts that have not signed in yet are queued, and activate
+          automatically the first time the recipient signs in. Every grant,
+          role change, and revocation is written to the audit log.
+        </p>
+        <MetaGroup className="grid-cols-2 sm:grid-cols-4">
+          <Meta label="Super admins" value={counts.supers} />
+          <Meta label="Admins" value={counts.admins} />
+          <Meta label="Pending sign-in" value={counts.pending} />
+          <Meta label="Total" value={counts.total} />
+        </MetaGroup>
+        <div>
+          <Button
+            onClick={() => {
+              form.reset({ email: "", role: "admin" });
+              setShowGrant(true);
+            }}
+          >
+            <UserPlus className="h-4 w-4" aria-hidden /> Grant admin
+          </Button>
         </div>
-        <Button
-          onClick={() => {
-            form.reset({ email: "", role: "admin" });
-            setShowGrant(true);
-          }}
-        >
-          <UserPlus className="h-4 w-4" /> Grant admin
-        </Button>
       </header>
+
+      {onlyOneSuper ? (
+        <NoticeStrip
+          markerPrimary="Single super admin"
+          markerSecondary="Succession plan"
+          markerIcon={
+            <AlertTriangle
+              className="h-4 w-4 text-[var(--copper)]"
+              aria-hidden
+            />
+          }
+          headline="Only one super admin on file"
+          tone="copper"
+        >
+          <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+            Super admins can revoke other admins, run emergency voter
+            audits, and resolve manual ties. If the only super admin loses
+            access, the portal can no longer be unlocked from inside the
+            app. Promote a second{" "}
+            <strong className="font-semibold">Super admin</strong> from the
+            Grant admin button above before the next AGM cycle so the
+            allowlist has a working succession path.
+          </p>
+        </NoticeStrip>
+      ) : null}
 
       <Modal
         open={showGrant}
-        onClose={() => setShowGrant(false)}
+        onClose={() => {
+          if (!form.formState.isSubmitting) setShowGrant(false);
+        }}
         title="Grant admin access"
-        description={
-          <>
-            <strong>Admin</strong> = day-to-day operations.{" "}
-            <strong>Super admin</strong> = also can manage admins, do
-            emergency overrides, and resolve ties.
-          </>
-        }
+        description="Choose a role and enter a USM student email. The grant is recorded in the audit log either way; if the recipient has not signed in yet, it is queued and activates on first sign-in."
         size="md"
       >
-        <form onSubmit={onGrant} className="grid gap-4">
-          <div className="grid gap-1.5">
-            <Label htmlFor="grant-email">Email</Label>
-            <Input
-              id="grant-email"
-              type="email"
-              placeholder="someone@student.usm.my"
-              {...form.register("email")}
-            />
-            {form.formState.errors.email ? (
-              <p className="text-xs text-[var(--color-destructive)]">
-                {form.formState.errors.email.message}
-              </p>
-            ) : null}
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="grant-role">Role</Label>
-            <Select id="grant-role" {...form.register("role")}>
-              <option value="admin">Admin</option>
-              <option value="super">Super admin</option>
-            </Select>
-          </div>
-          <p className="text-xs text-[var(--color-muted-foreground)]">
-            The recipient must have signed in once with their{" "}
-            <code>@student.usm.my</code> Microsoft account before they can be
-            granted access.
-          </p>
-          <div className="flex items-center justify-end gap-2 border-t pt-4">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setShowGrant(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" loading={form.formState.isSubmitting}>
-              Grant
-            </Button>
-          </div>
-        </form>
+        <GrantForm
+          form={form}
+          onSubmit={onGrant}
+          onCancel={() => setShowGrant(false)}
+        />
       </Modal>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            Current admins{" "}
-            <span className="text-[var(--color-muted-foreground)]">
-              ({list.length})
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {list.length === 0 ? (
-            <EmptyState
-              title="No admins yet"
-              description="Use the form above to grant access."
-            />
-          ) : (
-            <ul className="divide-y">
-              {list.map((a) => (
-                <li
-                  key={a._id}
-                  className="flex flex-wrap items-center gap-3 py-2"
-                >
-                  <Badge tone={a.role === "super" ? "brand" : "muted"}>
-                    {a.role === "super" ? (
-                      <>
-                        <ShieldCheck className="h-3 w-3" aria-hidden /> Super
-                      </>
-                    ) : (
-                      <>
-                        <ShieldOff className="h-3 w-3" aria-hidden /> Admin
-                      </>
-                    )}
-                  </Badge>
-                  {a.pending ? (
-                    <Badge tone="warning">
-                      <Clock3 className="h-3 w-3" aria-hidden /> Pending sign-in
-                    </Badge>
-                  ) : null}
-                  <div className="flex-1 min-w-0">
-                    <div className="truncate text-sm font-medium">
-                      {a.fullName ?? a.email}
-                    </div>
-                    <div className="truncate text-xs text-[var(--color-muted-foreground)]">
-                      {a.email} · {a.pending ? "invited" : "added"}{" "}
-                      {new Date(a.createdAt).toLocaleDateString()}
-                    </div>
-                  </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={async () => {
-                      const ok = await dialog.confirm({
-                        title: `Revoke ${a.role} access?`,
-                        description: (
-                          <>
-                            Remove access for <strong>{a.email}</strong>.
-                            They will lose admin privileges immediately.
-                            This is logged.
-                          </>
-                        ),
-                        confirmText: "Revoke access",
-                        variant: "destructive",
-                      });
-                      if (!ok) return;
-                      try {
-                        await revoke({ adminId: a._id });
-                        toast.success("Revoked");
-                      } catch (err) {
-                        toast.error("Revoke failed", {
-                          description: getConvexErrorMessage(
-                            err,
-                            "Revoke failed.",
-                          ),
-                        });
-                      }
-                    }}
-                    aria-label="Revoke"
-                  >
-                    <Trash2 className="h-4 w-4 text-[var(--color-destructive)]" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <section
+        aria-label="Admin allowlist"
+        className="space-y-4"
+      >
+        <header>
+          <SectionMarker
+            primary="Allowlist"
+            secondary={`${counts.total} ${counts.total === 1 ? "entry" : "entries"}`}
+          />
+        </header>
+        {list.length === 0 ? (
+          <EmptyState
+            icon={<ShieldCheck className="h-5 w-5" aria-hidden />}
+            title="No admins on file"
+            description="Use the Grant admin button above to add the first one. Grants for accounts that have not signed in yet are queued and activate on first sign-in."
+          />
+        ) : (
+          <ul
+            className="divide-y divide-[var(--ink-line)] rounded-md border border-[var(--ink-line)] bg-[var(--paper)]"
+          >
+            {list.map((entry) => (
+              <AdminRow
+                key={entry._id}
+                entry={entry}
+                isSelf={entry.email === actorEmail}
+                onlyOneSuper={onlyOneSuper}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
     </main>
+  );
+}
+
+function GrantForm({
+  form,
+  onSubmit,
+  onCancel,
+}: {
+  form: ReturnType<typeof useForm<GrantValues>>;
+  onSubmit: (e?: React.BaseSyntheticEvent) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const emailId = useId();
+  const roleId = useId();
+  const emailErrId = useId();
+
+  const role = form.watch("role");
+
+  return (
+    <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+      <div className="grid gap-1.5">
+        <Label htmlFor={emailId}>Student email</Label>
+        <Input
+          id={emailId}
+          type="email"
+          placeholder="someone@student.usm.my"
+          autoComplete="off"
+          aria-required="true"
+          aria-invalid={form.formState.errors.email ? "true" : undefined}
+          aria-describedby={
+            form.formState.errors.email ? emailErrId : undefined
+          }
+          autoFocus
+          {...form.register("email")}
+        />
+        {form.formState.errors.email ? (
+          <p
+            id={emailErrId}
+            role="alert"
+            className="text-xs text-[var(--color-destructive)]"
+          >
+            {form.formState.errors.email.message}
+          </p>
+        ) : null}
+      </div>
+      <div className="grid gap-1.5">
+        <Label htmlFor={roleId}>Role</Label>
+        <Select id={roleId} {...form.register("role")}>
+          <option value="admin">Admin</option>
+          <option value="super">Super admin</option>
+        </Select>
+        <p className="text-[11px] leading-relaxed text-[var(--color-muted-foreground)]">
+          {ROLE_DESCRIPTION[role]}
+        </p>
+      </div>
+      <div className="flex items-center justify-end gap-2 border-t pt-4">
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onCancel}
+          disabled={form.formState.isSubmitting}
+        >
+          Cancel
+        </Button>
+        <Button type="submit" loading={form.formState.isSubmitting}>
+          <UserPlus className="h-4 w-4" aria-hidden /> Grant {ROLE_LABEL[role].toLowerCase()}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function AdminRow({
+  entry,
+  isSelf,
+  onlyOneSuper,
+}: {
+  entry: AdminListEntry;
+  isSelf: boolean;
+  onlyOneSuper: boolean;
+}) {
+  const dialog = useDialog();
+  const revoke = useMutation(api.admins.revokeAdmin);
+  const [busy, setBusy] = useState(false);
+
+  const wouldOrphan =
+    entry.role === "super" && onlyOneSuper && !entry.pending;
+
+  const onRevoke = async () => {
+    const ok = await dialog.confirm({
+      title:
+        entry.role === "super"
+          ? "Revoke super admin access?"
+          : "Revoke admin access?",
+      description: (
+        <>
+          Remove{" "}
+          <strong className="font-semibold">
+            {entry.fullName ?? entry.email}
+          </strong>{" "}
+          ({entry.email}) from the admin allowlist. They lose every
+          permission attached to the{" "}
+          <strong className="font-semibold">
+            {ROLE_LABEL[entry.role]}
+          </strong>{" "}
+          role, including access to the admin tree, on their next request.
+          The action is recorded in the audit log against your account and
+          cannot be undone from this page; you would need to re-grant the
+          role.
+        </>
+      ),
+      confirmText: "Revoke access",
+      variant: "destructive",
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await revoke({ adminId: entry._id });
+      toast.success("Access revoked", {
+        description: `${entry.email} has been removed from the allowlist.`,
+      });
+    } catch (err) {
+      toast.error("Revoke failed", {
+        description: getConvexErrorMessage(err, "Revoke failed."),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <li className="flex flex-wrap items-center gap-3 px-3 py-3 text-sm">
+      <Badge tone={entry.role === "super" ? "copper" : "brand"}>
+        {entry.role === "super" ? (
+          <>
+            <ShieldCheck className="h-3 w-3" aria-hidden /> Super admin
+          </>
+        ) : (
+          <>
+            <ShieldOff className="h-3 w-3" aria-hidden /> Admin
+          </>
+        )}
+      </Badge>
+      {entry.pending ? (
+        <Badge tone="warning">
+          <Clock3 className="h-3 w-3" aria-hidden /> Pending sign-in
+        </Badge>
+      ) : null}
+      {isSelf ? (
+        <Badge tone="muted" aria-label="This is your own account">
+          You
+        </Badge>
+      ) : null}
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-medium text-[var(--ink)]">
+          {entry.fullName ?? entry.email}
+        </div>
+        <div className="truncate font-mono text-xs tabular-nums text-[var(--ink-muted)]">
+          {entry.email}
+          <span aria-hidden className="px-1 text-[var(--copper)]">
+            ·
+          </span>
+          {entry.pending ? "Invited" : "Added"} {formatMYT(entry.createdAt)}
+        </div>
+      </div>
+      {isSelf ? (
+        <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink-muted)]">
+          Self-revoke disabled
+        </span>
+      ) : wouldOrphan ? (
+        <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--copper)]">
+          Last super admin
+        </span>
+      ) : (
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={onRevoke}
+          loading={busy}
+          aria-label={`Revoke ${ROLE_LABEL[entry.role].toLowerCase()} access for ${entry.email}`}
+        >
+          <Trash2
+            className="h-4 w-4 text-[var(--color-destructive)]"
+            aria-hidden
+          />
+        </Button>
+      )}
+    </li>
   );
 }
