@@ -170,7 +170,7 @@ function Ballot({ session }: { session: ActiveSession }) {
     );
     return (
       <main className="container-narrow space-y-8 py-16 sm:py-20">
-        <header className="space-y-4">
+        <header className="tile-enter space-y-4" style={{ ["--index" as never]: 0 }}>
           <SectionMarker
             primary="Live ballot"
             secondary={
@@ -202,7 +202,8 @@ function Ballot({ session }: { session: ActiveSession }) {
         </header>
 
         <div
-          className="flex items-center gap-3 border-t border-[var(--ink-line)] pt-6"
+          className="tile-enter flex items-center gap-3 border-t border-[var(--ink-line)] pt-6"
+          style={{ ["--index" as never]: 1 }}
           role="status"
         >
           <CheckCircle2
@@ -267,8 +268,9 @@ function Ballot({ session }: { session: ActiveSession }) {
         role="radiogroup"
         aria-label={`Candidates for ${session.name}`}
         className="grid gap-3 sm:grid-cols-2 md:grid-cols-3"
+        key={session.positionId}
       >
-        {session.candidates.map((c) => {
+        {session.candidates.map((c, idx) => {
           const isSelected = selected === c.candidateId;
           return (
             <button
@@ -281,8 +283,9 @@ function Ballot({ session }: { session: ActiveSession }) {
                 setSelected(c.candidateId);
               }}
               disabled={confirming}
+              style={{ ["--index" as never]: idx }}
               className={cn(
-                "flex h-full flex-col items-start rounded-lg border bg-[var(--color-card)] p-4 text-left",
+                "tile-enter relative flex h-full flex-col items-start rounded-lg border bg-[var(--color-card)] p-4 text-left",
                 "transition-[transform,border-color,box-shadow] duration-200",
                 "[transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
                 "active:scale-[0.98]",
@@ -317,12 +320,16 @@ function Ballot({ session }: { session: ActiveSession }) {
                     </div>
                   ) : null}
                 </div>
-                {isSelected ? (
-                  <CheckCircle2
-                    className="h-5 w-5 text-[var(--color-primary)]"
-                    aria-hidden
-                  />
-                ) : null}
+                <CheckCircle2
+                  aria-hidden
+                  className={cn(
+                    "h-5 w-5 shrink-0 text-[var(--color-primary)]",
+                    "transition-[opacity,transform] duration-200 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
+                    isSelected
+                      ? "opacity-100 scale-100"
+                      : "opacity-0 scale-50",
+                  )}
+                />
               </div>
               {c.bio ? (
                 <p className="mt-3 line-clamp-3 text-xs leading-relaxed text-[var(--color-muted-foreground)]">
