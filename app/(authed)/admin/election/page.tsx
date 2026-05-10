@@ -14,6 +14,7 @@ import {
   ArrowUp,
   CalendarPlus,
   CheckCircle2,
+  ChevronDown,
   Clock,
   ListChecks,
   Pencil,
@@ -319,6 +320,7 @@ function ElectionArticle({
   const remove = useMutation(api.elections.remove);
   const [showRename, setShowRename] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(election.phase !== "published");
 
   const showWeights = election.phase === "setup";
   const showSchedule =
@@ -407,6 +409,58 @@ function ElectionArticle({
 
   const next = NEXT_PHASE_LABEL[election.phase];
 
+  if (!open) {
+    return (
+      <article className="border-t border-[var(--ink-line)]">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-expanded={false}
+          className="group flex w-full flex-wrap items-center gap-x-4 gap-y-1.5 py-4 text-left transition-colors duration-200 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] hover:bg-[var(--paper-2)]/40 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--paper)]"
+        >
+          <span
+            className="font-mono text-lg font-medium tabular-nums text-[var(--ink-muted)] sm:text-xl"
+            aria-hidden
+          >
+            {String(index + 1).padStart(2, "0")}
+          </span>
+          <SectionMarker
+            primary={`AGM ${election.year}`}
+            secondary={PHASE_LABELS[election.phase]}
+          />
+          <h2 className="font-display text-base font-medium tracking-[-0.01em] text-[var(--ink)] sm:text-lg">
+            {election.name}
+          </h2>
+          <Badge tone={PHASE_TONES[election.phase]}>
+            {PHASE_LABELS[election.phase]}
+          </Badge>
+          <span className="ml-auto flex items-center gap-3">
+            {readiness ? (
+              <span className="hidden font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)] sm:inline-flex">
+                {readiness.positionsCount} pos
+                <span aria-hidden className="mx-1.5 text-[var(--copper)]">
+                  ·
+                </span>
+                {readiness.candidatesCount} cand
+                <span aria-hidden className="mx-1.5 text-[var(--copper)]">
+                  ·
+                </span>
+                {readiness.whitelistCount} whitelist
+              </span>
+            ) : null}
+            <span
+              className="flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--ink-muted)] transition-colors group-hover:text-[var(--ink)]"
+              aria-hidden
+            >
+              Open
+              <ChevronDown className="h-3 w-3" aria-hidden />
+            </span>
+          </span>
+        </button>
+      </article>
+    );
+  }
+
   return (
     <article className="space-y-6 border-t border-[var(--ink-line)] pt-6 pb-8">
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1.5">
@@ -431,10 +485,23 @@ function ElectionArticle({
         >
           <Pencil className="h-3.5 w-3.5" aria-hidden /> Rename
         </Button>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
           <Badge tone={PHASE_TONES[election.phase]}>
             {PHASE_LABELS[election.phase]}
           </Badge>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setOpen(false)}
+            aria-label={`Collapse ${election.name}`}
+            className="font-mono text-[10.5px] uppercase tracking-[0.22em]"
+          >
+            Collapse
+            <ChevronDown
+              className="h-3 w-3 rotate-180"
+              aria-hidden
+            />
+          </Button>
         </div>
       </div>
 
