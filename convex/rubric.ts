@@ -17,6 +17,51 @@ export const list = query({
   },
 });
 
+/**
+ * Per-criterion impact count for destructive confirm copy.
+ *
+ * Walks every `internalScores` row that references the criterion, then
+ * groups by parent evaluation to separate scores tied to a `submitted`
+ * evaluation from those still in `draft`. The Tier 3 rubric editor uses
+ * this to spell out exactly what a delete-criterion or change-maxScore
+ * action will affect, instead of a generic "scores will be deleted"
+ * warning.
+ */
+export const criterionImpact = query({
+  args: { criterionId: v.id("rubricCriteria") },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const c = await ctx.db.get(args.criterionId);
+    if (!c) return null;
+
+    const scores = await ctx.db
+      .query("internalScores")
+      .filter((q) => q.eq(q.field("criterionId"), args.criterionId))
+      .collect();
+
+    const evalIds = new Set(scores.map((s) => s.evaluationId));
+    const submittedEvalIds = new Set<string>();
+    for (const evalId of evalIds) {
+      const ev = await ctx.db.get(evalId);
+      if (ev?.status === "submitted") submittedEvalIds.add(evalId);
+    }
+    const submittedScoreCount = scores.filter((s) =>
+      submittedEvalIds.has(s.evaluationId),
+    ).length;
+
+    return {
+      criterionId: c._id,
+      criterionName: c.name,
+      maxScore: c.maxScore,
+      scoreCount: scores.length,
+      submittedScoreCount,
+      draftScoreCount: scores.length - submittedScoreCount,
+      evaluatorCount: evalIds.size,
+      submittedEvaluatorCount: submittedEvalIds.size,
+    };
+  },
+});
+
 export const listForVoter = query({
   args: { electionId: v.id("elections") },
   handler: async (ctx, args) => {

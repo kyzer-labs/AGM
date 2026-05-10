@@ -551,3 +551,65 @@ export const setupReadiness = query({
     return await computeSetupReadiness(ctx, args.electionId);
   },
 });
+
+/**
+ * Live counts the Tier 3 election editor needs to write state-the-state
+ * warnings for already-collected data. Specifically: the weights and
+ * rubric editors should warn before mutating either if any internal
+ * evaluations or public votes already exist for this cycle (which is
+ * possible when an admin transitions internalOpen → setup or
+ * publicVoting → internalClosed → internalOpen → setup).
+ *
+ * Cheap to compute: bounded by evaluator count + public-vote count and
+ * runs once per cycle card render.
+ */
+export const cycleStats = query({
+  args: { electionId: v.id("elections") },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    await getElectionOrThrow(ctx, args.electionId);
+
+    const evaluations = await ctx.db
+      .query("internalEvaluations")
+      .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
+      .collect();
+
+    let submittedEvaluations = 0;
+    let draftEvaluations = 0;
+    let lastSubmittedAt: number | null = null;
+    for (const ev of evaluations) {
+      if (ev.status === "submitted") {
+        submittedEvaluations += 1;
+        if (
+          ev.submittedAt !== undefined &&
+          (lastSubmittedAt === null || ev.submittedAt > lastSubmittedAt)
+        ) {
+          lastSubmittedAt = ev.submittedAt;
+        }
+      } else {
+        draftEvaluations += 1;
+      }
+    }
+
+    const positions = await ctx.db
+      .query("positions")
+      .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
+      .collect();
+    let publicVoteCount = 0;
+    for (const p of positions) {
+      const votes = await ctx.db
+        .query("publicVotes")
+        .withIndex("by_position", (q) => q.eq("positionId", p._id))
+        .collect();
+      publicVoteCount += votes.length;
+    }
+
+    return {
+      submittedEvaluations,
+      draftEvaluations,
+      totalEvaluations: evaluations.length,
+      lastSubmittedAt,
+      publicVoteCount,
+    };
+  },
+});
