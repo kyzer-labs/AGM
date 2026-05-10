@@ -573,14 +573,14 @@ function CandidateCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <h3 className="truncate text-sm font-semibold text-[var(--ink)]">
+              <p className="font-mono text-[0.6375rem] uppercase leading-[1.15] tracking-[0.16em] text-[var(--ink-muted)]">
+                {c.matric && !c.matric.startsWith("auto-")
+                  ? c.matric
+                  : "Candidate"}
+              </p>
+              <h3 className="truncate text-[0.875rem] font-semibold leading-[1.14] text-[var(--ink)]">
                 {c.fullName}
               </h3>
-              {c.matric && !c.matric.startsWith("auto-") ? (
-                <p className="font-mono text-[11px] tabular-nums text-[var(--ink-muted)]">
-                  {c.matric}
-                </p>
-              ) : null}
             </div>
             {editable ? (
               <div className="flex items-center">
@@ -608,24 +608,26 @@ function CandidateCard({
           </div>
           {sortedPositions.length > 0 ? (
             <ol
-              className="mt-2 flex flex-wrap items-center gap-1"
+              className="mt-2 grid gap-1"
               aria-label="Contending positions in order of preference"
             >
               {sortedPositions.map((p, i) => (
-                <li key={p.positionId}>
-                  <Badge
-                    tone={i === 0 ? "brand" : "muted"}
-                    className="text-[10px]"
-                  >
-                    <span className="font-mono tabular-nums">{i + 1}</span>{" "}
+                <li
+                  key={p.positionId}
+                  className="flex min-w-0 items-center gap-1.5"
+                >
+                  <span className="font-mono text-[0.6375rem] leading-[1.15] tabular-nums text-[var(--ink-muted)]">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span className="truncate text-[11px] font-medium text-[var(--ink)]">
                     {p.name}
-                  </Badge>
+                  </span>
                 </li>
               ))}
             </ol>
           ) : (
             <p
-              className="mt-2 inline-flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--copper)]"
+              className="mt-2 inline-flex items-center gap-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-[var(--copper)]"
               role="status"
             >
               <Users className="h-3 w-3" aria-hidden /> No positions
