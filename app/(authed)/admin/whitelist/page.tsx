@@ -61,9 +61,9 @@ const VOTER_CLASS_OPTIONS: VoterClass[] = [
   "year2Committee",
 ];
 
-const VOTER_CLASS_TONE: Record<VoterClass, "brand" | "warning" | "muted"> = {
+const VOTER_CLASS_TONE: Record<VoterClass, "brand" | "copper" | "muted"> = {
   topCommittee: "brand",
-  headExecutive: "warning",
+  headExecutive: "copper",
   year2Committee: "muted",
 };
 
