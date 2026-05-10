@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NoticeStrip } from "@/components/ui/notice-strip";
 import { SectionMarker } from "@/components/ui/section-marker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getConvexErrorMessage } from "@/lib/convex-error";
@@ -253,30 +254,20 @@ function BootstrapPanel() {
   };
 
   return (
-    <section
-      aria-labelledby="bootstrap-title"
-      className="space-y-5 border-y border-[var(--copper)] bg-[var(--paper-2)] px-5 py-6 sm:px-7 sm:py-8"
+    <NoticeStrip
+      markerPrimary="First-time setup"
+      markerSecondary="Required"
+      headline="Become super admin"
     >
-      <div className="space-y-3">
-        <SectionMarker primary="First-time setup" secondary="Required" />
-        <h2
-          id="bootstrap-title"
-          className="font-display text-2xl font-medium tracking-[-0.02em] text-[var(--ink)] sm:text-3xl"
-        >
-          Become super admin
-        </h2>
-        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
-          No super admin exists yet. Paste the{" "}
-          <code className="rounded bg-[var(--paper)] px-1.5 py-0.5 font-mono text-xs">
-            SUPER_ADMIN_BOOTSTRAP_TOKEN
-          </code>{" "}
-          you set on the Convex deployment to claim super admin for{" "}
-          <strong className="font-semibold text-[var(--ink)]">
-            {me.email}
-          </strong>
-          . This bootstrap path can be used exactly once.
-        </p>
-      </div>
+      <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+        No super admin exists yet. Paste the{" "}
+        <code className="rounded bg-[var(--paper)] px-1.5 py-0.5 font-mono text-xs">
+          SUPER_ADMIN_BOOTSTRAP_TOKEN
+        </code>{" "}
+        you set on the Convex deployment to claim super admin for{" "}
+        <strong className="font-semibold text-[var(--ink)]">{me.email}</strong>
+        . This bootstrap path can be used exactly once.
+      </p>
       <form onSubmit={onSubmit} className="grid gap-3 sm:flex sm:items-end">
         <div className="grid flex-1 gap-1.5">
           <Label htmlFor="bootstrap-token">Bootstrap token</Label>
@@ -293,6 +284,6 @@ function BootstrapPanel() {
           Become super admin
         </Button>
       </form>
-    </section>
+    </NoticeStrip>
   );
 }

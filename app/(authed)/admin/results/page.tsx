@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LinkButton } from "@/components/ui/link-button";
 import { Meta, MetaGroup } from "@/components/ui/meta";
+import { NoticeStrip } from "@/components/ui/notice-strip";
 import { SectionMarker } from "@/components/ui/section-marker";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -376,37 +377,33 @@ function ActionPanel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="space-y-4 border-y border-[var(--copper)] bg-[var(--paper-2)] px-5 py-5 sm:px-7 sm:py-6">
-      <div className="space-y-2">
-        <SectionMarker primary={markerPrimary} secondary={markerSecondary} />
-        <h2 className="font-display text-xl font-medium tracking-[-0.01em] text-[var(--ink)] sm:text-2xl">
-          {title}
-        </h2>
-        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
-          {body}
-        </p>
-      </div>
+    <NoticeStrip
+      markerPrimary={markerPrimary}
+      markerSecondary={markerSecondary}
+      headline={title}
+    >
+      <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+        {body}
+      </p>
       <div className="flex flex-wrap items-center gap-3">{children}</div>
-    </section>
+    </NoticeStrip>
   );
 }
 
 function UnresolvedTiesNotice({ rows }: { rows: PreviewRow[] }) {
   return (
-    <section
-      className="space-y-3 border-y border-[var(--copper)] bg-[var(--paper-2)] px-5 py-5 sm:px-7 sm:py-6"
-      role="alert"
-    >
-      <div className="flex items-center gap-2">
+    <NoticeStrip
+      markerPrimary="Unresolved ties"
+      markerSecondary="Blocking publish"
+      markerIcon={
         <AlertTriangle
           className="h-4 w-4 text-[var(--copper)]"
           aria-hidden
         />
-        <SectionMarker primary="Unresolved ties" secondary="Blocking publish" />
-      </div>
-      <h2 className="font-display text-xl font-medium tracking-[-0.01em] text-[var(--ink)] sm:text-2xl">
-        Resolve every tie before publishing
-      </h2>
+      }
+      headline="Resolve every tie before publishing"
+      role="alert"
+    >
       <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
         These positions need a manual decision before results can be
         published. Resolve each one on the{" "}
@@ -428,7 +425,7 @@ function UnresolvedTiesNotice({ rows }: { rows: PreviewRow[] }) {
           </li>
         ))}
       </ul>
-    </section>
+    </NoticeStrip>
   );
 }
 

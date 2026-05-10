@@ -34,6 +34,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Label } from "@/components/ui/label";
 import { LinkButton } from "@/components/ui/link-button";
 import { Meta, MetaGroup } from "@/components/ui/meta";
+import { NoticeStrip } from "@/components/ui/notice-strip";
 import { SectionMarker } from "@/components/ui/section-marker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -208,17 +209,11 @@ function Body({ election }: { election: Doc<"elections"> }) {
 
 function PhaseMismatchNotice() {
   return (
-    <section
-      aria-labelledby="phase-warning-title"
-      className="space-y-3 border-y border-[var(--copper)] bg-[var(--paper-2)] px-5 py-5 sm:px-7 sm:py-6"
+    <NoticeStrip
+      markerPrimary="Phase mismatch"
+      markerSecondary="Action required"
+      headline="Move the cycle to public voting first"
     >
-      <SectionMarker primary="Phase mismatch" secondary="Action required" />
-      <h2
-        id="phase-warning-title"
-        className="font-display text-xl font-medium tracking-[-0.01em] text-[var(--ink)] sm:text-2xl"
-      >
-        Move the cycle to public voting first
-      </h2>
       <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
         Sessions can only be opened during the{" "}
         <strong className="font-semibold text-[var(--ink)]">
@@ -233,7 +228,7 @@ function PhaseMismatchNotice() {
         </Link>{" "}
         page.
       </p>
-    </section>
+    </NoticeStrip>
   );
 }
 
