@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { getConvexErrorMessage } from "@/lib/convex-error";
+import { formatMYT, formatMYTTimeOnly } from "@/lib/format";
 import { getWeights, internalSharePercent } from "@/lib/weights";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 
@@ -425,33 +426,3 @@ function Standby({
   );
 }
 
-const MYT_FORMATTER = new Intl.DateTimeFormat("en-MY", {
-  weekday: "short",
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-  timeZone: "Asia/Kuala_Lumpur",
-});
-
-const MYT_TIME_FORMATTER = new Intl.DateTimeFormat("en-MY", {
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-  timeZone: "Asia/Kuala_Lumpur",
-});
-
-/**
- * Deterministic Malaysia-Time formatter used for confirmation
- * timestamps. The chairperson's stage clock is in MYT; voters
- * abroad must read the same wall-clock time.
- */
-function formatMYT(ms: number): string {
-  return `${MYT_FORMATTER.format(new Date(ms))} MYT`;
-}
-
-function formatMYTTimeOnly(ms: number): string {
-  return `${MYT_TIME_FORMATTER.format(new Date(ms))} MYT`;
-}

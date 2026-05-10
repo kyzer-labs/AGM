@@ -9,6 +9,7 @@ import { AuthGate } from "@/components/auth/auth-gate";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { formatMYT } from "@/lib/format";
 import { internalSharePercent } from "@/lib/weights";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 
@@ -341,17 +342,3 @@ function Standby({
   );
 }
 
-const MYT_FORMATTER = new Intl.DateTimeFormat("en-MY", {
-  weekday: "short",
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-  timeZone: "Asia/Kuala_Lumpur",
-});
-
-function formatMYT(ms: number): string {
-  return `${MYT_FORMATTER.format(new Date(ms))} MYT`;
-}

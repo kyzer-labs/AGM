@@ -17,6 +17,7 @@ import { ScoreButtons } from "@/components/internal/score-buttons";
 import { RubricHelp } from "@/components/internal/rubric-help";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { getConvexErrorMessage } from "@/lib/convex-error";
+import { formatMYT } from "@/lib/format";
 import { getWeights, internalSharePercent } from "@/lib/weights";
 
 type VoterClass = "topCommittee" | "headExecutive" | "year2Committee";
@@ -653,19 +654,4 @@ function formatRelative(ms: number): string {
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} min ago`;
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} h ago`;
   return formatMYT(ms);
-}
-
-const MYT_FORMATTER = new Intl.DateTimeFormat("en-MY", {
-  weekday: "short",
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-  timeZone: "Asia/Kuala_Lumpur",
-});
-
-function formatMYT(ms: number): string {
-  return `${MYT_FORMATTER.format(new Date(ms))} MYT`;
 }

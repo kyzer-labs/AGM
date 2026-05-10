@@ -6,6 +6,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { AuthGate } from "@/components/auth/auth-gate";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatMYT } from "@/lib/format";
 
 type RedirectHref = "/admin" | "/internal" | "/vote" | "/results";
 
@@ -241,25 +242,4 @@ function PulsingDot() {
       />
     </span>
   );
-}
-
-const MYT_FORMATTER = new Intl.DateTimeFormat("en-MY", {
-  weekday: "short",
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-  timeZone: "Asia/Kuala_Lumpur",
-});
-
-/**
- * Deterministic Malaysia-Time formatter. The AGM is run from Penang;
- * scheduled windows are quoted in MYT regardless of the viewer's
- * locale so a voter abroad reads the same wall-clock time the
- * chairperson sees on stage.
- */
-function formatMYT(ms: number): string {
-  return `${MYT_FORMATTER.format(new Date(ms))} MYT`;
 }
