@@ -12,6 +12,7 @@ import { useDialog } from "@/components/dialog/dialog-provider";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { SectionMarker } from "@/components/ui/section-marker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScoreButtons } from "@/components/internal/score-buttons";
 import { RubricHelp } from "@/components/internal/rubric-help";
@@ -158,9 +159,7 @@ function Standby({
   return (
     <main className="container-narrow py-20 sm:py-24">
       <header className="space-y-4">
-        <p className="font-mono text-[10.5px] uppercase tracking-[0.28em] text-[var(--ink-muted)]">
-          Internal evaluation <span aria-hidden>·</span> {phase}
-        </p>
+        <SectionMarker primary="Internal evaluation" secondary={phase} />
         <h1 className="text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
           {cycleName ?? "No active AGM cycle"}
         </h1>
@@ -371,9 +370,10 @@ function ActiveEvaluation({
       <header className="space-y-6">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-3">
-            <p className="font-mono text-[10.5px] uppercase tracking-[0.28em] text-[var(--ink-muted)]">
-              Internal evaluation <span aria-hidden>·</span> {election.name}
-            </p>
+            <SectionMarker
+              primary="Internal evaluation"
+              secondary={election.name}
+            />
             <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
               Score the candidates
             </h1>

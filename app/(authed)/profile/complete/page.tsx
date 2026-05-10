@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SectionMarker } from "@/components/ui/section-marker";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getConvexErrorMessage } from "@/lib/convex-error";
@@ -102,9 +103,7 @@ export default function ProfileCompletePage() {
   return (
     <main className="container-narrow py-16 sm:py-20">
       <header className="space-y-4">
-        <p className="font-mono text-[10.5px] uppercase tracking-[0.28em] text-[var(--ink-muted)]">
-          01 · Voter profile
-        </p>
+        <SectionMarker primary="01" secondary="Voter profile" />
         <h1 className="text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
           Complete your voter profile
         </h1>

@@ -9,6 +9,7 @@ import { CheckCircle2, UserCircle2 } from "lucide-react";
 
 import { AuthGate } from "@/components/auth/auth-gate";
 import { Button } from "@/components/ui/button";
+import { SectionMarker } from "@/components/ui/section-marker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { getConvexErrorMessage } from "@/lib/convex-error";
@@ -169,10 +170,18 @@ function Ballot({ session }: { session: ActiveSession }) {
     return (
       <main className="container-narrow space-y-8 py-16 sm:py-20">
         <header className="space-y-4">
-          <p className="font-mono text-[10.5px] uppercase tracking-[0.28em] text-[var(--ink-muted)]">
-            Live ballot <span aria-hidden>·</span> Tier {session.tier}{" "}
-            <span aria-hidden>·</span> {session.name}
-          </p>
+          <SectionMarker
+            primary="Live ballot"
+            secondary={
+              <>
+                Tier {session.tier}{" "}
+                <span aria-hidden className="text-[var(--copper)]">
+                  ·
+                </span>{" "}
+                {session.name}
+              </>
+            }
+          />
           <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
             Vote recorded
           </h1>
@@ -227,16 +236,23 @@ function Ballot({ session }: { session: ActiveSession }) {
   return (
     <main className="container-wide space-y-10 py-12">
       <header className="space-y-3">
-        <p className="font-mono text-[10.5px] uppercase tracking-[0.28em] text-[var(--ink-muted)]">
-          Live ballot <span aria-hidden>·</span> Tier {session.tier}
-          {session.sessionStartedAt ? (
+        <SectionMarker
+          primary="Live ballot"
+          secondary={
             <>
-              {" "}
-              <span aria-hidden>·</span> Opened{" "}
-              {formatMYTTimeOnly(session.sessionStartedAt)}
+              Tier {session.tier}
+              {session.sessionStartedAt ? (
+                <>
+                  {" "}
+                  <span aria-hidden className="text-[var(--copper)]">
+                    ·
+                  </span>{" "}
+                  Opened {formatMYTTimeOnly(session.sessionStartedAt)}
+                </>
+              ) : null}
             </>
-          ) : null}
-        </p>
+          }
+        />
         <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
           Vote for {session.name}
         </h1>
@@ -412,9 +428,7 @@ function Standby({
   return (
     <main className="container-narrow py-20 sm:py-24">
       <header className="space-y-4">
-        <p className="font-mono text-[10.5px] uppercase tracking-[0.28em] text-[var(--ink-muted)]">
-          AGM voting <span aria-hidden>·</span> {phase}
-        </p>
+        <SectionMarker primary="AGM voting" secondary={phase} />
         <h1 className="text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
           {cycleName ?? "No active AGM cycle"}
         </h1>

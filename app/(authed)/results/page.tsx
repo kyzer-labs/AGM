@@ -7,6 +7,7 @@ import { ChevronDown, Trophy, UserCircle2 } from "lucide-react";
 
 import { AuthGate } from "@/components/auth/auth-gate";
 import { Button } from "@/components/ui/button";
+import { SectionMarker } from "@/components/ui/section-marker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { formatMYT } from "@/lib/format";
@@ -104,9 +105,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
   return (
     <main className="container-wide space-y-12 py-12 sm:py-16">
       <header className="space-y-4">
-        <p className="font-mono text-[10.5px] uppercase tracking-[0.28em] text-[var(--ink-muted)]">
-          Final results <span aria-hidden>·</span> Published
-        </p>
+        <SectionMarker primary="Final results" secondary="Published" />
         <h1 className="font-display text-4xl font-medium leading-[1.05] tracking-[-0.02em] text-[var(--ink)] sm:text-5xl">
           {election.name}
         </h1>
@@ -143,9 +142,7 @@ function ResultBlock({ row, index }: { row: PublicRow; index: number }) {
         <span className="font-mono text-2xl font-medium tabular-nums text-[var(--ink-muted)]">
           {String(index + 1).padStart(2, "0")}
         </span>
-        <p className="font-mono text-[10.5px] uppercase tracking-[0.28em] text-[var(--ink-muted)]">
-          Tier {row.tier}
-        </p>
+        <SectionMarker primary={`Tier ${row.tier}`} />
         <h2 className="font-display text-xl font-medium tracking-[-0.01em] text-[var(--ink)] sm:text-2xl">
           {row.positionName}
         </h2>
@@ -328,9 +325,7 @@ function Standby({
   return (
     <main className="container-narrow py-20 sm:py-24">
       <header className="space-y-4">
-        <p className="font-mono text-[10.5px] uppercase tracking-[0.28em] text-[var(--ink-muted)]">
-          Final results <span aria-hidden>·</span> {phase}
-        </p>
+        <SectionMarker primary="Final results" secondary={phase} />
         <h1 className="text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
           {cycleName ?? "No active AGM cycle"}
         </h1>
