@@ -30,7 +30,8 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { EmptyState } from "@/components/ui/empty-state";
+import { NoticeStrip } from "@/components/ui/notice-strip";
+import { SectionMarker } from "@/components/ui/section-marker";
 import { getConvexErrorMessage } from "@/lib/convex-error";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 
@@ -70,15 +71,30 @@ function Inner() {
   }
   if (!config.enabled) {
     return (
-      <main className="container-wide py-10 space-y-6">
+      <main className="container-wide space-y-8 py-12">
         <AdminBreadcrumb items={[{ label: "Dev seeder" }]} />
-        <EmptyState
-          icon={<AlertTriangle className="h-5 w-5" aria-hidden />}
-          title="Dev seeder disabled"
-          description={
-            "Set DEV_SEED_ALLOWED=\"true\" on your Convex deployment env to enable. Make sure this env var is NEVER set on production."
+        <NoticeStrip
+          markerPrimary="Dev seeder"
+          markerSecondary="Disabled"
+          markerIcon={
+            <AlertTriangle
+              className="h-4 w-4 text-[var(--copper)]"
+              aria-hidden
+            />
           }
-        />
+          headline="DEV_SEED_ALLOWED is not set on this deployment"
+          tone="copper"
+        >
+          <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+            Set <code>DEV_SEED_ALLOWED=&quot;true&quot;</code> on the
+            Convex deployment env to enable synthetic voters,
+            evaluations, and votes for end-to-end testing. This env var
+            must <strong className="font-semibold">never</strong> be set
+            on the production deployment; the seeder is gated server-side
+            so even an authenticated admin cannot insert seed rows when
+            the flag is absent.
+          </p>
+        </NoticeStrip>
       </main>
     );
   }
@@ -119,11 +135,15 @@ function DevBody({ election }: { election: Doc<"elections"> }) {
   const candidatesCount = candidates?.length ?? 0;
   const positionsCount = positions?.length ?? 0;
 
-  const wrap = async <T,>(label: string, fn: () => Promise<T>): Promise<void> => {
+  const wrap = async <T,>(
+    label: string,
+    fn: () => Promise<T>,
+    summarize?: (result: T) => string,
+  ): Promise<void> => {
     try {
       const result = await fn();
       toast.success(label, {
-        description: result ? JSON.stringify(result) : undefined,
+        description: summarize ? summarize(result) : undefined,
       });
     } catch (err) {
       toast.error(label, {
@@ -133,68 +153,95 @@ function DevBody({ election }: { election: Doc<"elections"> }) {
   };
 
   const onSeedEvaluators = () =>
-    wrap("Evaluator voters seeded", () =>
-      seedEvaluatorVoters({
-        electionId: election._id,
-        perClass: {
-          topCommittee: tcCount,
-          headExecutive: heCount,
-          year2Committee: y2Count,
-        },
-      }),
+    wrap(
+      "Evaluator voters seeded",
+      () =>
+        seedEvaluatorVoters({
+          electionId: election._id,
+          perClass: {
+            topCommittee: tcCount,
+            headExecutive: heCount,
+            year2Committee: y2Count,
+          },
+        }),
+      (r) =>
+        `${r.votersInserted} voters added, ${r.votersReused} reused, ${r.whitelistInserted} whitelisted, ${r.whitelistReused} whitelist rows already in place.`,
     );
 
   const onSeedExternal = () =>
-    wrap("External voters seeded", () =>
-      seedExternalVoters({
-        electionId: election._id,
-        count: externalCount,
-      }),
+    wrap(
+      "External voters seeded",
+      () =>
+        seedExternalVoters({
+          electionId: election._id,
+          count: externalCount,
+        }),
+      (r) =>
+        `${r.inserted} new external voters added, ${r.reused} reused.`,
     );
 
   const onSeedEvaluations = () =>
-    wrap("Internal evaluations seeded", () =>
-      seedInternalEvaluations({
-        electionId: election._id,
-        distribution,
-        submitted: submittedToggle,
-      }),
+    wrap(
+      "Internal evaluations seeded",
+      () =>
+        seedInternalEvaluations({
+          electionId: election._id,
+          distribution,
+          submitted: submittedToggle,
+        }),
+      (r) =>
+        `${r.evaluatorsTouched} evaluators, ${r.scoresWritten} scores, ${r.evaluationsSubmitted} submitted.`,
     );
 
   const onSeedVotes = () =>
-    wrap("Public votes seeded", () =>
-      seedPublicVotes({
-        electionId: election._id,
-        totalVotesPerPosition: voteTotal,
-        kind: voteKind,
-      }),
+    wrap(
+      "Public votes seeded",
+      () =>
+        seedPublicVotes({
+          electionId: election._id,
+          totalVotesPerPosition: voteTotal,
+          kind: voteKind,
+        }),
+      (r) =>
+        `${r.positionsTouched} positions touched, ${r.votesInserted} new votes, ${r.externalVotersUsed} unique external voters used.`,
     );
 
   const onEngineerTie = async () => {
     if (!tiePositionId) {
-      toast.error("Pick a position first.");
+      toast.error("Pick a position first.", {
+        description:
+          "Choose the position to engineer the tie at from the dropdown above.",
+      });
       return;
     }
-    await wrap("Tie engineered", () =>
-      engineerTieAtPosition({
-        positionId: tiePositionId,
-        votesPerTopCandidate: tiePerCandidate,
-      }),
+    await wrap(
+      "Tie engineered",
+      () =>
+        engineerTieAtPosition({
+          positionId: tiePositionId,
+          votesPerTopCandidate: tiePerCandidate,
+        }),
+      (r) =>
+        `${r.votesInserted} new votes inserted, ${r.scoresWritten} rubric scores written across ${r.topCandidateIds.length} top candidates.`,
     );
   };
 
   const onHappyPath = () =>
-    wrap("Happy path scenario complete", () =>
-      runHappyPathScenario({
-        electionId: election._id,
-        perClass: {
-          topCommittee: tcCount,
-          headExecutive: heCount,
-          year2Committee: y2Count,
-        },
-        externalVoters: externalCount,
-        distribution,
-      }),
+    wrap(
+      "Happy path scenario complete",
+      () =>
+        runHappyPathScenario({
+          electionId: election._id,
+          perClass: {
+            topCommittee: tcCount,
+            headExecutive: heCount,
+            year2Committee: y2Count,
+          },
+          externalVoters: externalCount,
+          distribution,
+        }),
+      (r) =>
+        `${r.votersInserted} evaluators added, ${r.externalInserted} external voters added, ${r.evaluationsSubmitted} evaluations submitted with ${r.distribution} distribution.`,
     );
 
   const onWipe = async () => {
@@ -212,30 +259,43 @@ function DevBody({ election }: { election: Doc<"elections"> }) {
       variant: "destructive",
     });
     if (!ok) return;
-    await wrap("Seed data wiped", () =>
-      wipeSeedData({ electionId: election._id }),
+    await wrap(
+      "Seed data wiped",
+      () => wipeSeedData({ electionId: election._id }),
+      (r) =>
+        `${r.votersDeleted} voters, ${r.whitelistDeleted} whitelist rows, ${r.evaluationsDeleted} evaluations, ${r.scoresDeleted} scores, ${r.votesDeleted} votes, and ${r.resultsCleared} result rows removed; ${r.positionsReset} positions reset to pending.`,
     );
   };
 
   return (
-    <main className="container-wide py-10 space-y-8">
+    <main className="container-wide space-y-10 py-12">
       <AdminBreadcrumb items={[{ label: "Dev seeder" }]} />
 
-      <header className="flex flex-wrap items-start gap-4">
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">Dev seeder</h1>
-            <Badge tone="warning">
-              <Beaker className="h-3 w-3" aria-hidden /> Dev only
-            </Badge>
-          </div>
-          <p className="text-sm text-[var(--color-muted-foreground)]">
-            Populate synthetic voters, evaluations, and votes so the scoring
-            math, cascade, and tie ladder can be exercised without dozens of
-            real <code>@student.usm.my</code> accounts. Disabled in production.
-          </p>
+      <header className="space-y-5">
+        <SectionMarker
+          primary="Dev seeder"
+          secondary={election.name}
+        />
+        <div className="flex flex-wrap items-start gap-3">
+          <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
+            Synthetic data for end-to-end testing
+          </h1>
+          <Badge tone="warning">
+            <Beaker className="h-3 w-3" aria-hidden /> Dev only
+          </Badge>
         </div>
-        <Badge tone="muted">Phase: {phase}</Badge>
+        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+          Populate synthetic voters, evaluations, and votes so the scoring
+          math, cascade, and tie ladder can be exercised without dozens of
+          real <code>@student.usm.my</code> accounts. Every seed mutation
+          checks <code>DEV_SEED_ALLOWED</code> server-side; this page is
+          gated behind the same flag.
+        </p>
+        <div>
+          <Badge tone="muted">
+            Phase: <span className="tabular-nums">{phase}</span>
+          </Badge>
+        </div>
       </header>
 
       {stats === null ? null : stats === undefined ? (
