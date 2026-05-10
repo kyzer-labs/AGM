@@ -103,21 +103,48 @@ function Body({ election }: { election: Doc<"elections"> }) {
   const internalShare = internalSharePercent(headerWeights);
   const publicShare = Math.max(0, 100 - internalShare);
 
+  const firstPublishedAt = data.rows.find((r) => r.publishedAt !== null)
+    ?.publishedAt ?? null;
+
   return (
-    <main className="container-wide space-y-12 py-12 sm:py-16">
-      <header className="space-y-4">
-        <SectionMarker primary="Final results" secondary="Published" />
-        <h1 className="font-display text-4xl font-medium leading-[1.05] tracking-[-0.02em] text-[var(--ink)] sm:text-5xl">
-          {election.name}
-        </h1>
-        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
-          Combined internal aggregate ({internalShare}%) and public vote (
-          {publicShare}%), in ballot order. Each position lists its winner;
-          open a position for the full per-candidate breakdown.
+    <main className="container-wide space-y-14 py-14 sm:space-y-20 sm:py-20">
+      <header className="space-y-6 sm:space-y-8">
+        <SectionMarker
+          primary={`AGM ${election.year}`}
+          secondary={
+            firstPublishedAt ? (
+              <>
+                Final results
+                <span aria-hidden className="px-1.5 text-[var(--copper)]">
+                  ·
+                </span>
+                Published{" "}
+                <time dateTime={new Date(firstPublishedAt).toISOString()}>
+                  {formatMYT(firstPublishedAt)}
+                </time>
+              </>
+            ) : (
+              "Final results"
+            )
+          }
+        />
+        <div className="space-y-3">
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.32em] text-[var(--ink-muted)]">
+            Annual General Meeting
+          </p>
+          <h1 className="font-serif text-[clamp(2.75rem,7vw,5rem)] font-medium leading-[0.96] tracking-[-0.014em] text-[var(--ink)]">
+            {election.name}
+          </h1>
+        </div>
+        <p className="max-w-[62ch] text-sm leading-relaxed text-[var(--color-muted-foreground)] sm:text-base">
+          The combined internal evaluation ({internalShare}%) and public AGM
+          ballot ({publicShare}%) determine each position. Results are
+          listed in ballot order; open a position to read the full
+          per-candidate breakdown.
         </p>
       </header>
 
-      <ol className="space-y-10">
+      <ol className="space-y-12 sm:space-y-14">
         {data.rows.map((row, index) => (
           <li key={row.positionId}>
             <ResultBlock row={row} index={index} />
@@ -138,20 +165,23 @@ function ResultBlock({ row, index }: { row: PublicRow; index: number }) {
   const publicShare = Math.max(0, 100 - internalShare);
 
   return (
-    <article className="space-y-5 border-t border-[var(--ink-line)] pt-6">
-      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <span className="font-mono text-2xl font-medium tabular-nums text-[var(--ink-muted)]">
+    <article className="space-y-6 border-t border-[var(--ink-line)] pt-7 sm:pt-8">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+        <span
+          className="font-mono text-2xl font-medium tabular-nums text-[var(--ink-muted)] sm:text-[1.625rem]"
+          aria-hidden
+        >
           {String(index + 1).padStart(2, "0")}
         </span>
         <SectionMarker primary={`Tier ${row.tier}`} />
-        <h2 className="font-display text-xl font-medium tracking-[-0.01em] text-[var(--ink)] sm:text-2xl">
+        <h2 className="font-serif text-2xl font-medium leading-[1.1] tracking-[-0.012em] text-[var(--ink)] sm:text-[1.875rem]">
           {row.positionName}
         </h2>
       </div>
 
       {winner ? (
-        <div className="flex items-center gap-4">
-          <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--color-muted)]">
+        <div className="flex items-center gap-5">
+          <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--color-muted)] ring-1 ring-[var(--ink-line)]">
             {winner.photoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -167,14 +197,14 @@ function ResultBlock({ row, index }: { row: PublicRow; index: number }) {
             )}
           </div>
           <div className="min-w-0">
-            <p className="flex items-center gap-2 text-base font-semibold text-[var(--ink)] sm:text-lg">
+            <p className="flex items-center gap-2.5 font-serif text-xl font-semibold leading-[1.15] text-[var(--ink)] sm:text-2xl">
               <Trophy
-                className="h-4 w-4 text-[var(--color-success)]"
+                className="h-5 w-5 shrink-0 text-[var(--color-success)]"
                 aria-label="Winner"
               />
-              {winner.fullName}
+              <span className="truncate">{winner.fullName}</span>
             </p>
-            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--ink-muted)] tabular-nums">
+            <p className="mt-1.5 font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--ink-muted)] tabular-nums">
               {winner.matric && !winner.matric.startsWith("auto-")
                 ? `${winner.matric} · `
                 : ""}
