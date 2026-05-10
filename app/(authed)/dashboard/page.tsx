@@ -5,13 +5,23 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { AuthGate } from "@/components/auth/auth-gate";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type RedirectHref = "/admin" | "/internal" | "/vote" | "/results";
 
+type ElectionPhase =
+  | "setup"
+  | "internalOpen"
+  | "internalClosed"
+  | "publicVoting"
+  | "resultsPreview"
+  | "published";
+
+type StandbyPhase = ElectionPhase | "noCycle";
+
 interface StandbyCopy {
   cycleName: string | null;
+  phase: StandbyPhase;
   body: string;
   scheduledStartAt: number | null;
   scheduledEndAt: number | null;
@@ -21,6 +31,16 @@ type StageDecision =
   | { kind: "loading" }
   | { kind: "redirect"; href: RedirectHref }
   | { kind: "standby"; standby: StandbyCopy };
+
+const PHASE_LABEL: Record<StandbyPhase, string> = {
+  noCycle: "Awaiting next AGM",
+  setup: "Cycle in setup",
+  internalOpen: "Internal evaluation open",
+  internalClosed: "Internal evaluation closed",
+  publicVoting: "AGM live voting",
+  resultsPreview: "Results preparing",
+  published: "Results published",
+};
 
 export default function DashboardPage() {
   return (
@@ -58,7 +78,8 @@ function Stage() {
         kind: "standby",
         standby: {
           cycleName: null,
-          body: "No active election right now. Check back when an AGM is announced.",
+          phase: "noCycle",
+          body: "No election cycle is active. The dashboard updates the moment admins announce the next AGM.",
           scheduledStartAt: null,
           scheduledEndAt: null,
         },
@@ -76,7 +97,8 @@ function Stage() {
           kind: "standby",
           standby: {
             cycleName: current.name,
-            body: "Cycle being prepared. Voting opens once admins finish setup.",
+            phase: "setup",
+            body: "Admins are still configuring this cycle (positions, candidates, internal whitelist). Voting opens once setup is finished.",
             scheduledStartAt,
             scheduledEndAt,
           },
@@ -87,9 +109,8 @@ function Stage() {
           kind: "standby",
           standby: {
             cycleName: current.name,
-            body: scheduledEndAt
-              ? "Internal evaluation is in progress. AGM live voting opens after the internal window closes."
-              : "Internal evaluation is in progress. AGM live voting opens shortly.",
+            phase: "internalOpen",
+            body: "Internal evaluation is in progress. AGM live voting opens once the internal window closes; this dashboard updates automatically when it does.",
             scheduledStartAt,
             scheduledEndAt,
           },
@@ -99,9 +120,10 @@ function Stage() {
           kind: "standby",
           standby: {
             cycleName: current.name,
+            phase: "internalClosed",
             body: isWhitelisted
-              ? "Internal evaluation submitted. Awaiting AGM live voting."
-              : "Internal evaluation has closed. AGM live voting opens shortly.",
+              ? "Your internal evaluation has been submitted. AGM live voting is reserved for external members."
+              : "The internal evaluation window has closed. AGM live voting opens shortly; the page updates the moment a ballot opens.",
             scheduledStartAt,
             scheduledEndAt,
           },
@@ -112,7 +134,8 @@ function Stage() {
             kind: "standby",
             standby: {
               cycleName: current.name,
-              body: "Internal evaluators don't vote in the public ballot. Results post once voting wraps.",
+              phase: "publicVoting",
+              body: "Internal evaluators do not vote in the public ballot. Results are posted here once the chairperson publishes them.",
               scheduledStartAt: null,
               scheduledEndAt: null,
             },
@@ -124,7 +147,8 @@ function Stage() {
           kind: "standby",
           standby: {
             cycleName: current.name,
-            body: "Voting is complete. Final results are being prepared.",
+            phase: "resultsPreview",
+            body: "All ballots are closed. Final results are being prepared and will appear here as soon as the chairperson publishes them.",
             scheduledStartAt: null,
             scheduledEndAt: null,
           },
@@ -142,10 +166,11 @@ function Stage() {
 
   if (decision.kind === "loading" || decision.kind === "redirect") {
     return (
-      <main className="container-narrow space-y-4 py-16">
-        <Skeleton className="h-8 w-1/3" />
+      <main className="container-narrow space-y-6 py-20 sm:py-24">
+        <Skeleton className="h-3 w-44" />
+        <Skeleton className="h-10 w-3/4" />
         <Skeleton className="h-4 w-2/3" />
-        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-4 w-1/2" />
       </main>
     );
   }
@@ -154,31 +179,51 @@ function Stage() {
 }
 
 function Standby({ copy }: { copy: StandbyCopy }) {
-  const windowText = formatScheduleWindow(
-    copy.scheduledStartAt,
-    copy.scheduledEndAt,
-  );
-
   return (
-    <main className="container-narrow flex min-h-[calc(100dvh-3.5rem)] items-center py-16">
-      <Card className="surface-glass mx-auto w-full max-w-xl border-0">
-        <CardContent className="flex flex-col items-center gap-5 px-7 py-10 text-center">
-          <PulsingDot />
-          <div className="space-y-2">
-            <h1 className="font-display text-xl tracking-tight text-[var(--ink)] sm:text-2xl">
-              {copy.cycleName ?? "No active cycle"}
-            </h1>
-            <p className="mx-auto max-w-md text-sm leading-relaxed text-[var(--ink-muted)]">
-              {copy.body}
-            </p>
-          </div>
-          {windowText ? (
-            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--ink-muted)]">
-              {windowText}
-            </p>
+    <main className="container-narrow py-20 sm:py-24">
+      <header className="space-y-4">
+        <p className="font-mono text-[10.5px] uppercase tracking-[0.28em] text-[var(--ink-muted)]">
+          Standby <span aria-hidden>·</span> {PHASE_LABEL[copy.phase]}
+        </p>
+        <h1 className="text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
+          {copy.cycleName ?? "No active AGM cycle"}
+        </h1>
+        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+          {copy.body}
+        </p>
+      </header>
+
+      {copy.scheduledStartAt || copy.scheduledEndAt ? (
+        <dl className="mt-12 grid gap-6 border-t border-[var(--ink-line)] pt-8 sm:grid-cols-2">
+          {copy.scheduledStartAt ? (
+            <div className="space-y-1.5">
+              <dt className="font-mono text-[10px] uppercase tracking-[0.24em] text-[var(--ink-muted)]">
+                Window opens
+              </dt>
+              <dd className="font-mono text-sm tabular-nums text-[var(--ink)]">
+                {formatMYT(copy.scheduledStartAt)}
+              </dd>
+            </div>
           ) : null}
-        </CardContent>
-      </Card>
+          {copy.scheduledEndAt ? (
+            <div className="space-y-1.5">
+              <dt className="font-mono text-[10px] uppercase tracking-[0.24em] text-[var(--ink-muted)]">
+                Window closes
+              </dt>
+              <dd className="font-mono text-sm tabular-nums text-[var(--ink)]">
+                {formatMYT(copy.scheduledEndAt)}
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+      ) : null}
+
+      <div className="mt-12 flex items-center gap-3">
+        <PulsingDot />
+        <p className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--ink-muted)]">
+          Live. Auto-updates the moment the phase changes.
+        </p>
+      </div>
     </main>
   );
 }
@@ -187,7 +232,7 @@ function PulsingDot() {
   return (
     <span
       aria-hidden
-      className="relative inline-block h-2.5 w-2.5 rounded-full"
+      className="relative inline-block h-2 w-2 rounded-full"
       style={{ backgroundColor: "var(--teal)" }}
     >
       <span
@@ -198,22 +243,23 @@ function PulsingDot() {
   );
 }
 
-function formatScheduleWindow(
-  startAt: number | null,
-  endAt: number | null,
-): string | null {
-  if (!startAt && !endAt) return null;
-  const start = startAt ? formatDate(startAt) : null;
-  const end = endAt ? formatDate(endAt) : null;
-  if (start && end) return `${start} → ${end}`;
-  if (start) return `Starts ${start}`;
-  if (end) return `Ends ${end}`;
-  return null;
-}
+const MYT_FORMATTER = new Intl.DateTimeFormat("en-MY", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: "Asia/Kuala_Lumpur",
+});
 
-function formatDate(ms: number): string {
-  return new Date(ms).toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+/**
+ * Deterministic Malaysia-Time formatter. The AGM is run from Penang;
+ * scheduled windows are quoted in MYT regardless of the viewer's
+ * locale so a voter abroad reads the same wall-clock time the
+ * chairperson sees on stage.
+ */
+function formatMYT(ms: number): string {
+  return `${MYT_FORMATTER.format(new Date(ms))} MYT`;
 }
