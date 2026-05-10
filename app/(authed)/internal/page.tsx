@@ -12,6 +12,7 @@ import { useDialog } from "@/components/dialog/dialog-provider";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Meta, MetaGroup } from "@/components/ui/meta";
 import { SectionMarker } from "@/components/ui/section-marker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScoreButtons } from "@/components/internal/score-buttons";
@@ -392,7 +393,7 @@ function ActiveEvaluation({
         </div>
 
         {voterClass ? (
-          <dl className="grid gap-6 border-t border-[var(--ink-line)] pt-6 sm:grid-cols-3">
+          <MetaGroup className="sm:grid-cols-3">
             <Meta label="Evaluating as" value={VOTER_CLASS_LABEL[voterClass]} />
             <Meta
               label="Class weight"
@@ -402,7 +403,7 @@ function ActiveEvaluation({
               label="Final result split"
               value={`${internalShare}% internal / ${publicShare}% public`}
             />
-          </dl>
+          </MetaGroup>
         ) : null}
       </header>
 
@@ -586,19 +587,6 @@ function StatusStrip({
           Last saved {formatRelative(lastSavedAt)}
         </p>
       ) : null}
-    </div>
-  );
-}
-
-function Meta({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="space-y-1.5">
-      <dt className="font-mono text-[10px] uppercase tracking-[0.24em] text-[var(--ink-muted)]">
-        {label}
-      </dt>
-      <dd className="font-mono text-sm text-[var(--ink)] tabular-nums">
-        {value}
-      </dd>
     </div>
   );
 }

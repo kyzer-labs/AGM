@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { AuthGate } from "@/components/auth/auth-gate";
+import { Meta, MetaGroup } from "@/components/ui/meta";
 import { SectionMarker } from "@/components/ui/section-marker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatMYT } from "@/lib/format";
@@ -194,28 +195,20 @@ function Standby({ copy }: { copy: StandbyCopy }) {
       </header>
 
       {copy.scheduledStartAt || copy.scheduledEndAt ? (
-        <dl className="mt-12 grid gap-6 border-t border-[var(--ink-line)] pt-8 sm:grid-cols-2">
+        <MetaGroup className="mt-12 pt-8 sm:grid-cols-2">
           {copy.scheduledStartAt ? (
-            <div className="space-y-1.5">
-              <dt className="font-mono text-[10px] uppercase tracking-[0.24em] text-[var(--ink-muted)]">
-                Window opens
-              </dt>
-              <dd className="font-mono text-sm tabular-nums text-[var(--ink)]">
-                {formatMYT(copy.scheduledStartAt)}
-              </dd>
-            </div>
+            <Meta
+              label="Window opens"
+              value={formatMYT(copy.scheduledStartAt)}
+            />
           ) : null}
           {copy.scheduledEndAt ? (
-            <div className="space-y-1.5">
-              <dt className="font-mono text-[10px] uppercase tracking-[0.24em] text-[var(--ink-muted)]">
-                Window closes
-              </dt>
-              <dd className="font-mono text-sm tabular-nums text-[var(--ink)]">
-                {formatMYT(copy.scheduledEndAt)}
-              </dd>
-            </div>
+            <Meta
+              label="Window closes"
+              value={formatMYT(copy.scheduledEndAt)}
+            />
           ) : null}
-        </dl>
+        </MetaGroup>
       ) : null}
 
       <div className="mt-12 flex items-center gap-3">
