@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useId, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
@@ -19,19 +20,27 @@ import { AdminBreadcrumb } from "@/components/admin/admin-breadcrumb";
 import { NoElection } from "@/components/admin/no-election";
 import { useDialog } from "@/components/dialog/dialog-provider";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { EmptyState } from "@/components/ui/empty-state";
-import { getConvexErrorMessage } from "@/lib/convex-error";
-import type { Doc, Id } from "@/convex/_generated/dataModel";
+  DialogBody,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogShell,
+  DialogTitle,
+} from "@/components/dialog/dialog";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Label } from "@/components/ui/label";
+import { Meta, MetaGroup } from "@/components/ui/meta";
+import { SectionMarker } from "@/components/ui/section-marker";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+
+import { getConvexErrorMessage } from "@/lib/convex-error";
+import { formatMYTTimeOnly } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
 
 interface SessionRow {
   positionId: Id<"positions">;
@@ -47,6 +56,12 @@ interface SessionRow {
   hasUnresolvedTie: boolean;
 }
 
+interface CandidateRef {
+  _id: Id<"candidates">;
+  fullName: string;
+  matric: string | null;
+}
+
 export default function AdminPublicPage() {
   return (
     <AuthGate mode="profileComplete">
@@ -57,12 +72,7 @@ export default function AdminPublicPage() {
 
 function Inner() {
   const election = useQuery(api.elections.getCurrent);
-  if (election === undefined)
-    return (
-      <main className="container-wide py-10">
-        <Skeleton className="h-40 w-full" />
-      </main>
-    );
+  if (election === undefined) return <PageSkeleton />;
   if (election === null) return <NoElection />;
   return <Body election={election} />;
 }
@@ -75,99 +85,176 @@ function Body({ election }: { election: Doc<"elections"> }) {
     electionId: election._id,
   });
 
+  const [tieRow, setTieRow] = useState<SessionRow | null>(null);
+
   if (sessions === undefined || candidates === undefined) {
-    return (
-      <main className="container-wide py-10">
-        <Skeleton className="h-40 w-full" />
-      </main>
-    );
+    return <PageSkeleton />;
   }
 
   const candidateNameById = new Map<Id<"candidates">, string>();
   for (const c of candidates) candidateNameById.set(c._id, c.fullName);
 
   const phaseOk = election.phase === "publicVoting";
-  const ordered = sessions.slice().sort((a, b) => a.tier - b.tier || a.order - b.order);
+  const ordered = sessions
+    .slice()
+    .sort((a, b) => a.tier - b.tier || a.order - b.order);
+
+  const counts = {
+    pending: ordered.filter((s) => s.sessionStatus === "pending").length,
+    active: ordered.filter((s) => s.sessionStatus === "active").length,
+    closed: ordered.filter((s) => s.sessionStatus === "closed").length,
+    unresolved: ordered.filter((s) => s.hasUnresolvedTie).length,
+  };
 
   return (
-    <main className="container-wide py-10 space-y-8">
+    <main className="container-wide space-y-10 py-12">
       <AdminBreadcrumb items={[{ label: "Public voting" }]} />
 
-      <header className="flex flex-wrap items-start gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Public voting
-          </h1>
-          <p className="text-sm text-[var(--color-muted-foreground)]">
-            Live ballot operations for <strong>{election.name}</strong>. Open
-            one position at a time, watch the live count, then close it. The
-            cascade is recomputed automatically as winners are decided.
-          </p>
-        </div>
-        <Badge tone={phaseOk ? "brand" : "muted"}>
-          {phaseOk ? "Public voting OPEN" : "Public voting not active"}
-        </Badge>
+      <header className="space-y-5">
+        <SectionMarker
+          primary="Live AGM voting"
+          secondary={election.name}
+        />
+        <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
+          Public ballot operations
+        </h1>
+        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+          Open one position at a time, watch the live count, then close the
+          ballot. The cascade recomputes automatically as winners are decided.
+          Closing a ballot is final; tied positions stay paused until you
+          resolve them manually.
+        </p>
+        <MetaGroup className="sm:grid-cols-2 lg:grid-cols-4">
+          <Meta
+            label="Cycle phase"
+            value={
+              <span className="inline-flex items-center gap-2">
+                <span
+                  aria-hidden
+                  className={cn(
+                    "inline-block h-1.5 w-1.5 rounded-full",
+                    phaseOk
+                      ? "bg-[var(--teal)]"
+                      : "bg-[var(--ink-muted)]",
+                  )}
+                />
+                {phaseOk ? "Public voting open" : "Public voting not active"}
+              </span>
+            }
+          />
+          <Meta label="Pending" value={counts.pending} />
+          <Meta label="Open right now" value={counts.active} />
+          <Meta
+            label="Closed"
+            value={
+              counts.unresolved > 0 ? (
+                <span>
+                  {counts.closed}
+                  <span className="ml-2 text-[var(--ink-muted)]">
+                    · {counts.unresolved} unresolved
+                  </span>
+                </span>
+              ) : (
+                counts.closed
+              )
+            }
+          />
+        </MetaGroup>
       </header>
 
       {!phaseOk ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Move the cycle to publicVoting first
-            </CardTitle>
-            <CardDescription>
-              From the{" "}
-              <a className="underline" href="/admin/election">
-                Election cycle
-              </a>{" "}
-              page, transition to <strong>Public AGM voting</strong>. Sessions
-              can only be opened during that phase.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <PhaseMismatchNotice />
       ) : null}
 
       {sessions.length === 0 ? (
         <EmptyState
           title="No positions configured"
-          description="Add positions on the Positions page first."
+          description="Configure the AGM ballot before any position can be opened."
+          action={
+            <Link href="/admin/positions">
+              <Button>Configure positions</Button>
+            </Link>
+          }
         />
       ) : (
-        <div className="space-y-3">
-          {ordered.map((s) => (
-            <SessionRowCard
-              key={s.positionId}
-              row={s}
-              electionId={election._id}
-              candidateNameById={candidateNameById}
-              phaseOk={phaseOk}
-              candidates={candidates}
-            />
+        <ol className="space-y-0" aria-label="Positions">
+          {ordered.map((row, index) => (
+            <li key={row.positionId}>
+              <SessionRowItem
+                row={row}
+                index={index}
+                electionId={election._id}
+                candidateNameById={candidateNameById}
+                phaseOk={phaseOk}
+                onResolveTie={() => setTieRow(row)}
+              />
+            </li>
           ))}
-        </div>
+        </ol>
       )}
+
+      {tieRow ? (
+        <TieResolverDialog
+          row={tieRow}
+          candidates={candidates}
+          candidateNameById={candidateNameById}
+          onClose={() => setTieRow(null)}
+        />
+      ) : null}
     </main>
   );
 }
 
-function SessionRowCard({
+function PhaseMismatchNotice() {
+  return (
+    <section
+      aria-labelledby="phase-warning-title"
+      className="space-y-3 border-y border-[var(--copper)] bg-[var(--paper-2)] px-5 py-5 sm:px-7 sm:py-6"
+    >
+      <SectionMarker primary="Phase mismatch" secondary="Action required" />
+      <h2
+        id="phase-warning-title"
+        className="font-display text-xl font-medium tracking-[-0.01em] text-[var(--ink)] sm:text-2xl"
+      >
+        Move the cycle to public voting first
+      </h2>
+      <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+        Sessions can only be opened during the{" "}
+        <strong className="font-semibold text-[var(--ink)]">
+          Public AGM voting
+        </strong>{" "}
+        phase. Transition the cycle from the{" "}
+        <Link
+          href="/admin/election"
+          className="underline decoration-[var(--copper)] underline-offset-4 hover:text-[var(--ink)]"
+        >
+          Election cycle
+        </Link>{" "}
+        page.
+      </p>
+    </section>
+  );
+}
+
+function SessionRowItem({
   row,
+  index,
   electionId,
   candidateNameById,
   phaseOk,
-  candidates,
+  onResolveTie,
 }: {
   row: SessionRow;
+  index: number;
   electionId: Id<"elections">;
   candidateNameById: Map<Id<"candidates">, string>;
   phaseOk: boolean;
-  candidates: { _id: Id<"candidates">; fullName: string; matric: string | null }[];
+  onResolveTie: () => void;
 }) {
   const dialog = useDialog();
   const [busy, setBusy] = useState(false);
   const start = useMutation(api.sessions.startSession);
   const close = useMutation(api.sessions.closeSession);
-  const resolveTie = useMutation(api.sessions.resolveTie);
 
   const liveCounts = useQuery(
     api.sessions.liveCounts,
@@ -188,8 +275,10 @@ function SessionRowCard({
       title: "Open this ballot?",
       description: (
         <>
-          Open public voting for <strong>{row.name}</strong>. Voters will be
-          able to cast votes immediately.
+          Opens public voting for{" "}
+          <strong className="font-semibold">{row.name}</strong> (Tier{" "}
+          {row.tier}). Every signed-in non-evaluator can cast one vote until
+          you close the ballot. The vote count appears live on this page.
         </>
       ),
       confirmText: "Open ballot",
@@ -208,13 +297,26 @@ function SessionRowCard({
   };
 
   const onClose = async () => {
+    const liveTotal = liveCounts?.total ?? row.voteCount;
+    const openedAt = row.sessionStartedAt
+      ? formatMYTTimeOnly(row.sessionStartedAt)
+      : null;
     const ok = await dialog.confirm({
-      title: "Close ballot?",
+      title: "Close this ballot?",
       description: (
         <>
-          Close voting for <strong>{row.name}</strong>. The result will be
-          computed immediately and the cascade will update for the remaining
-          positions.
+          Closes voting for{" "}
+          <strong className="font-semibold">{row.name}</strong>.{" "}
+          <strong className="font-semibold tabular-nums">
+            {liveTotal} {liveTotal === 1 ? "vote" : "votes"}
+          </strong>{" "}
+          {openedAt ? (
+            <>cast since opened {openedAt}</>
+          ) : (
+            <>cast so far</>
+          )}
+          . The winner is computed immediately and the cascade updates the
+          remaining positions. This cannot be reopened.
         </>
       ),
       confirmText: "Close ballot",
@@ -226,7 +328,7 @@ function SessionRowCard({
       const result = await close({ positionId: row.positionId });
       if (result.tieGroup.length > 0) {
         toast.warning("Tie detected", {
-          description: `Resolve manually before opening the next ballot.`,
+          description: "Resolve manually before opening the next ballot.",
         });
       } else {
         const winnerName = result.winnerCandidateId
@@ -242,187 +344,295 @@ function SessionRowCard({
     }
   };
 
-  const tone = (() => {
-    if (row.hasUnresolvedTie) return "warning" as const;
-    if (row.sessionStatus === "active") return "brand" as const;
-    if (row.sessionStatus === "closed") return "success" as const;
-    return "muted" as const;
+  const statusBadge = (() => {
+    if (row.hasUnresolvedTie) {
+      return (
+        <Badge tone="warning">
+          <AlertTriangle className="h-3 w-3" aria-hidden />
+          Tie: resolve
+        </Badge>
+      );
+    }
+    if (row.sessionStatus === "active") {
+      return (
+        <Badge tone="brand">
+          <span
+            aria-hidden
+            className="inline-block h-1.5 w-1.5 rounded-full bg-current"
+          />
+          Open
+        </Badge>
+      );
+    }
+    if (row.sessionStatus === "closed") {
+      return (
+        <Badge tone="success">
+          <CheckCircle2 className="h-3 w-3" aria-hidden />
+          Closed
+        </Badge>
+      );
+    }
+    return (
+      <Badge tone="muted">
+        <Lock className="h-3 w-3" aria-hidden />
+        Pending
+      </Badge>
+    );
   })();
 
-  const statusLabel = (() => {
-    if (row.hasUnresolvedTie) return "Tie: resolve";
-    if (row.sessionStatus === "active") return "Open";
-    if (row.sessionStatus === "closed") return "Closed";
-    return "Pending";
+  const stateLine = (() => {
+    if (row.sessionStatus === "active" && row.sessionStartedAt) {
+      const total = liveCounts?.total ?? row.voteCount;
+      return `Ballot opened ${formatMYTTimeOnly(row.sessionStartedAt)}. ${total} ${total === 1 ? "vote" : "votes"} cast. Closes when you press Close ballot.`;
+    }
+    if (row.sessionStatus === "closed" && row.sessionClosedAt) {
+      const opened = row.sessionStartedAt
+        ? formatMYTTimeOnly(row.sessionStartedAt)
+        : null;
+      const total = row.voteCount;
+      return `Ballot closed ${formatMYTTimeOnly(row.sessionClosedAt)}${
+        opened ? `, open ${opened}` : ""
+      }. ${total} ${total === 1 ? "vote" : "votes"} recorded.`;
+    }
+    if (row.sessionStatus === "pending") {
+      return phaseOk
+        ? "Pending. Opens when you press Open ballot."
+        : "Pending. Move the cycle to Public AGM voting before this can open.";
+    }
+    return null;
   })();
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-start gap-3 space-y-0">
-        <div className="flex-1">
-          <div className="text-xs text-[var(--color-muted-foreground)]">
-            Tier {row.tier} · Order {row.order + 1}
-          </div>
-          <CardTitle className="text-base">{row.name}</CardTitle>
-        </div>
-        <Badge tone={tone}>{statusLabel}</Badge>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {row.sessionStatus === "pending" && cascade ? (
-          <div className="rounded-md border bg-[var(--color-muted)]/40 p-3 text-xs">
-            <div className="flex items-center gap-2 font-medium">
-              <Eye className="h-3.5 w-3.5" aria-hidden />
-              Cascade preview
-            </div>
-            <div className="mt-2 grid gap-1.5">
-              <div>
-                <span className="text-[var(--color-muted-foreground)]">
-                  On the ballot:{" "}
-                </span>
-                {cascade.eligible.length === 0 ? (
-                  <span className="italic">none</span>
-                ) : (
-                  cascade.eligible.map((c) => c.fullName).join(", ")
-                )}
-              </div>
-              {cascade.removed.length > 0 ? (
-                <div>
-                  <span className="text-[var(--color-muted-foreground)]">
-                    Removed by cascade:{" "}
-                  </span>
-                  <span className="text-[var(--color-muted-foreground)]">
-                    {cascade.removed.map((c) => c.fullName).join(", ")}
-                  </span>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
+    <article className="space-y-5 border-t border-[var(--ink-line)] pt-6 pb-8">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1.5">
+        <span
+          className="font-mono text-2xl font-medium tabular-nums text-[var(--ink-muted)]"
+          aria-hidden
+        >
+          {String(index + 1).padStart(2, "0")}
+        </span>
+        <SectionMarker
+          primary={`Tier ${row.tier}`}
+          secondary={`Ballot order ${row.order + 1}`}
+        />
+        <h2 className="font-display text-xl font-medium tracking-[-0.01em] text-[var(--ink)] sm:text-2xl">
+          {row.name}
+        </h2>
+        <div className="ml-auto">{statusBadge}</div>
+      </div>
 
-        {liveCounts && row.sessionStatus !== "pending" ? (
-          <div className="grid gap-1.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-medium">
-                Live counts ({liveCounts.total} votes)
-              </span>
-            </div>
-            <ul className="grid gap-1">
-              {liveCounts.counts.map((c) => {
-                const pct =
-                  liveCounts.total > 0 ? (c.count / liveCounts.total) * 100 : 0;
-                return (
-                  <li key={c.candidateId} className="grid gap-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span>{c.fullName}</span>
-                      <span className="tabular-nums">
-                        {c.count} ({pct.toFixed(0)}%)
-                      </span>
-                    </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-[var(--color-muted)]">
-                      <div
-                        className="h-full bg-[var(--color-primary)]"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ) : null}
+      {stateLine ? (
+        <p className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--ink-muted)] tabular-nums">
+          {stateLine}
+        </p>
+      ) : null}
 
-        {row.sessionStatus === "closed" && row.winnerCandidateId ? (
-          <div className="flex items-center gap-2 rounded-md border border-[var(--color-success)]/40 bg-[var(--color-success)]/10 p-3 text-sm">
-            <Trophy className="h-4 w-4 text-[var(--color-success)]" aria-hidden />
-            Winner:{" "}
-            <strong>
-              {candidateNameById.get(row.winnerCandidateId) ?? "-"}
-            </strong>
-          </div>
-        ) : null}
+      {row.sessionStatus === "pending" && phaseOk && cascade ? (
+        <CascadePreview cascade={cascade} />
+      ) : null}
 
-        {row.hasUnresolvedTie ? (
-          <TieResolverPanel
-            positionId={row.positionId}
-            candidates={candidates}
-            onResolved={async (winnerId, reason) => {
-              setBusy(true);
-              try {
-                await resolveTie({
-                  positionId: row.positionId,
-                  winnerCandidateId: winnerId,
-                  reason,
-                });
-                toast.success("Tie resolved");
-              } catch (err) {
-                const m =
-                  getConvexErrorMessage(err, "Resolve failed.");
-                toast.error("Resolve failed", { description: m });
-              } finally {
-                setBusy(false);
-              }
-            }}
-            disabled={busy}
-          />
-        ) : null}
+      {liveCounts && row.sessionStatus !== "pending" ? (
+        <LiveCounts
+          counts={liveCounts.counts}
+          total={liveCounts.total}
+          highlightWinnerId={
+            row.sessionStatus === "closed" && !row.hasUnresolvedTie
+              ? row.winnerCandidateId
+              : null
+          }
+        />
+      ) : null}
 
-        <div className="flex flex-wrap items-center gap-2">
-          {row.sessionStartedAt ? (
-            <span className="text-xs text-[var(--color-muted-foreground)]">
-              Opened {new Date(row.sessionStartedAt).toLocaleString()}
-            </span>
-          ) : null}
-          {row.sessionClosedAt ? (
-            <span className="text-xs text-[var(--color-muted-foreground)]">
-              · Closed {new Date(row.sessionClosedAt).toLocaleString()}
-            </span>
-          ) : null}
-          <div className="flex-1" />
-          {row.sessionStatus === "pending" && phaseOk ? (
-            <Button onClick={onStart} loading={busy} size="sm">
-              <Play className="h-4 w-4" /> Start ballot
-            </Button>
-          ) : null}
-          {row.sessionStatus === "active" ? (
-            <Button
-              onClick={onClose}
-              loading={busy}
-              size="sm"
-              variant="destructive"
-            >
-              <Pause className="h-4 w-4" /> Close ballot
-            </Button>
-          ) : null}
-          {row.sessionStatus === "closed" && !row.hasUnresolvedTie ? (
-            <Badge tone="muted">
-              <Lock className="h-3 w-3" aria-hidden /> Closed
-            </Badge>
-          ) : null}
-        </div>
-      </CardContent>
-    </Card>
+      {row.sessionStatus === "closed" &&
+      row.winnerCandidateId &&
+      !row.hasUnresolvedTie ? (
+        <WinnerStrip
+          name={candidateNameById.get(row.winnerCandidateId) ?? "Unknown"}
+        />
+      ) : null}
+
+      {row.hasUnresolvedTie ? (
+        <UnresolvedTieStrip onResolve={onResolveTie} />
+      ) : null}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex-1" />
+        {row.sessionStatus === "pending" && phaseOk ? (
+          <Button onClick={onStart} loading={busy} size="sm">
+            <Play className="h-4 w-4" aria-hidden /> Open ballot
+          </Button>
+        ) : null}
+        {row.sessionStatus === "active" ? (
+          <Button
+            onClick={onClose}
+            loading={busy}
+            size="sm"
+            variant="destructive"
+          >
+            <Pause className="h-4 w-4" aria-hidden /> Close ballot
+          </Button>
+        ) : null}
+      </div>
+    </article>
   );
 }
 
-function TieResolverPanel({
-  positionId,
-  candidates,
-  onResolved,
-  disabled,
+function CascadePreview({
+  cascade,
 }: {
-  positionId: Id<"positions">;
-  candidates: { _id: Id<"candidates">; fullName: string }[];
-  onResolved: (
-    winnerId: Id<"candidates">,
-    reason: string,
-  ) => void | Promise<void>;
-  disabled: boolean;
+  cascade: {
+    eligible: { fullName: string }[];
+    removed: { fullName: string }[];
+  };
 }) {
-  const liveCounts = useQuery(api.sessions.liveCounts, { positionId });
+  return (
+    <div className="space-y-2 rounded-md border border-[var(--ink-line)] bg-[var(--paper-2)] px-4 py-3">
+      <div className="flex items-center gap-2">
+        <Eye className="h-3.5 w-3.5 text-[var(--ink-muted)]" aria-hidden />
+        <span className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--ink-muted)]">
+          Cascade preview
+        </span>
+      </div>
+      <p className="text-sm leading-relaxed text-[var(--ink)]">
+        <span className="text-[var(--ink-muted)]">On the ballot: </span>
+        {cascade.eligible.length === 0 ? (
+          <span className="italic text-[var(--ink-muted)]">none</span>
+        ) : (
+          cascade.eligible.map((c) => c.fullName).join(", ")
+        )}
+      </p>
+      {cascade.removed.length > 0 ? (
+        <p className="text-sm leading-relaxed text-[var(--ink-muted)]">
+          <span className="text-[var(--ink-muted)]">Removed by cascade: </span>
+          {cascade.removed.map((c) => c.fullName).join(", ")}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function LiveCounts({
+  counts,
+  total,
+  highlightWinnerId,
+}: {
+  counts: { candidateId: string; fullName: string; count: number }[];
+  total: number;
+  highlightWinnerId: Id<"candidates"> | null;
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--ink-muted)] tabular-nums">
+        Live count · {total} {total === 1 ? "vote" : "votes"}
+      </p>
+      <ul className="space-y-2">
+        {counts.map((c) => {
+          const pct = total > 0 ? (c.count / total) * 100 : 0;
+          const isWinner =
+            highlightWinnerId !== null &&
+            (c.candidateId as Id<"candidates">) === highlightWinnerId;
+          return (
+            <li key={c.candidateId} className="space-y-1.5">
+              <div className="flex items-baseline justify-between gap-3 text-sm">
+                <span
+                  className={cn(
+                    "truncate",
+                    isWinner
+                      ? "font-semibold text-[var(--ink)]"
+                      : "text-[var(--ink)]",
+                  )}
+                >
+                  {isWinner ? (
+                    <Trophy
+                      className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px text-[var(--teal)]"
+                      aria-label="Winner"
+                    />
+                  ) : null}
+                  {c.fullName}
+                </span>
+                <span className="font-mono text-xs tabular-nums text-[var(--ink-muted)]">
+                  <span className="text-[var(--ink)]">{c.count}</span>
+                  {total > 0 ? <span> · {pct.toFixed(0)}%</span> : null}
+                </span>
+              </div>
+              <div
+                className="h-1.5 overflow-hidden rounded-full bg-[var(--color-muted)]"
+                role="presentation"
+              >
+                <div
+                  className="h-full bg-[var(--teal)]"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function WinnerStrip({ name }: { name: string }) {
+  return (
+    <div
+      className="flex items-center gap-2 border-t border-[var(--ink-line)] pt-3"
+      role="status"
+    >
+      <Trophy className="h-4 w-4 text-[var(--teal)]" aria-label="Winner" />
+      <p className="text-sm">
+        <span className="text-[var(--ink-muted)]">Winner: </span>
+        <strong className="font-semibold text-[var(--ink)]">{name}</strong>
+      </p>
+    </div>
+  );
+}
+
+function UnresolvedTieStrip({ onResolve }: { onResolve: () => void }) {
+  return (
+    <div
+      className="flex flex-col gap-3 border-y border-[var(--copper)] bg-[var(--paper-2)] px-4 py-4 sm:flex-row sm:items-start sm:justify-between"
+      role="alert"
+    >
+      <div className="space-y-1">
+        <div className="flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--copper)]">
+          <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+          Manual tie resolution required
+        </div>
+        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--ink)]">
+          The automatic tiebreak ladder reached a manual decision. Pick the
+          winner and write a reason for the audit log before opening the next
+          ballot.
+        </p>
+      </div>
+      <Button onClick={onResolve} variant="destructive" size="sm">
+        Resolve tie
+      </Button>
+    </div>
+  );
+}
+
+function TieResolverDialog({
+  row,
+  candidates,
+  candidateNameById,
+  onClose,
+}: {
+  row: SessionRow;
+  candidates: CandidateRef[];
+  candidateNameById: Map<Id<"candidates">, string>;
+  onClose: () => void;
+}) {
+  const titleId = useId();
+  const descriptionId = useId();
+  const resolveTie = useMutation(api.sessions.resolveTie);
+  const liveCounts = useQuery(api.sessions.liveCounts, {
+    positionId: row.positionId,
+  });
   const [winnerId, setWinnerId] = useState<Id<"candidates"> | null>(null);
   const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const tieCandidates =
+  const tieGroup =
     liveCounts?.counts && liveCounts.counts.length > 0
       ? (() => {
           const top = liveCounts.counts[0];
@@ -431,73 +641,162 @@ function TieResolverPanel({
         })()
       : [];
 
+  const tieCount = tieGroup[0]?.count ?? 0;
+
+  const onSubmit = async () => {
+    if (!winnerId) {
+      toast.error("Pick a winner first.");
+      return;
+    }
+    if (reason.trim().length < 3) {
+      toast.error("Provide a reason for the audit log.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await resolveTie({
+        positionId: row.positionId,
+        winnerCandidateId: winnerId,
+        reason: reason.trim(),
+      });
+      toast.success("Tie resolved");
+      onClose();
+    } catch (err) {
+      const m = getConvexErrorMessage(err, "Resolve failed.");
+      toast.error("Resolve failed", { description: m });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <div className="rounded-md border border-[var(--color-warning)]/40 bg-[var(--color-warning)]/10 p-3 text-sm">
-      <div className="flex items-center gap-2 font-medium">
-        <AlertTriangle
-          className="h-4 w-4 text-[var(--color-warning)]"
-          aria-hidden
-        />
-        Manual tie resolution required
-      </div>
-      <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
-        Pick the winner and provide a reason. Both are recorded in the
-        immutable audit log.
-      </p>
-      <div className="mt-3 grid gap-2">
-        {tieCandidates.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {tieCandidates.map((tc) => (
-              <button
-                key={tc.candidateId}
-                type="button"
-                onClick={() =>
-                  setWinnerId(tc.candidateId as Id<"candidates">)
-                }
-                className={
-                  winnerId === tc.candidateId
-                    ? "rounded-full border border-[var(--color-primary)] bg-[var(--color-primary)] px-3 py-1 text-xs text-[var(--color-primary-foreground)]"
-                    : "rounded-full border px-3 py-1 text-xs hover:bg-[var(--color-muted)]"
-                }
-              >
-                <CheckCircle2
-                  className="mr-1 inline h-3 w-3"
-                  aria-hidden
-                />
-                {candidates.find((c) => c._id === tc.candidateId)?.fullName ??
-                  "Unknown"}{" "}
-                · {tc.count}
-              </button>
-            ))}
-          </div>
-        ) : null}
-        <textarea
-          rows={2}
-          placeholder="Reason for this manual decision (logged)…"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          className="rounded-md border bg-[var(--color-background)] px-3 py-2 text-sm"
-        />
-        <div className="flex justify-end">
-          <Button
-            size="sm"
-            onClick={() => {
-              if (!winnerId) {
-                toast.error("Pick a winner first.");
-                return;
-              }
-              if (reason.trim().length < 3) {
-                toast.error("Provide a reason for the audit log.");
-                return;
-              }
-              void onResolved(winnerId, reason.trim());
-            }}
-            disabled={disabled}
-          >
-            Resolve tie
-          </Button>
+    <DialogShell
+      open
+      onClose={() => {
+        if (!submitting) onClose();
+      }}
+      labelledBy={titleId}
+      describedBy={descriptionId}
+      size="lg"
+    >
+      <DialogHeader>
+        <SectionMarker primary={`Tier ${row.tier}`} secondary={row.name} />
+        <DialogTitle id={titleId}>Resolve tie manually</DialogTitle>
+        <DialogDescription id={descriptionId}>
+          Both choices are written to the immutable audit log and cannot be
+          revised. The full tiebreak ladder reached a manual decision because
+          every automated step (final score, class shares, public share) was
+          tied.
+        </DialogDescription>
+      </DialogHeader>
+      <DialogBody className="space-y-5">
+        <fieldset className="space-y-2">
+          <legend className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--ink-muted)] tabular-nums">
+            Tied candidates
+            {tieGroup.length > 0 ? (
+              <>
+                {" · "}
+                {tieCount} {tieCount === 1 ? "vote" : "votes"} each
+              </>
+            ) : null}
+          </legend>
+          {tieGroup.length === 0 ? (
+            <p className="text-sm text-[var(--ink-muted)]">
+              Loading tie group…
+            </p>
+          ) : (
+            <ul className="space-y-1">
+              {tieGroup.map((tc) => {
+                const id = tc.candidateId as Id<"candidates">;
+                const checked = winnerId === id;
+                const fullName =
+                  candidateNameById.get(id) ??
+                  candidates.find((c) => c._id === id)?.fullName ??
+                  "Unknown";
+                return (
+                  <li key={tc.candidateId}>
+                    <label
+                      className={cn(
+                        "flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2.5 text-sm transition-colors",
+                        "[transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
+                        checked
+                          ? "border-[var(--ink)] bg-[var(--paper-2)]"
+                          : "border-[var(--ink-line)] hover:border-[var(--ink)]",
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="tie-winner"
+                        value={tc.candidateId}
+                        checked={checked}
+                        onChange={() => setWinnerId(id)}
+                        disabled={submitting}
+                        className="h-4 w-4 accent-[var(--teal)]"
+                      />
+                      <span className="flex-1 font-medium text-[var(--ink)]">
+                        {fullName}
+                      </span>
+                      <span className="font-mono text-xs tabular-nums text-[var(--ink-muted)]">
+                        {tc.count} votes
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </fieldset>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="tie-reason">Reason (logged)</Label>
+          <Textarea
+            id="tie-reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. coin toss in the presence of the chairperson and both candidates"
+            rows={3}
+            disabled={submitting}
+            required
+          />
+          <p className="text-xs text-[var(--ink-muted)]">
+            At least 3 characters. Written verbatim into the audit log.
+          </p>
         </div>
-      </div>
-    </div>
+
+        <p
+          className="font-mono text-[10.5px] uppercase tracking-[0.28em] text-[var(--color-destructive)]"
+          role="status"
+        >
+          This finalizes the winner for {row.name}
+        </p>
+      </DialogBody>
+      <DialogFooter>
+        <Button
+          variant="outline"
+          onClick={onClose}
+          disabled={submitting}
+        >
+          Cancel
+        </Button>
+        <Button
+          variant="destructive"
+          onClick={onSubmit}
+          loading={submitting}
+        >
+          Resolve tie
+        </Button>
+      </DialogFooter>
+    </DialogShell>
+  );
+}
+
+function PageSkeleton() {
+  return (
+    <main className="container-wide space-y-6 py-12">
+      <Skeleton className="h-3 w-44" />
+      <Skeleton className="h-10 w-2/3" />
+      <Skeleton className="h-4 w-1/2" />
+      <Skeleton className="h-32 w-full" />
+    </main>
   );
 }
