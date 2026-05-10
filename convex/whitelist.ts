@@ -188,11 +188,25 @@ export const remove = mutation({
   },
 });
 
+interface BulkIssue {
+  displayRow: string;
+  email: string;
+  reason: string;
+}
+
 interface BulkSummary {
   inserted: number;
   skipped: number;
-  invalid: string[];
   reclassified: number;
+  /** Rows that did not import (invalid email, empty, etc.). */
+  errors: BulkIssue[];
+  /**
+   * Rows that imported with a fallback (e.g. unrecognized voterClass
+   * silently coerced to the default, or a duplicate within the same
+   * input list whose later occurrence was ignored). The row was either
+   * inserted or already existed; this is informational.
+   */
+  warnings: BulkIssue[];
 }
 
 export const bulkAdd = mutation({
@@ -200,6 +214,13 @@ export const bulkAdd = mutation({
     electionId: v.id("elections"),
     rows: v.array(
       v.object({
+        /**
+         * Caller-supplied label for error reporting (e.g. "Row 14" for
+         * CSV with a header line, "Line 5" for paste). The server passes
+         * it through to errors/warnings unchanged so the user sees the
+         * label that matches their source file.
+         */
+        displayRow: v.string(),
         email: v.string(),
         voterClass: v.optional(v.string()),
       }),
@@ -218,24 +239,56 @@ export const bulkAdd = mutation({
     const summary: BulkSummary = {
       inserted: 0,
       skipped: 0,
-      invalid: [],
       reclassified: 0,
+      errors: [],
+      warnings: [],
     };
     const seen = new Set<string>();
 
     for (const raw of args.rows) {
+      const displayRow = raw.displayRow;
       const email = normalizeEmail(raw.email);
-      if (email.length === 0) continue;
-      if (seen.has(email)) continue;
+      if (email.length === 0) {
+        summary.errors.push({
+          displayRow,
+          email: "(empty)",
+          reason: "Email is empty.",
+        });
+        continue;
+      }
+      if (seen.has(email)) {
+        summary.warnings.push({
+          displayRow,
+          email,
+          reason:
+            "Email appeared earlier in this import; later occurrence ignored.",
+        });
+        continue;
+      }
       seen.add(email);
 
       if (!validUsmEmail(email)) {
-        summary.invalid.push(email);
+        summary.errors.push({
+          displayRow,
+          email,
+          reason: `Email must end in ${USM_DOMAIN}.`,
+        });
         continue;
       }
 
-      const explicitClass = parseVoterClass(raw.voterClass);
-      const cls = explicitClass ?? args.defaultClass;
+      let cls = args.defaultClass;
+      if (raw.voterClass && raw.voterClass.trim().length > 0) {
+        const explicit = parseVoterClass(raw.voterClass);
+        if (explicit === null) {
+          summary.warnings.push({
+            displayRow,
+            email,
+            reason: `voterClass "${raw.voterClass}" is not one of topCommittee, headExecutive, or year2Committee. Used default class instead.`,
+          });
+        } else {
+          cls = explicit;
+        }
+      }
 
       const existing = await ctx.db
         .query("internalWhitelist")
@@ -272,10 +325,82 @@ export const bulkAdd = mutation({
         inserted: summary.inserted,
         skipped: summary.skipped,
         reclassified: summary.reclassified,
-        invalid: summary.invalid.length,
+        errors: summary.errors.length,
+        warnings: summary.warnings.length,
       },
     });
 
     return summary;
+  },
+});
+
+/**
+ * Per-entry impact for destructive confirm copy. Returns the evaluator's
+ * sign-in status, evaluation count, and (when applicable) the MYT
+ * timestamp of their most recent submitted evaluation. Lets the admin
+ * see exactly what gets dropped if they delete a whitelist entry that
+ * has already been used to score candidates.
+ */
+export const entryImpact = query({
+  args: { entryId: v.id("internalWhitelist") },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const entry = await ctx.db.get(args.entryId);
+    if (!entry) return null;
+
+    const voterRow = await ctx.db
+      .query("voters")
+      .withIndex("by_email", (q) => q.eq("email", entry.email))
+      .unique();
+
+    if (!voterRow) {
+      return {
+        email: entry.email,
+        hasSignedIn: false,
+        evaluationCount: 0,
+        submittedCount: 0,
+        draftCount: 0,
+        scoreCount: 0,
+        lastSubmittedAt: null as number | null,
+      };
+    }
+
+    const evaluations = await ctx.db
+      .query("internalEvaluations")
+      .withIndex("by_election_evaluator", (q) =>
+        q.eq("electionId", entry.electionId).eq("evaluatorVoterId", voterRow._id),
+      )
+      .collect();
+
+    let submittedCount = 0;
+    let draftCount = 0;
+    let lastSubmittedAt: number | null = null;
+    let scoreCount = 0;
+    for (const ev of evaluations) {
+      if (ev.status === "submitted") {
+        submittedCount += 1;
+        const stamp = ev.submittedAt ?? ev._creationTime;
+        if (lastSubmittedAt === null || stamp > lastSubmittedAt) {
+          lastSubmittedAt = stamp;
+        }
+      } else {
+        draftCount += 1;
+      }
+      const scores = await ctx.db
+        .query("internalScores")
+        .withIndex("by_evaluation", (q) => q.eq("evaluationId", ev._id))
+        .collect();
+      scoreCount += scores.length;
+    }
+
+    return {
+      email: entry.email,
+      hasSignedIn: true,
+      evaluationCount: evaluations.length,
+      submittedCount,
+      draftCount,
+      scoreCount,
+      lastSubmittedAt,
+    };
   },
 });

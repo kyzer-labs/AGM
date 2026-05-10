@@ -1,34 +1,51 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Papa from "papaparse";
 import { toast } from "sonner";
-import { Plus, Trash2, Upload, Users2 } from "lucide-react";
+import {
+  AlertTriangle,
+  FileWarning,
+  Lock,
+  Plus,
+  Trash2,
+  Upload,
+  Users2,
+} from "lucide-react";
 
 import { AuthGate } from "@/components/auth/auth-gate";
 import { AdminBreadcrumb } from "@/components/admin/admin-breadcrumb";
 import { NoElection } from "@/components/admin/no-election";
 import { useDialog } from "@/components/dialog/dialog-provider";
+
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { EmptyState } from "@/components/ui/empty-state";
+import { LinkButton } from "@/components/ui/link-button";
+import { Meta, MetaGroup } from "@/components/ui/meta";
 import { Modal } from "@/components/ui/modal";
-import { getConvexErrorMessage } from "@/lib/convex-error";
-import type { Doc } from "@/convex/_generated/dataModel";
+import { NoticeStrip } from "@/components/ui/notice-strip";
+import { SectionMarker } from "@/components/ui/section-marker";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 
+import { formatMYT } from "@/lib/format";
+import { getConvexErrorMessage } from "@/lib/convex-error";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
+
+const USM_DOMAIN = "@student.usm.my";
 
 type VoterClass = "topCommittee" | "headExecutive" | "year2Committee";
 
@@ -50,6 +67,43 @@ const VOTER_CLASS_TONE: Record<VoterClass, "brand" | "warning" | "muted"> = {
   year2Committee: "muted",
 };
 
+const PHASE_LABELS: Record<Doc<"elections">["phase"], string> = {
+  setup: "Setup",
+  internalOpen: "Internal evaluation open",
+  internalClosed: "Internal evaluation closed",
+  publicVoting: "Public AGM voting",
+  resultsPreview: "Results preview",
+  published: "Published",
+};
+
+interface BulkRow {
+  displayRow: string;
+  email: string;
+  voterClass?: string;
+}
+
+interface BulkIssue {
+  displayRow: string;
+  email: string;
+  reason: string;
+}
+
+interface BulkSummary {
+  inserted: number;
+  skipped: number;
+  reclassified: number;
+  errors: BulkIssue[];
+  warnings: BulkIssue[];
+}
+
+function isPlausibleUsmEmail(input: string): boolean {
+  const trimmed = input.trim().toLowerCase();
+  if (trimmed.length <= USM_DOMAIN.length) return false;
+  if (!trimmed.endsWith(USM_DOMAIN)) return false;
+  if (!/^[a-z0-9._-]+@student\.usm\.my$/i.test(trimmed)) return false;
+  return true;
+}
+
 export default function WhitelistPage() {
   return (
     <AuthGate mode="profileComplete">
@@ -60,32 +114,39 @@ export default function WhitelistPage() {
 
 function Inner() {
   const election = useQuery(api.elections.getCurrent);
-  if (election === undefined)
-    return (
-      <main className="container-wide py-10">
-        <Skeleton className="h-40 w-full" />
-      </main>
-    );
+  if (election === undefined) return <PageSkeleton />;
   if (election === null) return <NoElection />;
   return <Body election={election} />;
 }
 
-function Body({ election }: { election: Doc<"elections"> }) {
-  const dialog = useDialog();
-  const list = useQuery(api.whitelist.list, { electionId: election._id });
-  const add = useMutation(api.whitelist.add);
-  const bulkAdd = useMutation(api.whitelist.bulkAdd);
-  const remove = useMutation(api.whitelist.remove);
-  const setClass = useMutation(api.whitelist.setClass);
+function PageSkeleton() {
+  return (
+    <main className="container-wide space-y-6 py-12">
+      <Skeleton className="h-3 w-44" />
+      <Skeleton className="h-10 w-2/3" />
+      <Skeleton className="h-4 w-1/2" />
+      <Skeleton className="h-32 w-full" />
+    </main>
+  );
+}
 
-  const [single, setSingle] = useState("");
-  const [singleClass, setSingleClass] = useState<VoterClass>("year2Committee");
-  const [bulk, setBulk] = useState("");
-  const [bulkDefaultClass, setBulkDefaultClass] = useState<VoterClass>("year2Committee");
-  const [filterClass, setFilterClass] = useState<VoterClass | "all">("all");
-  const [busy, setBusy] = useState(false);
+function Body({ election }: { election: Doc<"elections"> }) {
+  const list = useQuery(api.whitelist.list, { electionId: election._id });
+  const bulkAdd = useMutation(api.whitelist.bulkAdd);
+
   const [showAdd, setShowAdd] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
+  const [bulkDefaultClass, setBulkDefaultClass] =
+    useState<VoterClass>("year2Committee");
+  const [filterClass, setFilterClass] = useState<VoterClass | "all">("all");
+  const [importing, setImporting] = useState(false);
+  const [lastImport, setLastImport] = useState<
+    | (BulkSummary & {
+        attempted: number;
+        sourceLabel: string;
+      })
+    | null
+  >(null);
 
   const editable =
     election.phase === "setup" || election.phase === "internalOpen";
@@ -107,68 +168,633 @@ function Body({ election }: { election: Doc<"elections"> }) {
     return counts;
   }, [list]);
 
-  const onAddSingle = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!single.trim()) return;
-    setBusy(true);
-    try {
-      await add({
-        electionId: election._id,
-        email: single,
-        voterClass: singleClass,
-      });
-      toast.success("Email added");
-      setSingle("");
-      setShowAdd(false);
-    } catch (err) {
-      const m = getConvexErrorMessage(err, "Add failed.");
-      toast.error("Add failed", { description: m });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const importBulk = async (
-    rows: { email: string; voterClass?: string }[],
-    defaultClass: VoterClass,
-  ) => {
-    setBusy(true);
+  const sendBulk = async (rows: BulkRow[], sourceLabel: string) => {
+    setImporting(true);
     try {
       const summary = await bulkAdd({
         electionId: election._id,
         rows,
-        defaultClass,
+        defaultClass: bulkDefaultClass,
       });
-      const parts = [`${summary.inserted} added`, `${summary.skipped} skipped`];
-      if (summary.reclassified > 0)
-        parts.push(`${summary.reclassified} reclassified`);
-      if (summary.invalid.length > 0)
-        parts.push(`${summary.invalid.length} invalid`);
-      toast.success("Bulk import complete", { description: parts.join(" · ") });
-      setBulk("");
+      setLastImport({ ...summary, attempted: rows.length, sourceLabel });
+      const issues = summary.errors.length + summary.warnings.length;
+      if (issues === 0) {
+        toast.success("Bulk import complete", {
+          description: `${summary.inserted} added, ${summary.skipped} skipped, ${summary.reclassified} reclassified.`,
+        });
+      } else {
+        toast.warning("Bulk import finished with issues", {
+          description: `${summary.inserted} added, ${summary.errors.length} ${
+            summary.errors.length === 1 ? "error" : "errors"
+          }, ${summary.warnings.length} ${
+            summary.warnings.length === 1 ? "warning" : "warnings"
+          }. See details below.`,
+        });
+      }
       setShowBulk(false);
     } catch (err) {
-      const m = getConvexErrorMessage(err, "Import failed.");
-      toast.error("Import failed", { description: m });
+      toast.error("Import failed", {
+        description: getConvexErrorMessage(err, "Import failed."),
+      });
     } finally {
-      setBusy(false);
+      setImporting(false);
     }
   };
 
-  const onPasteSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const emails = bulk
-      .split(/[\s,;]+/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-    if (emails.length === 0) return;
-    await importBulk(
-      emails.map((email) => ({ email })),
-      bulkDefaultClass,
-    );
+  if (list === undefined) {
+    return <PageSkeleton />;
+  }
+
+  return (
+    <main className="container-wide space-y-10 py-12">
+      <AdminBreadcrumb items={[{ label: "Internal whitelist" }]} />
+
+      <header className="space-y-5">
+        <SectionMarker
+          primary="Internal whitelist"
+          secondary={election.name}
+        />
+        <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
+          Evaluator allowlist and class assignment
+        </h1>
+        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+          Committee members on this list are the only people who can submit
+          internal evaluations during the rubric window. Each evaluator is
+          assigned to a class (Top Committee, Head Executive, or Year 2
+          Committee); the cycle&apos;s configured weight for that class
+          applies to every score they submit.
+        </p>
+        <MetaGroup className="grid-cols-2 sm:grid-cols-4">
+          <Meta
+            label="Cycle phase"
+            value={PHASE_LABELS[election.phase]}
+          />
+          <Meta label="Top committee" value={countByClass.topCommittee} />
+          <Meta label="Head executive" value={countByClass.headExecutive} />
+          <Meta
+            label="Year 2 committee"
+            value={countByClass.year2Committee}
+          />
+        </MetaGroup>
+        {editable ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={() => setShowAdd(true)}>
+              <Plus className="h-4 w-4" aria-hidden /> Add evaluator
+            </Button>
+            <Button variant="outline" onClick={() => setShowBulk(true)}>
+              <Upload className="h-4 w-4" aria-hidden /> Bulk import
+            </Button>
+          </div>
+        ) : null}
+      </header>
+
+      {!editable ? (
+        <NoticeStrip
+          markerPrimary="Phase lock"
+          markerSecondary={PHASE_LABELS[election.phase]}
+          markerIcon={
+            <Lock className="h-4 w-4 text-[var(--copper)]" aria-hidden />
+          }
+          headline="Whitelist is frozen for the rest of the cycle"
+          tone="copper"
+        >
+          <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+            Adds, edits, and deletes are only allowed during{" "}
+            <strong className="font-semibold">Setup</strong> or{" "}
+            <strong className="font-semibold">Internal evaluation open</strong>
+            . Changing the allowlist after the rubric window has closed
+            would alter who is counted in the weighted breakdown. Move the
+            cycle back to one of those phases from the{" "}
+            <LinkButton
+              href="/admin/election"
+              variant="link"
+              size="sm"
+              className="h-auto p-0 text-sm"
+            >
+              Election cycle page
+            </LinkButton>{" "}
+            if a structural change is genuinely necessary.
+          </p>
+        </NoticeStrip>
+      ) : null}
+
+      {lastImport ? (
+        <ImportSummaryStrip
+          summary={lastImport}
+          onDismiss={() => setLastImport(null)}
+        />
+      ) : null}
+
+      <AddSingleModal
+        open={editable && showAdd}
+        electionId={election._id}
+        onClose={() => setShowAdd(false)}
+      />
+
+      <BulkImportModal
+        open={editable && showBulk}
+        defaultClass={bulkDefaultClass}
+        importing={importing}
+        onChangeDefaultClass={setBulkDefaultClass}
+        onClose={() => setShowBulk(false)}
+        onSubmitPaste={(rows) => sendBulk(rows, "Pasted emails")}
+        onSubmitCsv={(rows, fileName) => sendBulk(rows, fileName)}
+      />
+
+      <section
+        aria-label="Whitelist roster"
+        className="space-y-4"
+      >
+        <header className="flex flex-wrap items-center gap-3">
+          <SectionMarker
+            primary="Roster"
+            secondary={`${list.length} ${
+              list.length === 1 ? "evaluator" : "evaluators"
+            }`}
+          />
+          <FilterChips
+            current={filterClass}
+            counts={countByClass}
+            total={list.length}
+            onChange={setFilterClass}
+          />
+        </header>
+        {filteredList.length === 0 ? (
+          <EmptyState
+            icon={<Users2 className="h-5 w-5" aria-hidden />}
+            title={
+              filterClass === "all"
+                ? "No evaluators on the whitelist yet"
+                : `No evaluators in ${VOTER_CLASS_LABEL[filterClass]}`
+            }
+            description={
+              filterClass === "all"
+                ? "Internal evaluation cannot start until the whitelist has at least one evaluator. Use Add evaluator or Bulk import to populate it."
+                : "Add evaluators with this class, or change the filter above to All classes."
+            }
+          />
+        ) : (
+          <ul
+            className="divide-y divide-[var(--ink-line)] rounded-md border border-[var(--ink-line)] bg-[var(--paper)]"
+            aria-busy={importing ? "true" : undefined}
+          >
+            {filteredList.map((row) => (
+              <WhitelistRow
+                key={row._id}
+                row={row}
+                editable={editable}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function FilterChips({
+  current,
+  counts,
+  total,
+  onChange,
+}: {
+  current: VoterClass | "all";
+  counts: Record<VoterClass, number>;
+  total: number;
+  onChange: (cls: VoterClass | "all") => void;
+}) {
+  const chips: { value: VoterClass | "all"; label: string; count: number }[] =
+    [
+      { value: "all", label: "All classes", count: total },
+      {
+        value: "topCommittee",
+        label: VOTER_CLASS_LABEL.topCommittee,
+        count: counts.topCommittee,
+      },
+      {
+        value: "headExecutive",
+        label: VOTER_CLASS_LABEL.headExecutive,
+        count: counts.headExecutive,
+      },
+      {
+        value: "year2Committee",
+        label: VOTER_CLASS_LABEL.year2Committee,
+        count: counts.year2Committee,
+      },
+    ];
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Filter whitelist by class"
+      className="flex flex-wrap items-center gap-1.5"
+    >
+      {chips.map((c) => {
+        const active = current === c.value;
+        return (
+          <button
+            key={c.value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(c.value)}
+            className={
+              active
+                ? "inline-flex items-center gap-1.5 rounded-full border border-[var(--ink)] bg-[var(--ink)] px-3 py-1 font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--paper)]"
+                : "inline-flex items-center gap-1.5 rounded-full border border-[var(--ink-line)] px-3 py-1 font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink-muted)] hover:text-[var(--ink)]"
+            }
+          >
+            <span>{c.label}</span>
+            <span className="tabular-nums">{c.count}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function WhitelistRow({
+  row,
+  editable,
+}: {
+  row: {
+    _id: Id<"internalWhitelist">;
+    email: string;
+    voterClass: VoterClass;
+    addedAt: number;
+  };
+  editable: boolean;
+}) {
+  const dialog = useDialog();
+  const setClass = useMutation(api.whitelist.setClass);
+  const removeEntry = useMutation(api.whitelist.remove);
+  const impact = useQuery(api.whitelist.entryImpact, { entryId: row._id });
+
+  const onChangeClass = async (next: VoterClass) => {
+    if (next === row.voterClass) return;
+    try {
+      await setClass({ entryId: row._id, voterClass: next });
+      toast.success("Class updated", {
+        description: `Set ${row.email} to ${VOTER_CLASS_LABEL[next]}.`,
+      });
+    } catch (err) {
+      toast.error("Update failed", {
+        description: getConvexErrorMessage(err, "Update failed."),
+      });
+    }
   };
 
-  const onCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onRemove = async () => {
+    if (impact === undefined) return;
+
+    let description: React.ReactNode;
+    if (
+      impact === null ||
+      !impact.hasSignedIn ||
+      impact.evaluationCount === 0
+    ) {
+      description = (
+        <>
+          Remove <strong className="font-semibold">{row.email}</strong> from
+          the whitelist. They have not submitted any evaluations yet, so no
+          scores are affected. They will lose access to the internal
+          evaluation window. The action cannot be undone.
+        </>
+      );
+    } else {
+      description = (
+        <>
+          Remove <strong className="font-semibold">{row.email}</strong> from
+          the whitelist. This evaluator has{" "}
+          <strong className="font-semibold tabular-nums">
+            {impact.submittedCount}
+          </strong>{" "}
+          submitted{" "}
+          {impact.submittedCount === 1 ? "evaluation" : "evaluations"}
+          {impact.draftCount > 0 ? (
+            <>
+              {" "}and{" "}
+              <strong className="font-semibold tabular-nums">
+                {impact.draftCount}
+              </strong>{" "}
+              draft{" "}
+              {impact.draftCount === 1 ? "evaluation" : "evaluations"}
+            </>
+          ) : null}
+          {", covering "}
+          <strong className="font-semibold tabular-nums">
+            {impact.scoreCount}
+          </strong>{" "}
+          {impact.scoreCount === 1 ? "score" : "scores"} across the rubric
+          {impact.lastSubmittedAt !== null ? (
+            <>
+              {", last submitted on "}
+              <strong className="font-semibold">
+                {formatMYT(impact.lastSubmittedAt)}
+              </strong>
+            </>
+          ) : null}
+          . Removing them does not delete those scores, but they will no
+          longer be able to edit or resubmit. The action cannot be undone.
+        </>
+      );
+    }
+
+    const ok = await dialog.confirm({
+      title: "Remove from whitelist?",
+      description,
+      confirmText: "Remove evaluator",
+      variant: "destructive",
+    });
+    if (!ok) return;
+
+    try {
+      await removeEntry({ entryId: row._id });
+      toast.success("Evaluator removed");
+    } catch (err) {
+      toast.error("Remove failed", {
+        description: getConvexErrorMessage(err, "Remove failed."),
+      });
+    }
+  };
+
+  return (
+    <li className="flex flex-wrap items-center gap-3 px-3 py-2.5 text-sm">
+      <span className="flex-1 font-mono text-[13px] tabular-nums text-[var(--ink)]">
+        {row.email}
+      </span>
+      {impact && impact.hasSignedIn && impact.submittedCount > 0 ? (
+        <Badge tone="brand" className="text-[10px]">
+          <span className="font-mono tabular-nums">
+            {impact.submittedCount}
+          </span>{" "}
+          submitted
+        </Badge>
+      ) : null}
+      {editable ? (
+        <Select
+          aria-label={`Set class for ${row.email}`}
+          value={row.voterClass}
+          onChange={(e) => void onChangeClass(e.target.value as VoterClass)}
+          className="h-8 w-44"
+        >
+          {VOTER_CLASS_OPTIONS.map((c) => (
+            <option key={c} value={c}>
+              {VOTER_CLASS_LABEL[c]}
+            </option>
+          ))}
+        </Select>
+      ) : (
+        <Badge tone={VOTER_CLASS_TONE[row.voterClass]}>
+          {VOTER_CLASS_LABEL[row.voterClass]}
+        </Badge>
+      )}
+      {editable ? (
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={onRemove}
+          aria-label={`Remove ${row.email}`}
+          disabled={impact === undefined}
+        >
+          <Trash2
+            className="h-4 w-4 text-[var(--color-destructive)]"
+            aria-hidden
+          />
+        </Button>
+      ) : null}
+    </li>
+  );
+}
+
+function AddSingleModal({
+  open,
+  electionId,
+  onClose,
+}: {
+  open: boolean;
+  electionId: Id<"elections">;
+  onClose: () => void;
+}) {
+  const add = useMutation(api.whitelist.add);
+
+  const emailId = useId();
+  const classId = useId();
+  const emailErrId = useId();
+
+  const [email, setEmail] = useState("");
+  const [cls, setCls] = useState<VoterClass>("year2Committee");
+  const [submitting, setSubmitting] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setEmail("");
+      setCls("year2Committee");
+      setEmailError(null);
+    }
+  }, [open]);
+
+  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const trimmed = email.trim();
+    if (trimmed.length === 0) {
+      setEmailError("Enter an email address.");
+      return;
+    }
+    if (!isPlausibleUsmEmail(trimmed)) {
+      setEmailError(`Email must end in ${USM_DOMAIN}.`);
+      return;
+    }
+    setEmailError(null);
+    setSubmitting(true);
+    try {
+      await add({
+        electionId,
+        email: trimmed,
+        voterClass: cls,
+      });
+      toast.success("Evaluator added", {
+        description: `${trimmed} (${VOTER_CLASS_LABEL[cls]}).`,
+      });
+      onClose();
+    } catch (err) {
+      toast.error("Add failed", {
+        description: getConvexErrorMessage(err, "Add failed."),
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={() => {
+        if (!submitting) onClose();
+      }}
+      title="Add evaluator"
+      description={
+        <>
+          The email must end in <code>{USM_DOMAIN}</code>. The evaluator
+          gains access the next time they sign in.
+        </>
+      }
+      size="md"
+    >
+      <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+        <div className="grid gap-1.5">
+          <Label htmlFor={emailId}>Student email</Label>
+          <Input
+            id={emailId}
+            type="email"
+            autoComplete="off"
+            placeholder={`someone${USM_DOMAIN}`}
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (emailError) setEmailError(null);
+            }}
+            aria-required="true"
+            aria-invalid={emailError ? "true" : undefined}
+            aria-describedby={emailError ? emailErrId : undefined}
+            autoFocus
+          />
+          {emailError ? (
+            <p
+              id={emailErrId}
+              role="alert"
+              className="text-xs text-[var(--color-destructive)]"
+            >
+              {emailError}
+            </p>
+          ) : null}
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor={classId}>Class</Label>
+          <Select
+            id={classId}
+            value={cls}
+            onChange={(e) => setCls(e.target.value as VoterClass)}
+            aria-required="true"
+          >
+            {VOTER_CLASS_OPTIONS.map((c) => (
+              <option key={c} value={c}>
+                {VOTER_CLASS_LABEL[c]}
+              </option>
+            ))}
+          </Select>
+          <p className="text-[11px] text-[var(--color-muted-foreground)]">
+            The cycle&apos;s configured weight for this class applies to
+            every score this evaluator submits.
+          </p>
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t pt-4">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onClose}
+            disabled={submitting}
+          >
+            Cancel
+          </Button>
+          <Button type="submit" loading={submitting}>
+            <Plus className="h-4 w-4" aria-hidden /> Add evaluator
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function BulkImportModal({
+  open,
+  defaultClass,
+  importing,
+  onChangeDefaultClass,
+  onClose,
+  onSubmitPaste,
+  onSubmitCsv,
+}: {
+  open: boolean;
+  defaultClass: VoterClass;
+  importing: boolean;
+  onChangeDefaultClass: (cls: VoterClass) => void;
+  onClose: () => void;
+  onSubmitPaste: (rows: BulkRow[]) => Promise<void> | void;
+  onSubmitCsv: (rows: BulkRow[], fileName: string) => Promise<void> | void;
+}) {
+  const pasteId = useId();
+  const defaultClassId = useId();
+  const csvInputRef = useRef<HTMLInputElement>(null);
+
+  const [paste, setPaste] = useState("");
+
+  useEffect(() => {
+    if (!open) setPaste("");
+  }, [open]);
+
+  const onPasteSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const lines = paste.split(/\r?\n/);
+    const rows: BulkRow[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const lineNum = i + 1;
+      const line = lines[i];
+      if (!line || line.trim().length === 0) continue;
+      const pieces = line
+        .split(/[,;]\s*/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      if (pieces.length === 0) continue;
+      pieces.forEach((email, j) => {
+        rows.push({
+          displayRow:
+            pieces.length === 1
+              ? `Line ${lineNum}`
+              : `Line ${lineNum}, item ${j + 1}`,
+          email,
+        });
+      });
+    }
+    if (rows.length === 0) {
+      toast.error("Nothing to import", {
+        description: "Paste at least one email address.",
+      });
+      return;
+    }
+    void onSubmitPaste(rows);
+  };
+
+  const tryHeaderlessParse = (file: File): Promise<BulkRow[] | null> => {
+    return new Promise((resolve) => {
+      Papa.parse<string[]>(file, {
+        complete: (r) => {
+          const rows: BulkRow[] = [];
+          for (let i = 0; i < r.data.length; i++) {
+            const cells = r.data[i];
+            if (!Array.isArray(cells)) continue;
+            for (let j = 0; j < cells.length; j++) {
+              const cell = cells[j];
+              if (typeof cell !== "string") continue;
+              const trimmed = cell.trim();
+              if (trimmed.length === 0) continue;
+              rows.push({
+                displayRow:
+                  cells.length > 1
+                    ? `Row ${i + 1}, col ${j + 1}`
+                    : `Row ${i + 1}`,
+                email: trimmed,
+              });
+            }
+          }
+          resolve(rows.length > 0 ? rows : null);
+        },
+        error: () => resolve(null),
+      });
+    });
+  };
+
+  const onCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
@@ -176,52 +802,83 @@ function Body({ election }: { election: Doc<"elections"> }) {
     Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (result) => {
-        const rows: { email: string; voterClass?: string }[] = [];
-        for (const row of result.data) {
-          const email =
+      transformHeader: (h) => h.trim(),
+      complete: async (result) => {
+        const fatalParseErrors = result.errors.filter(
+          (err) => err.code !== "TooFewFields",
+        );
+        if (fatalParseErrors.length > 0) {
+          const first = fatalParseErrors[0];
+          const rowLabel =
+            typeof first?.row === "number"
+              ? `Row ${first.row + 2}`
+              : "CSV";
+          toast.error("Could not parse CSV", {
+            description: `${rowLabel}: ${first?.message ?? "Unknown parse error"}`,
+          });
+          return;
+        }
+
+        const detected = (result.meta.fields ?? []).map((c) => c.trim());
+        const detectedLc = new Set(
+          detected.map((c) => c.toLowerCase()),
+        );
+        const hasEmailColumn =
+          detectedLc.has("email") ||
+          detectedLc.has("e-mail") ||
+          detectedLc.has("mail") ||
+          detectedLc.has("student email");
+
+        if (!hasEmailColumn) {
+          const fallback = await tryHeaderlessParse(file);
+          if (!fallback) {
+            toast.error("CSV missing required column", {
+              description: `Add an "email" column. Detected: ${
+                detected.length > 0 ? detected.join(", ") : "(none)"
+              }.`,
+            });
+            return;
+          }
+          await onSubmitCsv(fallback, file.name);
+          return;
+        }
+
+        const rows: BulkRow[] = [];
+        for (let i = 0; i < result.data.length; i++) {
+          const row = result.data[i] ?? {};
+          const email = (
             row.email ??
             row.Email ??
             row["E-mail"] ??
             row["e-mail"] ??
-            Object.values(row)[0];
-          if (typeof email !== "string" || email.trim().length === 0) continue;
-          const cls =
+            row.mail ??
+            row["Student Email"] ??
+            ""
+          ).trim();
+          if (email.length === 0) continue;
+          const cls = (
             row.voterClass ??
             row.VoterClass ??
             row.class ??
             row.Class ??
             row.role ??
-            row.Role;
-          rows.push(
-            cls && cls.trim().length > 0
-              ? { email: email.trim(), voterClass: cls.trim() }
-              : { email: email.trim() },
-          );
+            row.Role ??
+            ""
+          ).trim();
+          rows.push({
+            displayRow: `Row ${i + 2}`,
+            email,
+            voterClass: cls.length > 0 ? cls : undefined,
+          });
         }
         if (rows.length === 0) {
-          // Try header-less parsing as a fallback
-          Papa.parse<string[]>(file, {
-            complete: (r2) => {
-              const flat: { email: string }[] = [];
-              for (const row of r2.data) {
-                for (const cell of row) {
-                  if (typeof cell === "string" && cell.trim().length > 0) {
-                    flat.push({ email: cell.trim() });
-                  }
-                }
-              }
-              if (flat.length > 0) void importBulk(flat, bulkDefaultClass);
-              else
-                toast.error("No usable rows found in CSV.", {
-                  description:
-                    "Required column: email. Optional: voterClass.",
-                });
-            },
+          toast.error("No usable rows", {
+            description:
+              "Every row was missing an email value. Add the email to each row and re-upload.",
           });
           return;
         }
-        void importBulk(rows, bulkDefaultClass);
+        await onSubmitCsv(rows, file.name);
       },
       error: (err) => {
         toast.error("CSV parse failed", { description: err.message });
@@ -229,295 +886,202 @@ function Body({ election }: { election: Doc<"elections"> }) {
     });
   };
 
-  if (list === undefined)
-    return (
-      <main className="container-wide py-10">
-        <Skeleton className="h-40 w-full" />
-      </main>
-    );
-
   return (
-    <main className="container-wide py-10 space-y-8">
-      <AdminBreadcrumb items={[{ label: "Internal whitelist" }]} />
-      <header className="flex flex-wrap items-start gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Internal whitelist
-          </h1>
-          <p className="text-sm text-[var(--color-muted-foreground)]">
-            Committee members who can submit internal evaluations for{" "}
-            <strong>{election.name}</strong>. Each evaluator is assigned to a
-            class (Top Committee, Head Executive, or Year 2 Committee), and
-            their class&apos;s configured weight applies to their submitted
-            scores.
+    <Modal
+      open={open}
+      onClose={() => {
+        if (!importing) onClose();
+      }}
+      title="Bulk import evaluators"
+      description={
+        <>
+          Paste comma, semicolon, or newline-separated emails, or upload a
+          CSV with <code>email</code> and optional <code>voterClass</code>{" "}
+          columns. Rows without a class fall back to the default below.
+          Every email must end in <code>{USM_DOMAIN}</code>.
+        </>
+      }
+    >
+      <form onSubmit={onPasteSubmit} className="grid gap-4">
+        <div className="grid gap-1.5">
+          <Label htmlFor={pasteId}>Emails</Label>
+          <Textarea
+            id={pasteId}
+            rows={6}
+            placeholder={`alice${USM_DOMAIN}\nbob${USM_DOMAIN}`}
+            value={paste}
+            onChange={(e) => setPaste(e.target.value)}
+            aria-describedby={`${pasteId}-hint`}
+          />
+          <p
+            id={`${pasteId}-hint`}
+            className="text-[11px] text-[var(--color-muted-foreground)]"
+          >
+            One email per line is easiest. Comma- or semicolon-separated
+            lists work too. Per-row class overrides aren&apos;t supported
+            in pasted input — use CSV for that.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {editable ? (
-            <>
-              <Button onClick={() => setShowAdd(true)}>
-                <Plus className="h-4 w-4" /> Add evaluator
-              </Button>
-              <Button variant="outline" onClick={() => setShowBulk(true)}>
-                <Upload className="h-4 w-4" /> Bulk import
-              </Button>
-            </>
-          ) : (
-            <Badge tone="warning">Locked</Badge>
-          )}
+        <div className="grid gap-1.5">
+          <Label htmlFor={defaultClassId}>Default class</Label>
+          <Select
+            id={defaultClassId}
+            value={defaultClass}
+            onChange={(e) =>
+              onChangeDefaultClass(e.target.value as VoterClass)
+            }
+          >
+            {VOTER_CLASS_OPTIONS.map((c) => (
+              <option key={c} value={c}>
+                {VOTER_CLASS_LABEL[c]}
+              </option>
+            ))}
+          </Select>
+          <p className="text-[11px] text-[var(--color-muted-foreground)]">
+            Applied to any row without a recognized voterClass column. CSV
+            rows with a recognized class override this.
+          </p>
         </div>
-      </header>
+        <div className="flex flex-wrap items-center gap-2 border-t pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            loading={importing}
+            onClick={() => csvInputRef.current?.click()}
+          >
+            <Upload className="h-4 w-4" aria-hidden /> Upload CSV
+          </Button>
+          <input
+            ref={csvInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="sr-only"
+            onChange={onCsvUpload}
+            disabled={importing}
+            aria-hidden="true"
+            tabIndex={-1}
+          />
+          <div className="flex-1" />
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onClose}
+            disabled={importing}
+          >
+            Close
+          </Button>
+          <Button
+            type="submit"
+            loading={importing}
+            disabled={paste.trim() === ""}
+          >
+            Import pasted emails
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
 
-      <Modal
-        open={editable && showAdd}
-        onClose={() => setShowAdd(false)}
-        title="Add evaluator"
-        description={
-          <>
-            Email must end in <code>@student.usm.my</code>.
-          </>
-        }
-        size="md"
-      >
-        <form onSubmit={onAddSingle} className="grid gap-4">
-          <div className="grid gap-1.5">
-            <Label htmlFor="wl-email">Student email</Label>
-            <Input
-              id="wl-email"
-              type="email"
-              autoComplete="off"
-              placeholder="someone@student.usm.my"
-              value={single}
-              onChange={(e) => setSingle(e.target.value)}
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="wl-class">Class</Label>
-            <Select
-              id="wl-class"
-              value={singleClass}
-              onChange={(e) => setSingleClass(e.target.value as VoterClass)}
-            >
-              {VOTER_CLASS_OPTIONS.map((c) => (
-                <option key={c} value={c}>
-                  {VOTER_CLASS_LABEL[c]}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="flex items-center justify-end gap-2 border-t pt-4">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setShowAdd(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" loading={busy}>
-              <Plus className="h-4 w-4" /> Add
-            </Button>
-          </div>
-        </form>
-      </Modal>
+function ImportSummaryStrip({
+  summary,
+  onDismiss,
+}: {
+  summary: BulkSummary & { attempted: number; sourceLabel: string };
+  onDismiss: () => void;
+}) {
+  const totalIssues = summary.errors.length + summary.warnings.length;
+  return (
+    <NoticeStrip
+      markerPrimary="Last bulk import"
+      markerSecondary={summary.sourceLabel}
+      markerIcon={
+        totalIssues > 0 ? (
+          <FileWarning
+            className="h-4 w-4 text-[var(--copper)]"
+            aria-hidden
+          />
+        ) : undefined
+      }
+      headline={`${summary.inserted} of ${summary.attempted} ${
+        summary.attempted === 1 ? "row" : "rows"
+      } imported`}
+      tone={totalIssues > 0 ? "copper" : "neutral"}
+    >
+      <dl className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+        <SummaryStat label="Added" value={summary.inserted} />
+        <SummaryStat label="Reclassified" value={summary.reclassified} />
+        <SummaryStat label="Skipped" value={summary.skipped} />
+        <SummaryStat label="Errors" value={summary.errors.length} />
+        <SummaryStat label="Warnings" value={summary.warnings.length} />
+      </dl>
 
-      <Modal
-        open={editable && showBulk}
-        onClose={() => setShowBulk(false)}
-        title="Bulk import evaluators"
-        description={
-          <>
-            Paste comma/space/newline-separated emails, or upload a CSV with{" "}
-            <code>email</code> and optional <code>voterClass</code> columns.
-            Rows without a class fall back to the default below.
-          </>
-        }
-      >
-        <form onSubmit={onPasteSubmit} className="grid gap-4">
-          <div className="grid gap-1.5">
-            <Label htmlFor="wl-bulk">Emails</Label>
-            <Textarea
-              id="wl-bulk"
-              rows={6}
-              placeholder={"alice@student.usm.my\nbob@student.usm.my"}
-              value={bulk}
-              onChange={(e) => setBulk(e.target.value)}
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="wl-bulk-class">Default class</Label>
-            <Select
-              id="wl-bulk-class"
-              value={bulkDefaultClass}
-              onChange={(e) =>
-                setBulkDefaultClass(e.target.value as VoterClass)
-              }
-            >
-              {VOTER_CLASS_OPTIONS.map((c) => (
-                <option key={c} value={c}>
-                  {VOTER_CLASS_LABEL[c]}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 border-t pt-4">
-            <label className="inline-flex">
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                className="sr-only"
-                onChange={onCsvUpload}
-              />
-              <span className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border bg-transparent px-4 text-sm font-medium hover:bg-[var(--color-muted)]">
-                <Upload className="h-4 w-4" /> Upload CSV
-              </span>
-            </label>
-            <div className="flex-1" />
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setShowBulk(false)}
-            >
-              Close
-            </Button>
-            <Button type="submit" loading={busy} disabled={bulk.trim() === ""}>
-              Import pasted emails
-            </Button>
-          </div>
-        </form>
-      </Modal>
+      {summary.errors.length > 0 ? (
+        <div className="space-y-2">
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--copper)]">
+            <AlertTriangle
+              className="mr-1 inline-block h-3 w-3"
+              aria-hidden
+            />{" "}
+            Errors — these rows did not import
+          </p>
+          <ul className="max-h-48 space-y-1.5 overflow-auto rounded-md border border-[var(--ink-line)] bg-[var(--paper)] p-3 font-mono text-xs">
+            {summary.errors.map((err, i) => (
+              <li key={i} className="flex flex-wrap gap-2">
+                <span className="shrink-0 tabular-nums text-[var(--ink-muted)]">
+                  {err.displayRow}
+                </span>
+                <span className="text-[var(--ink)]">{err.email}</span>
+                <span className="text-[var(--copper)]">{err.reason}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center gap-3">
-            <CardTitle className="text-base">
-              Whitelist{" "}
-              <span className="text-[var(--color-muted-foreground)]">
-                ({list.length})
-              </span>
-            </CardTitle>
-            <div className="flex flex-wrap items-center gap-2">
-              {VOTER_CLASS_OPTIONS.map((c) => (
-                <Badge key={c} tone={VOTER_CLASS_TONE[c]}>
-                  {VOTER_CLASS_LABEL[c]}: {countByClass[c]}
-                </Badge>
-              ))}
-            </div>
-            <div className="flex-1" />
-            <div className="flex items-center gap-2">
-              <Label htmlFor="wl-filter" className="text-xs">
-                Filter
-              </Label>
-              <Select
-                id="wl-filter"
-                value={filterClass}
-                onChange={(e) =>
-                  setFilterClass(e.target.value as VoterClass | "all")
-                }
-                className="h-8 w-44"
-              >
-                <option value="all">All classes</option>
-                {VOTER_CLASS_OPTIONS.map((c) => (
-                  <option key={c} value={c}>
-                    {VOTER_CLASS_LABEL[c]}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {filteredList.length === 0 ? (
-            <EmptyState
-              icon={<Users2 className="h-5 w-5" aria-hidden />}
-              title={
-                filterClass === "all"
-                  ? "No emails added yet"
-                  : `No evaluators in ${VOTER_CLASS_LABEL[filterClass]}`
-              }
-              description={
-                filterClass === "all"
-                  ? "Internal evaluation cannot start until the whitelist has at least one evaluator with a non-zero weighted class."
-                  : "Use the form above to add some, or change the filter."
-              }
-            />
-          ) : (
-            <ul className="divide-y">
-              {filteredList.map((row) => (
-                <li
-                  key={row._id}
-                  className="flex flex-wrap items-center gap-3 py-2"
-                >
-                  <span className="flex-1 text-sm">{row.email}</span>
-                  {editable ? (
-                    <Select
-                      value={row.voterClass}
-                      onChange={async (e) => {
-                        const v = e.target.value as VoterClass;
-                        try {
-                          await setClass({
-                            entryId: row._id,
-                            voterClass: v,
-                          });
-                          toast.success("Class updated");
-                        } catch (err) {
-                          const m =
-                            getConvexErrorMessage(err, "Update failed.");
-                          toast.error("Update failed", { description: m });
-                        }
-                      }}
-                      className="h-8 w-44"
-                    >
-                      {VOTER_CLASS_OPTIONS.map((c) => (
-                        <option key={c} value={c}>
-                          {VOTER_CLASS_LABEL[c]}
-                        </option>
-                      ))}
-                    </Select>
-                  ) : (
-                    <Badge tone={VOTER_CLASS_TONE[row.voterClass]}>
-                      {VOTER_CLASS_LABEL[row.voterClass]}
-                    </Badge>
-                  )}
-                  {editable ? (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={async () => {
-                        const ok = await dialog.confirm({
-                          title: "Remove from whitelist?",
-                          description: (
-                            <>
-                              Remove <strong>{row.email}</strong>? They will
-                              lose access to the internal evaluation window.
-                            </>
-                          ),
-                          confirmText: "Remove",
-                          variant: "destructive",
-                        });
-                        if (!ok) return;
-                        try {
-                          await remove({ entryId: row._id });
-                          toast.success("Removed");
-                        } catch (err) {
-                          toast.error("Remove failed", {
-                            description: getConvexErrorMessage(
-                              err,
-                              "Remove failed.",
-                            ),
-                          });
-                        }
-                      }}
-                      aria-label="Remove"
-                    >
-                      <Trash2 className="h-4 w-4 text-[var(--color-destructive)]" />
-                    </Button>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-    </main>
+      {summary.warnings.length > 0 ? (
+        <div className="space-y-2">
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink-muted)]">
+            Warnings — imported with a fallback
+          </p>
+          <ul className="max-h-48 space-y-1.5 overflow-auto rounded-md border border-[var(--ink-line)] bg-[var(--paper)] p-3 font-mono text-xs">
+            {summary.warnings.map((w, i) => (
+              <li key={i} className="flex flex-wrap gap-2">
+                <span className="shrink-0 tabular-nums text-[var(--ink-muted)]">
+                  {w.displayRow}
+                </span>
+                <span className="text-[var(--ink)]">{w.email}</span>
+                <span className="text-[var(--ink-muted)]">{w.reason}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <div>
+        <Button variant="ghost" size="sm" onClick={onDismiss}>
+          Dismiss
+        </Button>
+      </div>
+    </NoticeStrip>
+  );
+}
+
+function SummaryStat({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="space-y-0.5">
+      <dt className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink-muted)]">
+        {label}
+      </dt>
+      <dd className="font-display text-2xl font-medium tabular-nums text-[var(--ink)]">
+        {value}
+      </dd>
+    </div>
   );
 }
