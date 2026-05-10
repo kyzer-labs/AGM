@@ -1,29 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import {
-  Award,
-  ChevronDown,
-  Lock,
-  Trophy,
-  UserCircle2,
-} from "lucide-react";
+import { ChevronDown, Trophy, UserCircle2 } from "lucide-react";
 
 import { AuthGate } from "@/components/auth/auth-gate";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
+import { internalSharePercent } from "@/lib/weights";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 
 interface PublicBreakdown {
@@ -65,22 +51,16 @@ export default function PublicResultsPage() {
 
 function Inner() {
   const election = useQuery(api.elections.getCurrent);
-  if (election === undefined)
+  if (election === undefined) return <PageSkeleton />;
+  if (election === null) {
     return (
-      <main className="container-narrow py-12">
-        <Skeleton className="h-40 w-full" />
-      </main>
+      <Standby
+        cycleName={null}
+        phase="No active cycle"
+        body="Final results appear here once the chairperson publishes them. The page activates the moment a cycle is created."
+      />
     );
-  if (election === null)
-    return (
-      <main className="container-narrow py-12">
-        <EmptyState
-          icon={<Award className="h-5 w-5" aria-hidden />}
-          title="No active election"
-          description="Results will appear here once the chairperson publishes them."
-        />
-      </main>
-    );
+  }
   return <Body election={election} />;
 }
 
@@ -89,175 +69,184 @@ function Body({ election }: { election: Doc<"elections"> }) {
     electionId: election._id,
   });
 
-  if (data === undefined) {
-    return (
-      <main className="container-narrow py-12">
-        <Skeleton className="h-40 w-full" />
-      </main>
-    );
-  }
+  if (data === undefined) return <PageSkeleton />;
 
   if (data === null || data.phase !== "published") {
     return (
-      <main className="container-narrow py-12">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Lock className="h-5 w-5" aria-hidden />
-              Results not published yet
-            </CardTitle>
-            <CardDescription>
-              <strong>{election.name}</strong> hasn&apos;t published results.
-              When the chairperson releases them, the winners and full
-              breakdown will appear here.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </main>
+      <Standby
+        cycleName={election.name}
+        phase="Results not published yet"
+        body={`${election.name} has not published results. When the chairperson releases them, the winners and full per-candidate breakdown appear here.`}
+      />
     );
   }
 
   if (data.rows.length === 0) {
     return (
-      <main className="container-narrow py-12">
-        <EmptyState
-          icon={<Award className="h-5 w-5" aria-hidden />}
-          title="Nothing to show"
-          description="Results were published but no positions had a final winner."
-        />
-      </main>
+      <Standby
+        cycleName={election.name}
+        phase="No positions to show"
+        body="Results were published, but no positions had a final winner. If this looks wrong, contact the AGM admin team."
+      />
     );
   }
 
+  const headerWeights = data.rows[0]?.weights ?? {
+    topCommittee: 0,
+    headExecutive: 0,
+    year2Committee: 0,
+    public: 0,
+  };
+  const internalShare = internalSharePercent(headerWeights);
+  const publicShare = Math.max(0, 100 - internalShare);
+
   return (
-    <main className="container-wide py-10 space-y-8">
-      <header>
-        <Badge tone="success" className="mb-2">
-          <Trophy className="h-3 w-3" aria-hidden /> Final results
-        </Badge>
-        <h1 className="text-3xl font-semibold tracking-tight">
+    <main className="container-wide space-y-12 py-12 sm:py-16">
+      <header className="space-y-4">
+        <p className="font-mono text-[10.5px] uppercase tracking-[0.28em] text-[var(--ink-muted)]">
+          Final results <span aria-hidden>·</span> Published
+        </p>
+        <h1 className="font-display text-4xl font-medium leading-[1.05] tracking-[-0.02em] text-[var(--ink)] sm:text-5xl">
           {election.name}
         </h1>
-        <p className="text-sm text-[var(--color-muted-foreground)]">
-          Combined internal aggregate ({data.weights.public < 100 ? 100 - data.weights.public : 0}%) +
-          public vote ({data.weights.public}%), in ballot order. Click any
-          position to see the full per-candidate breakdown.
+        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+          Combined internal aggregate ({internalShare}%) and public vote (
+          {publicShare}%), in ballot order. Each position lists its winner;
+          open a position for the full per-candidate breakdown.
         </p>
       </header>
 
-      <div className="grid gap-3">
-        {data.rows.map((row) => (
-          <ResultBlock key={row.positionId} row={row} />
+      <ol className="space-y-10">
+        {data.rows.map((row, index) => (
+          <li key={row.positionId}>
+            <ResultBlock row={row} index={index} />
+          </li>
         ))}
-      </div>
+      </ol>
     </main>
   );
 }
 
-function ResultBlock({ row }: { row: PublicRow }) {
+function ResultBlock({ row, index }: { row: PublicRow; index: number }) {
   const [open, setOpen] = useState(false);
+  const panelId = useId();
   const winner =
     row.breakdown.find((b) => b.candidateId === row.winnerCandidateId) ?? null;
 
+  const internalShare = internalSharePercent(row.weights);
+  const publicShare = Math.max(0, 100 - internalShare);
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-3">
-          <div className="text-xs text-[var(--color-muted-foreground)]">
-            Tier {row.tier}
-          </div>
-          <CardTitle className="flex-1 text-base">
-            {row.positionName}
-          </CardTitle>
-        </div>
-        {winner ? (
-          <div className="mt-2 flex items-center gap-3">
-            <div className="grid h-12 w-12 place-items-center overflow-hidden rounded-full bg-[var(--color-muted)]">
-              {winner.photoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={winner.photoUrl}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <UserCircle2
-                  className="h-6 w-6 text-[var(--color-muted-foreground)]"
-                  aria-hidden
-                />
-              )}
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 text-base font-semibold">
-                <Trophy
-                  className="h-4 w-4 text-[var(--color-success)]"
-                  aria-hidden
-                />
-                {winner.fullName}
-              </div>
-              <div className="text-xs text-[var(--color-muted-foreground)]">
-                {winner.matric && !winner.matric.startsWith("auto-")
-                  ? `${winner.matric} · `
-                  : ""}
-                final score {(winner.finalScore * 100).toFixed(2)}%
-              </div>
-            </div>
-          </div>
-        ) : (
-          <CardDescription>No winner recorded.</CardDescription>
-        )}
-      </CardHeader>
-      <CardContent>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setOpen((v) => !v)}
-          className="px-0 text-xs"
-        >
-          {open ? "Hide" : "Show"} full breakdown
-          <ChevronDown
-            className={cn(
-              "ml-1 h-3 w-3 transition-transform",
-              open ? "rotate-180" : undefined,
+    <article className="space-y-5 border-t border-[var(--ink-line)] pt-6">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <span className="font-mono text-2xl font-medium tabular-nums text-[var(--ink-muted)]">
+          {String(index + 1).padStart(2, "0")}
+        </span>
+        <p className="font-mono text-[10.5px] uppercase tracking-[0.28em] text-[var(--ink-muted)]">
+          Tier {row.tier}
+        </p>
+        <h2 className="font-display text-xl font-medium tracking-[-0.01em] text-[var(--ink)] sm:text-2xl">
+          {row.positionName}
+        </h2>
+      </div>
+
+      {winner ? (
+        <div className="flex items-center gap-4">
+          <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--color-muted)]">
+            {winner.photoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={winner.photoUrl}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <UserCircle2
+                className="h-7 w-7 text-[var(--color-muted-foreground)]"
+                aria-hidden
+              />
             )}
-            aria-hidden
-          />
-        </Button>
-        {open ? (
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs text-[var(--color-muted-foreground)]">
-                  <th className="px-2 py-1.5 font-medium">Candidate</th>
-                  <th className="px-2 py-1.5 font-medium text-right">
-                    Internal aggregate (
-                    {row.weights.public < 100
-                      ? 100 - row.weights.public
-                      : 0}
-                    %)
-                  </th>
-                  <th className="px-2 py-1.5 font-medium text-right">
-                    Public ({row.weights.public}%)
-                  </th>
-                  <th className="px-2 py-1.5 font-medium text-right">
-                    Public votes
-                  </th>
-                  <th className="px-2 py-1.5 font-medium text-right">
-                    Final
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {row.breakdown.map((b) => (
+          </div>
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-base font-semibold text-[var(--ink)] sm:text-lg">
+              <Trophy
+                className="h-4 w-4 text-[var(--color-success)]"
+                aria-label="Winner"
+              />
+              {winner.fullName}
+            </p>
+            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--ink-muted)] tabular-nums">
+              {winner.matric && !winner.matric.startsWith("auto-")
+                ? `${winner.matric} · `
+                : ""}
+              Final score {(winner.finalScore * 100).toFixed(2)}%
+            </p>
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-[var(--color-muted-foreground)]">
+          No winner recorded for this position.
+        </p>
+      )}
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-controls={panelId}
+        className="px-0 font-mono text-[11px] uppercase tracking-[0.22em]"
+      >
+        {open ? "Hide" : "Show"} full breakdown
+        <ChevronDown
+          className={cn(
+            "ml-1 h-3 w-3 transition-transform",
+            open ? "rotate-180" : undefined,
+          )}
+          aria-hidden
+        />
+      </Button>
+
+      {open ? (
+        <div id={panelId} className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <caption className="sr-only">
+              Per-candidate breakdown for {row.positionName}
+            </caption>
+            <thead>
+              <tr className="border-b text-left text-xs text-[var(--color-muted-foreground)]">
+                <th scope="col" className="px-2 py-1.5 font-medium">
+                  Candidate
+                </th>
+                <th scope="col" className="px-2 py-1.5 font-medium text-right">
+                  Internal aggregate ({internalShare}%)
+                </th>
+                <th scope="col" className="px-2 py-1.5 font-medium text-right">
+                  Public ({publicShare}%)
+                </th>
+                <th scope="col" className="px-2 py-1.5 font-medium text-right">
+                  Public votes
+                </th>
+                <th scope="col" className="px-2 py-1.5 font-medium text-right">
+                  Final
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {row.breakdown.map((b) => {
+                const isWinner = b.candidateId === row.winnerCandidateId;
+                return (
                   <tr
                     key={b.candidateId}
-                    className={
-                      b.candidateId === row.winnerCandidateId
-                        ? "bg-[var(--color-success)]/10"
-                        : "border-b last:border-b-0"
-                    }
+                    className={cn(
+                      "border-b last:border-b-0",
+                      isWinner ? "bg-[var(--color-success)]/10" : null,
+                    )}
                   >
-                    <td className="px-2 py-2">
+                    <th
+                      scope="row"
+                      className="px-2 py-2 text-left font-normal"
+                    >
                       <div className="flex items-center gap-2">
                         {b.photoUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -270,8 +259,14 @@ function ResultBlock({ row }: { row: PublicRow }) {
                           <div className="h-6 w-6 rounded bg-[var(--color-muted)]" />
                         )}
                         <span>{b.fullName}</span>
+                        {isWinner ? (
+                          <Trophy
+                            className="h-3.5 w-3.5 text-[var(--color-success)]"
+                            aria-label="Winner"
+                          />
+                        ) : null}
                       </div>
-                    </td>
+                    </th>
                     <td className="px-2 py-2 text-right tabular-nums">
                       {(b.internalAggregate * 100).toFixed(2)}%
                     </td>
@@ -285,18 +280,78 @@ function ResultBlock({ row }: { row: PublicRow }) {
                       {(b.finalScore * 100).toFixed(2)}%
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
-              {row.totalPublicVotes} total public votes
-              {row.publishedAt
-                ? ` · published ${new Date(row.publishedAt).toLocaleString()}`
-                : ""}
-            </p>
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
+                );
+              })}
+            </tbody>
+          </table>
+          <p className="mt-3 font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--ink-muted)] tabular-nums">
+            {row.totalPublicVotes} total public votes
+            {row.publishedAt ? (
+              <>
+                {" "}
+                <span aria-hidden>·</span> Published{" "}
+                {formatMYT(row.publishedAt)}
+              </>
+            ) : null}
+          </p>
+        </div>
+      ) : null}
+    </article>
   );
+}
+
+function PageSkeleton() {
+  return (
+    <main className="container-wide space-y-6 py-12 sm:py-16">
+      <Skeleton className="h-3 w-44" />
+      <Skeleton className="h-12 w-2/3" />
+      <Skeleton className="h-4 w-1/2" />
+      <div className="space-y-8 pt-6">
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-32 w-full" />
+      </div>
+    </main>
+  );
+}
+
+function Standby({
+  cycleName,
+  phase,
+  body,
+}: {
+  cycleName: string | null;
+  phase: string;
+  body: string;
+}) {
+  return (
+    <main className="container-narrow py-20 sm:py-24">
+      <header className="space-y-4">
+        <p className="font-mono text-[10.5px] uppercase tracking-[0.28em] text-[var(--ink-muted)]">
+          Final results <span aria-hidden>·</span> {phase}
+        </p>
+        <h1 className="text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
+          {cycleName ?? "No active AGM cycle"}
+        </h1>
+        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+          {body}
+        </p>
+      </header>
+    </main>
+  );
+}
+
+const MYT_FORMATTER = new Intl.DateTimeFormat("en-MY", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: "Asia/Kuala_Lumpur",
+});
+
+function formatMYT(ms: number): string {
+  return `${MYT_FORMATTER.format(new Date(ms))} MYT`;
 }
