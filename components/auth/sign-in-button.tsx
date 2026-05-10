@@ -3,6 +3,20 @@
 import { Button } from "@/components/ui/button";
 import { useMicrosoftSignIn } from "@/components/auth/use-microsoft-signin";
 
+/**
+ * Smaller secondary-surface sign-in button. The landing's loud CTA
+ * lives in `components/landing/sign-in-cta.tsx` and is the one a voter
+ * actually sees on the door; this component is the implicit fallback
+ * for any future authed surface that needs an in-page sign-in trigger
+ * without the premium Button-in-Button treatment.
+ *
+ * Vocabulary stays USM-student-facing: "Sign in with USM email" rather
+ * than "Sign in with Microsoft". The OAuth provider underneath is
+ * still Microsoft (USM accounts are Outlook), but no student
+ * recognises their account by that name. The Microsoft mark is
+ * deliberately omitted to keep the surface speaking the student's
+ * vocabulary, matching the landing CTA.
+ */
 export function SignInButton({
   size = "lg",
   className,
@@ -19,13 +33,7 @@ export function SignInButton({
       size={size}
       className={className}
     >
-      <svg viewBox="0 0 23 23" className="h-4 w-4" aria-hidden>
-        <rect x="1" y="1" width="10" height="10" fill="#F25022" />
-        <rect x="12" y="1" width="10" height="10" fill="#7FBA00" />
-        <rect x="1" y="12" width="10" height="10" fill="#00A4EF" />
-        <rect x="12" y="12" width="10" height="10" fill="#FFB900" />
-      </svg>
-      Sign in with Microsoft
+      Sign in with USM email
     </Button>
   );
 }
