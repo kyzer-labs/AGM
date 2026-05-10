@@ -1,0 +1,25 @@
+{
+  "id": "234a116e",
+  "phase": "agent_error",
+  "pageUrl": "/internal",
+  "sourceFile": null,
+  "expectedVariants": 3,
+  "arrivedVariants": 0,
+  "visibleVariant": 0,
+  "paramValues": {},
+  "pendingEventSeq": null,
+  "pendingEvent": null,
+  "deliveryLease": null,
+  "checkpointRevision": 1,
+  "activeOwner": "6a77fa99",
+  "sourceMarkers": {},
+  "fallbackMode": null,
+  "annotationArtifacts": [],
+  "diagnostics": [
+    {
+      "error": "agent_error",
+      "message": "Applied direct header shell layout change: wider percentage-based container with brand and account pinned to opposite edges."
+    }
+  ],
+  "updatedAt": "2026-05-10T20:01:21.978Z"
+}

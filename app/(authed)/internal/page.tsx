@@ -5,31 +5,18 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  CheckCircle2,
-  Circle,
-  Pencil,
-  Save,
-} from "lucide-react";
+import { ArrowLeft, CheckCircle2, Pencil } from "lucide-react";
 
 import { AuthGate } from "@/components/auth/auth-gate";
 import { useDialog } from "@/components/dialog/dialog-provider";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Meta, MetaGroup } from "@/components/ui/meta";
 import { SectionMarker } from "@/components/ui/section-marker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Standby as StandbyBlock } from "@/components/ui/standby";
-import { ScoreButtons } from "@/components/internal/score-buttons";
-import { RubricHelp } from "@/components/internal/rubric-help";
 import { matchRubricCategory } from "@/lib/rubric-categories";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { getConvexErrorMessage } from "@/lib/convex-error";
 import { formatMYT } from "@/lib/format";
-import { getWeights, internalSharePercent } from "@/lib/weights";
 import { cn } from "@/lib/utils";
 
 type VoterClass = "topCommittee" | "headExecutive" | "year2Committee";
@@ -142,7 +129,6 @@ function Body({ election }: { election: Doc<"elections"> }) {
     <ActiveEvaluation
       election={election}
       voterClass={status.voterClass as VoterClass | null}
-      voterClassWeight={status.voterClassWeight}
     />
   );
 }
@@ -187,14 +173,18 @@ interface CandidateRow {
   positions: { name: string; fallbackOrder: number }[];
 }
 
+interface CriterionRow {
+  _id: Id<"rubricCriteria">;
+  name: string;
+  maxScore: number;
+}
+
 function ActiveEvaluation({
   election,
   voterClass,
-  voterClassWeight,
 }: {
   election: Doc<"elections">;
   voterClass: VoterClass | null;
-  voterClassWeight: number;
 }) {
   const dialog = useDialog();
   const evaluation = useQuery(api.internal.myEvaluation, {
@@ -212,6 +202,7 @@ function ActiveEvaluation({
   const [saving, setSaving] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [view, setView] = useState<View>("score");
+  const [activeCandidateIdx, setActiveCandidateIdx] = useState(0);
   const [activeCriterionIdx, setActiveCriterionIdx] = useState(0);
 
   const seededFor = useRef<string | null>(null);
@@ -232,6 +223,13 @@ function ActiveEvaluation({
   const isSubmitted = evaluation?.status === "submitted";
   const editable = !isSubmitted;
 
+  const orderedCandidates = useMemo<CandidateRow[]>(() => {
+    if (!candidates) return [];
+    return candidates
+      .slice()
+      .sort((a, b) => a.fullName.localeCompare(b.fullName, "en"));
+  }, [candidates]);
+
   const totals = useMemo(() => {
     if (!candidates || !evaluation)
       return { complete: 0, total: 0, criteriaCount: 0 };
@@ -244,19 +242,6 @@ function ActiveEvaluation({
       if (allFilled) complete += 1;
     }
     return { complete, total: candidates.length, criteriaCount };
-  }, [candidates, evaluation, local]);
-
-  const criterionCompletion = useMemo(() => {
-    if (!candidates || !evaluation) return new Map<string, number>();
-    const map = new Map<string, number>();
-    for (const cr of evaluation.criteria) {
-      let count = 0;
-      for (const c of candidates) {
-        if (local.get(scoreKey(c._id, cr._id)) !== undefined) count += 1;
-      }
-      map.set(cr._id, count);
-    }
-    return map;
   }, [candidates, evaluation, local]);
 
   const buildScoresPayload = (): {
@@ -369,6 +354,90 @@ function ActiveEvaluation({
     }
   };
 
+  // Stable-ref keyboard model. Listener attaches once per ActiveEvaluation
+  // mount; reads live state from a ref so we don't re-bind every keystroke.
+  // Contract:
+  //   1-9: set the active criterion's score (range-checked against maxScore),
+  //        then advance to next criterion within the same candidate.
+  //   ↑ / ↓: cycle criteria within the active candidate.
+  //   ← / →: cycle candidates (resets criterion to 0).
+  //   Enter: advance to next candidate when every criterion of the current
+  //          candidate has a score; otherwise no-op.
+  // Keystrokes are ignored while focus is in an input/textarea/select or any
+  // editable element so users can still type freely if a future field lands.
+  const kbdRef = useRef<{
+    candIdx: number;
+    critIdx: number;
+    candidates: CandidateRow[];
+    criteria: CriterionRow[];
+    local: ScoreMap;
+    editable: boolean;
+    view: View;
+  }>({
+    candIdx: 0,
+    critIdx: 0,
+    candidates: [],
+    criteria: [],
+    local: new Map(),
+    editable: false,
+    view: "score",
+  });
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        target.matches("input, textarea, select, [contenteditable='true']")
+      ) {
+        return;
+      }
+      const s = kbdRef.current;
+      if (s.view !== "score" || !s.editable) return;
+      const cand = s.candidates[s.candIdx];
+      const cr = s.criteria[s.critIdx];
+      if (!cand || !cr) return;
+      const k = e.key;
+      if (k >= "1" && k <= "9" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const n = Number(k);
+        if (n < 1 || n > cr.maxScore) return;
+        e.preventDefault();
+        onSetScore(cand._id, cr._id, n);
+        if (s.critIdx < s.criteria.length - 1) {
+          setActiveCriterionIdx(s.critIdx + 1);
+        }
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (k === "ArrowDown") {
+        e.preventDefault();
+        setActiveCriterionIdx((i) => Math.min(s.criteria.length - 1, i + 1));
+      } else if (k === "ArrowUp") {
+        e.preventDefault();
+        setActiveCriterionIdx((i) => Math.max(0, i - 1));
+      } else if (k === "ArrowRight") {
+        e.preventDefault();
+        setActiveCandidateIdx((i) => Math.min(s.candidates.length - 1, i + 1));
+        setActiveCriterionIdx(0);
+      } else if (k === "ArrowLeft") {
+        e.preventDefault();
+        setActiveCandidateIdx((i) => Math.max(0, i - 1));
+        setActiveCriterionIdx(0);
+      } else if (k === "Enter") {
+        const allScored = s.criteria.every(
+          (c) => s.local.get(scoreKey(cand._id, c._id)) !== undefined,
+        );
+        if (allScored && s.candIdx < s.candidates.length - 1) {
+          e.preventDefault();
+          setActiveCandidateIdx(s.candIdx + 1);
+          setActiveCriterionIdx(0);
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   if (!candidates || !evaluation) {
     return <PageSkeleton />;
   }
@@ -393,106 +462,302 @@ function ActiveEvaluation({
     );
   }
 
-  const internalShare = internalSharePercent(getWeights(election));
-  const publicShare = Math.max(0, 100 - internalShare);
+  const totalCount = orderedCandidates.length;
+  const criteriaCount = evaluation.criteria.length;
+  const safeCandIdx = Math.max(0, Math.min(activeCandidateIdx, totalCount - 1));
+  const safeCritIdx = Math.max(
+    0,
+    Math.min(activeCriterionIdx, criteriaCount - 1),
+  );
+  const activeCand: CandidateRow | undefined = orderedCandidates[safeCandIdx];
 
-  const orderedCandidates = candidates.slice().sort((a, b) => {
-    return a.fullName.localeCompare(b.fullName, "en");
-  });
+  const perCandidateFilled = (c: CandidateRow): number =>
+    evaluation.criteria.filter(
+      (cr) => local.get(scoreKey(c._id, cr._id)) !== undefined,
+    ).length;
 
-  const activeCriterion =
-    evaluation.criteria[
-      Math.min(activeCriterionIdx, evaluation.criteria.length - 1)
-    ];
-
-  const goPrev = () => {
-    setActiveCriterionIdx((i) => Math.max(0, i - 1));
-    if (typeof window !== "undefined")
-      window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-  const goNext = () => {
-    setActiveCriterionIdx((i) =>
-      Math.min(evaluation.criteria.length - 1, i + 1),
+  const activeAllScored =
+    activeCand !== undefined &&
+    evaluation.criteria.every(
+      (cr) => local.get(scoreKey(activeCand._id, cr._id)) !== undefined,
     );
-    if (typeof window !== "undefined")
-      window.scrollTo({ top: 0, behavior: "smooth" });
+
+  // Keep keyboard ref in sync each render.
+  kbdRef.current = {
+    candIdx: safeCandIdx,
+    critIdx: safeCritIdx,
+    candidates: orderedCandidates,
+    criteria: evaluation.criteria,
+    local,
+    editable,
+    view,
+  };
+
+  const goPrevCandidate = () => {
+    setActiveCandidateIdx((i) => Math.max(0, i - 1));
+    setActiveCriterionIdx(0);
+  };
+  const goNextCandidate = () => {
+    setActiveCandidateIdx((i) => Math.min(totalCount - 1, i + 1));
+    setActiveCriterionIdx(0);
+  };
+  const pickCandidate = (i: number) => {
+    setActiveCandidateIdx(i);
+    setActiveCriterionIdx(0);
   };
   const goReview = () => {
     setView("review");
-    if (typeof window !== "undefined")
-      window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  const goBackToScore = (criterionIdx?: number) => {
+  const goBackToScore = (candidateIdx?: number, criterionIdx?: number) => {
+    if (candidateIdx !== undefined) setActiveCandidateIdx(candidateIdx);
     if (criterionIdx !== undefined) setActiveCriterionIdx(criterionIdx);
     setView("score");
-    if (typeof window !== "undefined")
-      window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  return (
-    <main className="container-wide space-y-10 py-12 pb-32">
-      <header className="space-y-6">
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-3">
-            <SectionMarker
-              primary="Internal evaluation"
-              secondary={election.name}
-            />
-            <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
-              Score the candidates
-            </h1>
-            <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
-              Score every active candidate against each rubric criterion, one
-              criterion at a time. Drafts save explicitly. Your scores are
-              private until you submit, and remain editable until the internal
-              window closes.
-            </p>
+  const renderRail = (railClassName = "") => (
+    <nav
+      className={cn("internal-rail", railClassName)}
+      aria-label="Candidate roster"
+    >
+      <p className="internal-rail-h">Roster · {totalCount}</p>
+      <ol className="internal-rail-list">
+        {orderedCandidates.map((c, i) => {
+          const filled = perCandidateFilled(c);
+          const allDone = filled === criteriaCount;
+          const isActive = i === safeCandIdx;
+          return (
+            <li key={c._id}>
+              <button
+                type="button"
+                onClick={() => pickCandidate(i)}
+                className={cn("internal-rail-item", isActive && "is-active")}
+                aria-current={isActive ? "true" : undefined}
+                aria-label={`${c.fullName}, ${filled} of ${criteriaCount} criteria scored`}
+              >
+                <span className="internal-rail-num">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span className="internal-rail-name">{c.fullName}</span>
+                <span
+                  className={cn("internal-rail-prog", allDone && "is-done")}
+                >
+                  {filled}/{criteriaCount}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+
+  const renderSurface = (surfaceClassName = "") => (
+    <main className={cn("container-wide", surfaceClassName)}>
+      {view === "score" ? (
+        <>
+          <div className="internal-strip internal-strip-distill-v1">
+            <div>
+              <p className="internal-strip-mark">
+                Internal evaluation{" "}
+                <span className="internal-dot" aria-hidden>
+                  ·
+                </span>{" "}
+                {election.name}
+              </p>
+              <h1 className="internal-strip-title">Score the candidates</h1>
+              <p className="internal-strip-meta">
+                {voterClass ? VOTER_CLASS_LABEL[voterClass] : "Evaluator"}
+              </p>
+            </div>
+            <div className="internal-strip-status">
+              <span className="internal-draft" aria-live="polite">
+                {isSubmitted ? (
+                  <>
+                    <CheckCircle2 className="h-3 w-3" aria-hidden />
+                    Submitted
+                  </>
+                ) : (
+                  <>
+                    <Pencil className="h-3 w-3" aria-hidden />
+                    Draft
+                  </>
+                )}
+              </span>
+              <span className="internal-progress">
+                {totals.complete} / {totals.total} complete
+              </span>
+            </div>
           </div>
-          <StatusStrip
-            isSubmitted={Boolean(isSubmitted)}
-            complete={totals.complete}
-            total={totals.total}
-            lastSavedAt={lastSavedAt}
-          />
-        </div>
 
-        {voterClass ? (
-          <MetaGroup className="sm:grid-cols-3">
-            <Meta label="Evaluating as" value={VOTER_CLASS_LABEL[voterClass]} />
-            <Meta
-              label="Class weight"
-              value={`${voterClassWeight}% of final`}
-            />
-            <Meta
-              label="Final result split"
-              value={`${internalShare}% internal / ${publicShare}% public`}
-            />
-          </MetaGroup>
-        ) : null}
-      </header>
+          <div className="internal-body">
+            {renderRail("internal-rail-lock-v1")}
 
-      <RubricHelp />
+            <article
+              className="internal-card"
+              aria-label="Active candidate scoring"
+              key={activeCand?._id ?? "none"}
+            >
+              <div className="internal-card-head">
+                <div className="internal-photo" aria-hidden>
+                  {activeCand?.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={activeCand.photoUrl} alt="" />
+                  ) : null}
+                </div>
+                <div>
+                  <p className="internal-bio-step">
+                    Candidate {String(safeCandIdx + 1).padStart(2, "0")} of{" "}
+                    {String(totalCount).padStart(2, "0")}
+                  </p>
+                  <h2 className="internal-bio-name">
+                    {activeCand?.fullName ?? "—"}
+                  </h2>
+                  <p className="internal-bio-pos">
+                    {activeCand?.matric &&
+                    !activeCand.matric.startsWith("auto-") ? (
+                      <>
+                        <span>{activeCand.matric}</span>
+                        {activeCand.positions[0] ? (
+                          <span className="internal-dot" aria-hidden>
+                            ·
+                          </span>
+                        ) : null}
+                      </>
+                    ) : null}
+                    {activeCand?.positions
+                      .slice()
+                      .sort((a, b) => a.fallbackOrder - b.fallbackOrder)
+                      .map((p) => p.name)
+                      .join(", ") || null}
+                  </p>
+                </div>
+                <div className="internal-keys" aria-hidden>
+                  <div className="internal-keys-row">
+                    <kbd>1</kbd>
+                    <kbd>2</kbd>
+                    <kbd>3</kbd>
+                    <kbd>4</kbd>
+                    <kbd>5</kbd>
+                    <span>score</span>
+                  </div>
+                  <div className="internal-keys-row">
+                    <kbd>↑</kbd>
+                    <kbd>↓</kbd>
+                    <span>criterion</span>
+                  </div>
+                  <div className="internal-keys-row">
+                    <kbd>←</kbd>
+                    <kbd>→</kbd>
+                    <span>candidate</span>
+                  </div>
+                </div>
+              </div>
 
-      {view === "score" && activeCriterion ? (
-        <ScoreView
-          criterion={activeCriterion}
-          activeIdx={activeCriterionIdx}
-          allCriteria={evaluation.criteria}
-          candidates={orderedCandidates}
-          local={local}
-          editable={editable}
-          criterionCompletion={criterionCompletion}
-          totals={totals}
-          onSetScore={onSetScore}
-          onPickCriterion={(i) => {
-            setActiveCriterionIdx(i);
-            if (typeof window !== "undefined")
-              window.scrollTo({ top: 0, behavior: "smooth" });
-          }}
-          onPrev={goPrev}
-          onNext={goNext}
-          onReview={goReview}
-        />
+              <ol className="internal-criteria">
+                {evaluation.criteria.map((cr, i) => {
+                  const value = activeCand
+                    ? local.get(scoreKey(activeCand._id, cr._id))
+                    : undefined;
+                  const blurb =
+                    matchRubricCategory(cr.name)?.bullets.join(" · ") ?? null;
+                  const isFocus = i === safeCritIdx;
+                  return (
+                    <li
+                      key={cr._id}
+                      className={cn(
+                        "internal-crit",
+                        isFocus && "is-active",
+                      )}
+                    >
+                      <div className="internal-crit-mark">
+                        <span className="internal-crit-num">
+                          Criterion {String(i + 1).padStart(2, "0")}
+                          <span className="internal-dot" aria-hidden>
+                            {" · "}
+                          </span>
+                          Max {cr.maxScore}
+                        </span>
+                        <span className="internal-crit-name">{cr.name}</span>
+                      </div>
+                      <p className="internal-crit-rubric">
+                        {blurb ?? "Apply the rubric reference."}
+                      </p>
+                      <div
+                        className="internal-buttons"
+                        role="group"
+                        aria-label={`${cr.name} score for ${activeCand?.fullName ?? "candidate"}`}
+                      >
+                        {Array.from(
+                          { length: cr.maxScore },
+                          (_, n) => n + 1,
+                        ).map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            disabled={!editable || !activeCand}
+                            onClick={() =>
+                              activeCand &&
+                              onSetScore(activeCand._id, cr._id, n)
+                            }
+                            onFocus={() => setActiveCriterionIdx(i)}
+                            aria-pressed={value === n}
+                            aria-label={`${n} of ${cr.maxScore}`}
+                            className={cn(
+                              "internal-btn",
+                              value === n && "is-on",
+                            )}
+                          >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+
+              <footer className="internal-card-foot">
+                <button
+                  type="button"
+                  className="internal-pager"
+                  onClick={goPrevCandidate}
+                  disabled={safeCandIdx === 0}
+                  aria-label={
+                    safeCandIdx === 0
+                      ? "Previous candidate (disabled)"
+                      : `Previous candidate: ${orderedCandidates[safeCandIdx - 1]?.fullName ?? ""}`
+                  }
+                >
+                  ← Previous
+                </button>
+                {safeCandIdx === totalCount - 1 ? (
+                  <button
+                    type="button"
+                    className="internal-pager is-primary"
+                    onClick={goReview}
+                    aria-label={`Review all ${totalCount} candidates before submitting`}
+                  >
+                    Review and submit →
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className={cn(
+                      "internal-pager",
+                      activeAllScored && "is-primary",
+                    )}
+                    onClick={goNextCandidate}
+                    aria-label={`Next candidate: ${
+                      orderedCandidates[safeCandIdx + 1]?.fullName ?? ""
+                    }`}
+                  >
+                    Next candidate →
+                  </button>
+                )}
+              </footer>
+            </article>
+          </div>
+        </>
       ) : null}
 
       {view === "review" ? (
@@ -501,408 +766,58 @@ function ActiveEvaluation({
           allCriteria={evaluation.criteria}
           local={local}
           totals={totals}
-          onJumpToCriterion={(i) => goBackToScore(i)}
+          onJumpTo={(candidateIdx, criterionIdx) =>
+            goBackToScore(candidateIdx, criterionIdx)
+          }
           onBack={() => goBackToScore()}
         />
       ) : null}
 
-      <StickyControls
-        dirty={dirty}
-        saving={saving}
-        isSubmitted={Boolean(isSubmitted)}
-        lastSavedAt={lastSavedAt}
-        completeRatio={`${totals.complete}/${totals.total}`}
-        onSave={onManualSave}
-        onSubmit={onSubmit}
-        onReopen={onReopen}
-      />
-    </main>
-  );
-}
-
-function StatusStrip({
-  isSubmitted,
-  complete,
-  total,
-  lastSavedAt,
-}: {
-  isSubmitted: boolean;
-  complete: number;
-  total: number;
-  lastSavedAt: number | null;
-}) {
-  return (
-    <div className="flex flex-col items-start gap-2 sm:items-end">
-      <Badge tone={isSubmitted ? "success" : "brand"}>
-        {isSubmitted ? (
-          <>
-            <CheckCircle2 className="h-3 w-3" aria-hidden /> Submitted
-          </>
-        ) : (
-          <>
-            <Pencil className="h-3 w-3" aria-hidden /> Draft
-          </>
-        )}
-      </Badge>
-      <p className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--ink-muted)] tabular-nums">
-        {complete} / {total} candidates fully scored
-      </p>
-      {lastSavedAt ? (
-        <p className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--ink-muted)]">
-          Last saved {formatRelative(lastSavedAt)}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function ScoreView({
-  criterion,
-  activeIdx,
-  allCriteria,
-  candidates,
-  local,
-  editable,
-  criterionCompletion,
-  totals,
-  onSetScore,
-  onPickCriterion,
-  onPrev,
-  onNext,
-  onReview,
-}: {
-  criterion: { _id: Id<"rubricCriteria">; name: string; maxScore: number };
-  activeIdx: number;
-  allCriteria: { _id: Id<"rubricCriteria">; name: string; maxScore: number }[];
-  candidates: CandidateRow[];
-  local: ScoreMap;
-  editable: boolean;
-  criterionCompletion: Map<string, number>;
-  totals: { complete: number; total: number; criteriaCount: number };
-  onSetScore: (
-    candidateId: Id<"candidates">,
-    criterionId: Id<"rubricCriteria">,
-    n: number,
-  ) => void;
-  onPickCriterion: (i: number) => void;
-  onPrev: () => void;
-  onNext: () => void;
-  onReview: () => void;
-}) {
-  const category = matchRubricCategory(criterion.name);
-  const isFirst = activeIdx === 0;
-  const isLast = activeIdx === allCriteria.length - 1;
-  const prev = !isFirst ? allCriteria[activeIdx - 1] : null;
-  const next = !isLast ? allCriteria[activeIdx + 1] : null;
-  const scoredHere = criterionCompletion.get(criterion._id) ?? 0;
-  const totalCandidates = candidates.length;
-
-  return (
-    <section
-      aria-label="Score one criterion at a time"
-      className="space-y-8"
-      key={criterion._id}
-    >
-      <CriterionStepper
-        criteria={allCriteria}
-        activeIdx={activeIdx}
-        criterionCompletion={criterionCompletion}
-        totalCandidates={totalCandidates}
-        onPick={onPickCriterion}
-      />
-
-      <div className="space-y-4">
-        <SectionMarker
-          primary={`Criterion ${String(activeIdx + 1).padStart(2, "0")} of ${String(
-            allCriteria.length,
-          ).padStart(2, "0")}`}
-          secondary={`Max ${criterion.maxScore} per candidate`}
-        />
-        <h2 className="font-display text-2xl font-medium leading-tight tracking-[-0.012em] text-[var(--ink)] sm:text-3xl">
-          {criterion.name}
-        </h2>
-        {category ? (
-          <p className="max-w-[68ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
-            {category.bullets.join(" · ")}
-          </p>
-        ) : null}
-        <div className="font-mono text-[10.5px] uppercase tracking-[0.22em] tabular-nums text-[var(--ink-muted)]">
-          {scoredHere} / {totalCandidates} candidates scored on this criterion
-        </div>
-      </div>
-
-      <ol
-        aria-label={`${criterion.name} scores`}
-        className="divide-y divide-[var(--ink-line)] border-y border-[var(--ink-line)]"
+      <div
+        className="internal-save"
+        role="region"
+        aria-label="Save and submit"
       >
-        {candidates.map((c, idx) => {
-          const value = local.get(scoreKey(c._id, criterion._id));
-          const allFilled = allCriteria.every(
-            (cr) => local.get(scoreKey(c._id, cr._id)) !== undefined,
-          );
-          return (
-            <li
-              key={c._id}
-              className="tile-enter"
-              style={{ ["--index" as never]: idx }}
-            >
-              <CandidateScoreRow
-                candidate={c}
-                value={value}
-                maxScore={criterion.maxScore}
-                index={idx}
-                allFilled={allFilled}
-                disabled={!editable}
-                onChange={(n) => onSetScore(c._id, criterion._id, n)}
-                ariaLabel={`${c.fullName}, ${criterion.name}`}
-              />
-            </li>
-          );
-        })}
-      </ol>
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Button
-          variant="ghost"
-          onClick={onPrev}
-          disabled={isFirst}
-          aria-label={
-            prev
-              ? `Previous criterion: ${prev.name}`
-              : "Previous criterion (disabled)"
-          }
-        >
-          <ArrowLeft className="h-4 w-4" aria-hidden />
-          {prev ? (
-            <span className="flex flex-col items-start text-left leading-tight">
-              <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--ink-muted)]">
-                Previous
-              </span>
-              <span>{prev.name}</span>
-            </span>
-          ) : (
-            <span>Previous</span>
-          )}
-        </Button>
-        {isLast ? (
-          <Button
-            onClick={onReview}
-            aria-label={`Review all ${totals.total} candidates before submitting`}
+        <span className="internal-save-status" aria-live="polite">
+          {dirty
+            ? "Unsaved changes"
+            : lastSavedAt
+              ? `Saved ${formatRelative(lastSavedAt)}`
+              : "No scores saved yet"}
+        </span>
+        {isSubmitted ? (
+          <button
+            type="button"
+            className="internal-pager"
+            onClick={onReopen}
           >
-            <span className="flex flex-col items-end text-right leading-tight">
-              <span className="font-mono text-[10px] uppercase tracking-[0.22em] opacity-80">
-                Final step
-              </span>
-              <span>Review and submit</span>
-            </span>
-            <ArrowRight className="h-4 w-4" aria-hidden />
-          </Button>
+            Re-open for editing
+          </button>
         ) : (
-          <Button
-            onClick={onNext}
-            aria-label={next ? `Next criterion: ${next.name}` : "Next criterion"}
-          >
-            <span className="flex flex-col items-end text-right leading-tight">
-              <span className="font-mono text-[10px] uppercase tracking-[0.22em] opacity-80">
-                Next criterion
-              </span>
-              <span>{next?.name ?? "Next"}</span>
-            </span>
-            <ArrowRight className="h-4 w-4" aria-hidden />
-          </Button>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function CriterionStepper({
-  criteria,
-  activeIdx,
-  criterionCompletion,
-  totalCandidates,
-  onPick,
-}: {
-  criteria: { _id: Id<"rubricCriteria">; name: string }[];
-  activeIdx: number;
-  criterionCompletion: Map<string, number>;
-  totalCandidates: number;
-  onPick: (i: number) => void;
-}) {
-  return (
-    <ol
-      aria-label="Rubric criteria"
-      className="flex flex-wrap items-stretch gap-2"
-    >
-      {criteria.map((cr, idx) => {
-        const completed = criterionCompletion.get(cr._id) ?? 0;
-        const allDone = totalCandidates > 0 && completed >= totalCandidates;
-        const active = idx === activeIdx;
-        return (
-          <li key={cr._id} className="min-w-[10rem] flex-1">
+          <>
             <button
               type="button"
-              onClick={() => onPick(idx)}
-              aria-current={active ? "step" : undefined}
-              aria-label={`Go to criterion ${idx + 1}: ${cr.name}. ${completed} of ${totalCandidates} candidates scored.`}
-              className={cn(
-                "group flex w-full items-baseline gap-2.5 border-t-2 py-3 pr-2 pl-2 text-left",
-                "transition-[border-color,background-color,color] duration-200 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]",
-                active
-                  ? "border-[var(--ink)] bg-[var(--paper-2)]/40"
-                  : allDone
-                    ? "border-[var(--color-success)] hover:bg-[var(--paper-2)]/30"
-                    : "border-[var(--ink-line)] hover:border-[var(--ink)]/50 hover:bg-[var(--paper-2)]/20",
-              )}
+              className="internal-pager"
+              onClick={onManualSave}
+              disabled={saving}
             >
-              <span
-                className={cn(
-                  "font-mono text-[10.5px] font-medium uppercase tracking-[0.22em] tabular-nums",
-                  active
-                    ? "text-[var(--ink)]"
-                    : allDone
-                      ? "text-[var(--color-success)]"
-                      : "text-[var(--ink-muted)]",
-                )}
-                aria-hidden
-              >
-                {String(idx + 1).padStart(2, "0")}
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span
-                  className={cn(
-                    "truncate font-medium",
-                    active ? "text-[var(--ink)]" : "text-[var(--ink-muted)]",
-                  )}
-                >
-                  {cr.name}
-                </span>
-                <span className="font-mono text-[10px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
-                  {completed} / {totalCandidates}
-                </span>
-              </span>
-              {allDone ? (
-                <Check
-                  className="h-3.5 w-3.5 shrink-0 text-[var(--color-success)]"
-                  aria-hidden
-                />
-              ) : (
-                <Circle
-                  className="h-3.5 w-3.5 shrink-0 text-[var(--ink-line)]"
-                  aria-hidden
-                />
-              )}
+              {saving ? "Saving…" : "Save draft"}
             </button>
-          </li>
-        );
-      })}
-    </ol>
+            <button
+              type="button"
+              className="internal-pager is-primary"
+              onClick={onSubmit}
+              disabled={saving}
+            >
+              Submit ({totals.complete}/{totals.total})
+            </button>
+          </>
+        )}
+      </div>
+    </main>
   );
-}
 
-function CandidateScoreRow({
-  candidate,
-  value,
-  maxScore,
-  index,
-  allFilled,
-  disabled,
-  onChange,
-  ariaLabel,
-}: {
-  candidate: CandidateRow;
-  value: number | undefined;
-  maxScore: number;
-  index: number;
-  allFilled: boolean;
-  disabled: boolean;
-  onChange: (n: number) => void;
-  ariaLabel: string;
-}) {
-  const positionLabel = candidate.positions
-    .slice()
-    .sort((a, b) => a.fallbackOrder - b.fallbackOrder)
-    .map((p) => p.name)
-    .join(", ");
-  return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-3 py-4">
-      <span
-        className="font-mono text-lg font-medium tabular-nums text-[var(--ink-muted)] sm:text-xl"
-        aria-hidden
-      >
-        {String(index + 1).padStart(2, "0")}
-      </span>
-      <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-md bg-[var(--color-muted)]">
-        {candidate.photoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={candidate.photoUrl}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="h-full w-full bg-[var(--paper-2)]" />
-        )}
-      </div>
-      <div className="min-w-0 flex-1 basis-[16rem]">
-        <div className="truncate font-medium text-[var(--ink)]">
-          {candidate.fullName}
-        </div>
-        <div className="truncate font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink-muted)] tabular-nums">
-          {candidate.matric && !candidate.matric.startsWith("auto-") ? (
-            <span>{candidate.matric}</span>
-          ) : null}
-          {candidate.matric &&
-          !candidate.matric.startsWith("auto-") &&
-          positionLabel ? (
-            <span aria-hidden className="px-1 text-[var(--copper)]">
-              ·
-            </span>
-          ) : null}
-          {positionLabel ? <span>{positionLabel}</span> : null}
-        </div>
-      </div>
-      <div className="ml-auto flex flex-wrap items-center gap-3">
-        {maxScore <= 5 ? (
-          <ScoreButtons
-            value={value}
-            maxScore={maxScore}
-            onChange={onChange}
-            ariaLabel={ariaLabel}
-            disabled={disabled}
-          />
-        ) : (
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={maxScore}
-            step={1}
-            value={value ?? ""}
-            disabled={disabled}
-            onChange={(e) => {
-              const n = Number(e.target.value);
-              if (!Number.isFinite(n)) return;
-              const clamped = Math.max(1, Math.min(maxScore, Math.round(n)));
-              onChange(clamped);
-            }}
-            aria-label={ariaLabel}
-            className="h-9 w-20 rounded-md border bg-[var(--color-background)] px-2 text-sm tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] disabled:cursor-not-allowed disabled:opacity-50"
-          />
-        )}
-        {allFilled ? (
-          <Badge tone="muted" className="text-[10px]">
-            <Check
-              className="h-3 w-3 text-[var(--color-success)]"
-              aria-hidden
-            />
-            Complete
-          </Badge>
-        ) : null}
-      </div>
-    </div>
-  );
+  return renderSurface("internal-wide-v4");
 }
 
 function ReviewView({
@@ -910,14 +825,14 @@ function ReviewView({
   allCriteria,
   local,
   totals,
-  onJumpToCriterion,
+  onJumpTo,
   onBack,
 }: {
   candidates: CandidateRow[];
   allCriteria: { _id: Id<"rubricCriteria">; name: string; maxScore: number }[];
   local: ScoreMap;
   totals: { complete: number; total: number; criteriaCount: number };
-  onJumpToCriterion: (i: number) => void;
+  onJumpTo: (candidateIdx: number, criterionIdx: number) => void;
   onBack: () => void;
 }) {
   const incomplete = totals.total - totals.complete;
@@ -935,9 +850,9 @@ function ReviewView({
           Confirm every score
         </h2>
         <p className="max-w-[68ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
-          Click any column header to jump back to that criterion. Rows
-          highlighted in copper are missing at least one score; resolve them
-          before submitting.
+          Click any cell to jump back to that exact candidate-criterion pair.
+          Rows highlighted in copper still need scoring; resolve them before
+          submitting.
         </p>
         {incomplete > 0 ? (
           <p className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--copper)]">
@@ -958,19 +873,12 @@ function ReviewView({
               <th className="px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
                 Candidate
               </th>
-              {allCriteria.map((cr, idx) => (
+              {allCriteria.map((cr) => (
                 <th
                   key={cr._id}
                   className="px-3 py-2 text-right font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)] whitespace-nowrap"
                 >
-                  <button
-                    type="button"
-                    onClick={() => onJumpToCriterion(idx)}
-                    className="cursor-pointer underline-offset-4 hover:text-[var(--ink)] hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
-                    aria-label={`Jump to ${cr.name} scoring`}
-                  >
-                    {cr.name}
-                  </button>
+                  {cr.name}
                 </th>
               ))}
               <th className="px-3 py-2 text-right font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
@@ -979,19 +887,22 @@ function ReviewView({
             </tr>
           </thead>
           <tbody>
-            {candidates.map((c) => {
+            {candidates.map((c, candIdx) => {
+              const total = allCriteria.reduce(
+                (sum, cr) =>
+                  sum + (local.get(scoreKey(c._id, cr._id)) ?? 0),
+                0,
+              );
               const allFilled = allCriteria.every(
                 (cr) => local.get(scoreKey(c._id, cr._id)) !== undefined,
               );
-              const total = allCriteria.reduce((sum, cr) => {
-                return sum + (local.get(scoreKey(c._id, cr._id)) ?? 0);
-              }, 0);
               return (
                 <tr
                   key={c._id}
                   className={cn(
                     "border-b border-[var(--ink-line)] last:border-b-0",
-                    !allFilled ? "bg-[var(--copper)]/8" : null,
+                    !allFilled &&
+                      "bg-[color-mix(in_srgb,var(--copper)_8%,transparent)]",
                   )}
                 >
                   <td className="px-3 py-2">
@@ -1004,7 +915,7 @@ function ReviewView({
                       </div>
                     ) : null}
                   </td>
-                  {allCriteria.map((cr, idx) => {
+                  {allCriteria.map((cr, critIdx) => {
                     const value = local.get(scoreKey(c._id, cr._id));
                     return (
                       <td
@@ -1014,14 +925,21 @@ function ReviewView({
                         {value === undefined ? (
                           <button
                             type="button"
-                            onClick={() => onJumpToCriterion(idx)}
+                            onClick={() => onJumpTo(candIdx, critIdx)}
                             className="text-[var(--copper)] underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
                             aria-label={`Score ${c.fullName} on ${cr.name}`}
                           >
                             —
                           </button>
                         ) : (
-                          <span className="text-[var(--ink)]">{value}</span>
+                          <button
+                            type="button"
+                            onClick={() => onJumpTo(candIdx, critIdx)}
+                            className="text-[var(--ink)] underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
+                            aria-label={`${c.fullName} ${cr.name}: ${value} of ${cr.maxScore}. Click to revise.`}
+                          >
+                            {value}
+                          </button>
                         )}
                       </td>
                     );
@@ -1040,60 +958,6 @@ function ReviewView({
         <ArrowLeft className="h-4 w-4" aria-hidden /> Back to scoring
       </Button>
     </section>
-  );
-}
-
-function StickyControls({
-  dirty,
-  saving,
-  isSubmitted,
-  lastSavedAt,
-  completeRatio,
-  onSave,
-  onSubmit,
-  onReopen,
-}: {
-  dirty: boolean;
-  saving: boolean;
-  isSubmitted: boolean;
-  lastSavedAt: number | null;
-  completeRatio: string;
-  onSave: () => void;
-  onSubmit: () => void;
-  onReopen: () => void;
-}) {
-  return (
-    <div
-      className="sticky bottom-4 z-20 flex flex-wrap items-center gap-3 rounded-lg border border-[var(--ink-line)] bg-[var(--paper)]/95 px-4 py-3 shadow-[0_-12px_40px_-8px_rgba(15,106,106,0.18)] backdrop-blur"
-      role="region"
-      aria-label="Save and submit"
-    >
-      <span
-        className="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--ink-muted)]"
-        aria-live="polite"
-      >
-        {dirty
-          ? "Unsaved changes"
-          : lastSavedAt
-            ? `Saved ${formatRelative(lastSavedAt)}`
-            : "No scores saved yet"}
-      </span>
-      <div className="flex-1" />
-      {isSubmitted ? (
-        <Button variant="outline" onClick={onReopen}>
-          Re-open for editing
-        </Button>
-      ) : (
-        <>
-          <Button variant="outline" onClick={onSave} loading={saving}>
-            <Save className="h-4 w-4" aria-hidden /> Save draft
-          </Button>
-          <Button onClick={onSubmit} disabled={saving}>
-            <Pencil className="h-4 w-4" aria-hidden /> Submit ({completeRatio})
-          </Button>
-        </>
-      )}
-    </div>
   );
 }
 

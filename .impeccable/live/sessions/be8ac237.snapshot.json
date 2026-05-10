@@ -1,0 +1,23 @@
+{
+  "id": "be8ac237",
+  "phase": "discarded",
+  "pageUrl": "/internal",
+  "sourceFile": "app/(authed)/internal/page.tsx",
+  "expectedVariants": 4,
+  "arrivedVariants": 4,
+  "visibleVariant": 2,
+  "paramValues": {
+    "row-height": 0.55,
+    "box-height": 0
+  },
+  "pendingEventSeq": null,
+  "pendingEvent": null,
+  "deliveryLease": null,
+  "checkpointRevision": 55,
+  "activeOwner": "c11e70c9",
+  "sourceMarkers": {},
+  "fallbackMode": null,
+  "annotationArtifacts": [],
+  "diagnostics": [],
+  "updatedAt": "2026-05-10T19:37:59.120Z"
+}
