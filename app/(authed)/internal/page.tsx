@@ -5,32 +5,19 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
-import {
-  CheckCircle2,
-  ClipboardCheck,
-  Clock,
-  Lock,
-  Pencil,
-  Save,
-  ShieldOff,
-} from "lucide-react";
+import { CheckCircle2, Pencil, Save } from "lucide-react";
 
 import { AuthGate } from "@/components/auth/auth-gate";
 import { useDialog } from "@/components/dialog/dialog-provider";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { EmptyState } from "@/components/ui/empty-state";
 import { ScoreButtons } from "@/components/internal/score-buttons";
+import { RubricHelp } from "@/components/internal/rubric-help";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { getConvexErrorMessage } from "@/lib/convex-error";
+import { getWeights, internalSharePercent } from "@/lib/weights";
 
 type VoterClass = "topCommittee" | "headExecutive" | "year2Committee";
 
@@ -42,7 +29,10 @@ const VOTER_CLASS_LABEL: Record<VoterClass, string> = {
 
 type ScoreMap = Map<string, number>;
 
-function scoreKey(candidateId: Id<"candidates">, criterionId: Id<"rubricCriteria">): string {
+function scoreKey(
+  candidateId: Id<"candidates">,
+  criterionId: Id<"rubricCriteria">,
+): string {
   return `${candidateId}::${criterionId}`;
 }
 
@@ -56,22 +46,16 @@ export default function InternalPage() {
 
 function Inner() {
   const election = useQuery(api.elections.getCurrent);
-  if (election === undefined)
+  if (election === undefined) return <PageSkeleton />;
+  if (election === null) {
     return (
-      <main className="container-wide py-10">
-        <Skeleton className="h-40 w-full" />
-      </main>
+      <Standby
+        cycleName={null}
+        phase="No active cycle"
+        body="No election is in progress. The internal evaluation surface activates the moment admins create an AGM cycle and open the rubric window."
+      />
     );
-  if (election === null)
-    return (
-      <main className="container-narrow py-12">
-        <EmptyState
-          icon={<ClipboardCheck className="h-5 w-5" aria-hidden />}
-          title="No active election"
-          description="Internal evaluation will appear here once admins create the AGM cycle and open the window."
-        />
-      </main>
-    );
+  }
   return <Body election={election} />;
 }
 
@@ -97,57 +81,27 @@ function Body({ election }: { election: Doc<"elections"> }) {
   }, [me, status, isAdmin, election.phase, router]);
 
   if (status === undefined || me === undefined) {
-    return (
-      <main className="container-wide py-10">
-        <Skeleton className="h-40 w-full" />
-      </main>
-    );
+    return <PageSkeleton />;
   }
 
   if (!status.isWhitelisted) {
-    if (!isAdmin) {
-      return (
-        <main className="container-wide py-10">
-          <Skeleton className="h-40 w-full" />
-        </main>
-      );
-    }
+    if (!isAdmin) return <PageSkeleton />;
     return (
-      <main className="container-narrow py-12">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <ShieldOff className="h-5 w-5" aria-hidden />
-                Not on the internal whitelist
-              </CardTitle>
-              <Badge tone="muted">External voter</Badge>
-            </div>
-            <CardDescription>
-              Internal evaluation is restricted to committee members on the
-              whitelist for <strong>{election.name}</strong>. You will vote
-              externally during the live AGM. If you believe this is a
-              mistake, contact the AGM admin team.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </main>
+      <Standby
+        cycleName={election.name}
+        phase="Internal access denied"
+        body="Internal evaluation is restricted to committee members on the whitelist for this cycle. You will vote externally during the live AGM. If this looks wrong, contact the AGM admin team."
+      />
     );
   }
 
   if (election.phase === "setup") {
-    if (!isAdmin) {
-      return (
-        <main className="container-wide py-10">
-          <Skeleton className="h-40 w-full" />
-        </main>
-      );
-    }
+    if (!isAdmin) return <PageSkeleton />;
     return (
-      <PhaseInfo
-        title="Internal evaluation hasn't opened yet"
-        body={`Admins are still preparing "${election.name}". Check back when the internal evaluation window opens.`}
-        icon={<Clock className="h-5 w-5" aria-hidden />}
+      <Standby
+        cycleName={election.name}
+        phase="Internal evaluation not open"
+        body="Admins are still configuring this cycle. The rubric activates the moment the internal evaluation window opens."
       />
     );
   }
@@ -159,14 +113,14 @@ function Body({ election }: { election: Doc<"elections"> }) {
     election.phase === "published"
   ) {
     return (
-      <PhaseInfo
-        title="Internal evaluation is closed"
+      <Standby
+        cycleName={election.name}
+        phase="Internal evaluation closed"
         body={
-          status.evaluationStatus === "submitted"
-            ? `Your evaluation was submitted on ${formatDate(status.submittedAt)}. Scores can no longer be edited.`
-            : "The internal window is closed. New scores can no longer be saved."
+          status.evaluationStatus === "submitted" && status.submittedAt
+            ? `Your evaluation was submitted on ${formatMYT(status.submittedAt)}. Scores are locked for this cycle.`
+            : "The internal window is closed. New scores can no longer be saved or edited for this cycle."
         }
-        icon={<Lock className="h-5 w-5" aria-hidden />}
       />
     );
   }
@@ -180,26 +134,39 @@ function Body({ election }: { election: Doc<"elections"> }) {
   );
 }
 
-function PhaseInfo({
-  title,
+function PageSkeleton() {
+  return (
+    <main className="container-wide space-y-6 py-12">
+      <Skeleton className="h-3 w-48" />
+      <Skeleton className="h-10 w-2/3" />
+      <Skeleton className="h-3 w-1/2" />
+      <Skeleton className="h-72 w-full" />
+    </main>
+  );
+}
+
+function Standby({
+  cycleName,
+  phase,
   body,
-  icon,
 }: {
-  title: string;
+  cycleName: string | null;
+  phase: string;
   body: string;
-  icon: React.ReactNode;
 }) {
   return (
-    <main className="container-narrow py-12">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            {icon}
-            {title}
-          </CardTitle>
-          <CardDescription>{body}</CardDescription>
-        </CardHeader>
-      </Card>
+    <main className="container-narrow py-20 sm:py-24">
+      <header className="space-y-4">
+        <p className="font-mono text-[10.5px] uppercase tracking-[0.28em] text-[var(--ink-muted)]">
+          Internal evaluation <span aria-hidden>·</span> {phase}
+        </p>
+        <h1 className="text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
+          {cycleName ?? "No active AGM cycle"}
+        </h1>
+        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+          {body}
+        </p>
+      </header>
     </main>
   );
 }
@@ -303,7 +270,7 @@ function ActiveEvaluation({
   ): Promise<boolean> => {
     if (payload.length === 0) {
       if (!silent) {
-        toast("Nothing to save yet — pick at least one rubric score first.");
+        toast("Nothing to save yet. Pick at least one rubric score first.");
       }
       return false;
     }
@@ -331,7 +298,7 @@ function ActiveEvaluation({
   const onSubmit = async () => {
     if (totals.complete < totals.total) {
       toast.error("Not ready to submit", {
-        description: `Score every candidate (${totals.complete}/${totals.total} complete).`,
+        description: `Score every candidate before submitting (${totals.complete}/${totals.total} complete).`,
       });
       return;
     }
@@ -347,7 +314,7 @@ function ActiveEvaluation({
     if (!ok) return;
     try {
       await submit({ electionId: election._id });
-      toast.success("Submitted!");
+      toast.success("Evaluation submitted");
     } catch (err) {
       const m = getConvexErrorMessage(err, "Submit failed.");
       toast.error("Submit failed", { description: m });
@@ -358,7 +325,7 @@ function ActiveEvaluation({
     const confirmed = await dialog.confirm({
       title: "Re-open evaluation?",
       description:
-        "Your evaluation will move back to draft status. Submit again before the window closes or your scores will not count.",
+        "Your evaluation moves back to draft. Submit again before the window closes or your scores will not count toward the final result.",
       confirmText: "Re-open for editing",
     });
     if (!confirmed) return;
@@ -372,103 +339,99 @@ function ActiveEvaluation({
   };
 
   if (!candidates || !evaluation) {
-    return (
-      <main className="container-wide py-10">
-        <Skeleton className="h-40 w-full" />
-      </main>
-    );
+    return <PageSkeleton />;
   }
 
   if (candidates.length === 0) {
     return (
-      <main className="container-narrow py-12">
-        <EmptyState
-          icon={<ClipboardCheck className="h-5 w-5" aria-hidden />}
-          title="No candidates to evaluate"
-          description="Admins haven't added any candidates yet."
-        />
-      </main>
+      <Standby
+        cycleName={election.name}
+        phase="Awaiting candidates"
+        body="Admins haven't added any candidates yet. The rubric activates the moment a candidate slate is published."
+      />
     );
   }
 
   if (evaluation.criteria.length === 0) {
     return (
-      <main className="container-narrow py-12">
-        <EmptyState
-          icon={<ClipboardCheck className="h-5 w-5" aria-hidden />}
-          title="No rubric criteria configured"
-          description="Admins haven't set up the rubric for this cycle yet."
-        />
-      </main>
+      <Standby
+        cycleName={election.name}
+        phase="Awaiting rubric"
+        body="Admins haven't set up the rubric criteria for this cycle yet. The scoring grid activates the moment the rubric is published."
+      />
     );
   }
 
+  const internalShare = internalSharePercent(getWeights(election));
+  const publicShare = Math.max(0, 100 - internalShare);
+
   return (
-    <main className="container-wide py-10 space-y-6">
-      <header className="flex flex-wrap items-start gap-4">
-        <div className="flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Internal evaluation
-          </h1>
-          <p className="text-sm text-[var(--color-muted-foreground)]">
-            Score every active candidate against each rubric criterion.
-            Drafts save explicitly — your scores are private until you submit.
-          </p>
+    <main className="container-wide space-y-10 py-12">
+      <header className="space-y-6">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-3">
+            <p className="font-mono text-[10.5px] uppercase tracking-[0.28em] text-[var(--ink-muted)]">
+              Internal evaluation <span aria-hidden>·</span> {election.name}
+            </p>
+            <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
+              Score the candidates
+            </h1>
+            <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+              Score every active candidate against each rubric criterion.
+              Drafts save explicitly. Your scores are private until you
+              submit, and remain editable until the internal window closes.
+            </p>
+          </div>
+          <StatusStrip
+            isSubmitted={isSubmitted}
+            complete={totals.complete}
+            total={totals.total}
+            lastSavedAt={lastSavedAt}
+          />
         </div>
-        <div className="flex flex-col items-end gap-1.5">
-          <Badge tone={isSubmitted ? "success" : "brand"}>
-            {isSubmitted ? (
-              <>
-                <CheckCircle2 className="h-3 w-3" aria-hidden /> Submitted
-              </>
-            ) : (
-              <>
-                <Pencil className="h-3 w-3" aria-hidden /> Draft
-              </>
-            )}
-          </Badge>
-          <span className="text-xs text-[var(--color-muted-foreground)]">
-            {totals.complete} / {totals.total} candidates fully scored
-          </span>
-          {lastSavedAt ? (
-            <span className="text-xs text-[var(--color-muted-foreground)]">
-              Last saved {formatRelative(lastSavedAt)}
-            </span>
-          ) : null}
-        </div>
+
+        {voterClass ? (
+          <dl className="grid gap-6 border-t border-[var(--ink-line)] pt-6 sm:grid-cols-3">
+            <Meta label="Evaluating as" value={VOTER_CLASS_LABEL[voterClass]} />
+            <Meta
+              label="Class weight"
+              value={`${voterClassWeight}% of final`}
+            />
+            <Meta
+              label="Final result split"
+              value={`${internalShare}% internal / ${publicShare}% public`}
+            />
+          </dl>
+        ) : null}
       </header>
 
-      {voterClass ? (
-        <Card className="border-[var(--color-brand)]/30 bg-[var(--color-brand)]/5">
-          <CardContent className="flex flex-wrap items-center gap-3 p-4 text-sm">
-            <Badge tone="brand">{VOTER_CLASS_LABEL[voterClass]}</Badge>
-            <span>
-              Evaluating as <strong>{VOTER_CLASS_LABEL[voterClass]}</strong>{" "}
-              — your class contributes{" "}
-              <strong className="tabular-nums">{voterClassWeight}%</strong> of
-              the final result.
-            </span>
-          </CardContent>
-        </Card>
-      ) : null}
+      <RubricHelp />
 
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
+              <caption className="sr-only">
+                Rubric scores for {election.name}. Pick one score per
+                criterion for each candidate.
+              </caption>
               <thead>
                 <tr className="border-b bg-[var(--color-muted)]/40 text-left">
-                  <th className="sticky left-0 z-10 min-w-[14rem] bg-[var(--color-muted)]/40 px-3 py-2 font-medium">
+                  <th
+                    scope="col"
+                    className="sticky left-0 z-10 min-w-[14rem] bg-[var(--color-muted)]/40 px-3 py-2 font-medium"
+                  >
                     Candidate
                   </th>
                   {evaluation.criteria.map((c) => (
                     <th
                       key={c._id}
+                      scope="col"
                       className="px-3 py-2 font-medium whitespace-nowrap"
                     >
                       <div>{c.name}</div>
-                      <div className="text-[10px] font-normal text-[var(--color-muted-foreground)]">
-                        max {c.maxScore}
+                      <div className="font-mono text-[10px] font-normal uppercase tracking-[0.18em] text-[var(--ink-muted)]">
+                        Max {c.maxScore}
                       </div>
                     </th>
                   ))}
@@ -481,7 +444,10 @@ function ActiveEvaluation({
                   );
                   return (
                     <tr key={c._id} className="border-b last:border-b-0">
-                      <td className="sticky left-0 z-10 min-w-[14rem] bg-[var(--color-card)] px-3 py-3">
+                      <th
+                        scope="row"
+                        className="sticky left-0 z-10 min-w-[14rem] bg-[var(--color-card)] px-3 py-3 text-left font-normal"
+                      >
                         <div className="flex items-center gap-3">
                           {c.photoUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -520,20 +486,24 @@ function ActiveEvaluation({
                               ) : null}
                             </div>
                             {allFilled ? (
-                              <Badge tone="success" className="mt-1 text-[10px]">
+                              <Badge tone="muted" className="mt-1.5 text-[10px]">
+                                <CheckCircle2
+                                  className="h-3 w-3 text-[var(--color-success)]"
+                                  aria-hidden
+                                />{" "}
                                 Complete
                               </Badge>
                             ) : null}
                           </div>
                         </div>
-                      </td>
+                      </th>
                       {evaluation.criteria.map((cr) => (
                         <td key={cr._id} className="px-3 py-3 align-middle">
                           <CriterionScoreInput
                             value={local.get(scoreKey(c._id, cr._id))}
                             maxScore={cr.maxScore}
                             onChange={(n) => onSetScore(c._id, cr._id, n)}
-                            ariaLabel={`${c.fullName} ${cr.name}`}
+                            ariaLabel={`${c.fullName}, ${cr.name}`}
                             disabled={!editable}
                           />
                         </td>
@@ -547,8 +517,15 @@ function ActiveEvaluation({
         </CardContent>
       </Card>
 
-      <div className="sticky bottom-4 z-20 flex flex-wrap items-center gap-2 rounded-lg border bg-[var(--color-card)]/95 px-4 py-3 shadow-lg backdrop-blur">
-        <span className="text-sm text-[var(--color-muted-foreground)]">
+      <div
+        className="sticky bottom-4 z-20 flex flex-wrap items-center gap-3 rounded-lg border bg-[var(--color-card)]/95 px-4 py-3 shadow-lg backdrop-blur"
+        role="region"
+        aria-label="Save and submit"
+      >
+        <span
+          className="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--ink-muted)]"
+          aria-live="polite"
+        >
           {dirty
             ? "Unsaved changes"
             : lastSavedAt
@@ -563,15 +540,65 @@ function ActiveEvaluation({
         ) : (
           <>
             <Button variant="outline" onClick={onManualSave} loading={saving}>
-              <Save className="h-4 w-4" /> Save draft
+              <Save className="h-4 w-4" aria-hidden /> Save draft
             </Button>
             <Button onClick={onSubmit} disabled={saving}>
-              Submit ({totals.complete}/{totals.total})
+              <Pencil className="h-4 w-4" aria-hidden /> Submit ({totals.complete}/
+              {totals.total})
             </Button>
           </>
         )}
       </div>
     </main>
+  );
+}
+
+function StatusStrip({
+  isSubmitted,
+  complete,
+  total,
+  lastSavedAt,
+}: {
+  isSubmitted: boolean;
+  complete: number;
+  total: number;
+  lastSavedAt: number | null;
+}) {
+  return (
+    <div className="flex flex-col items-start gap-2 sm:items-end">
+      <Badge tone={isSubmitted ? "success" : "brand"}>
+        {isSubmitted ? (
+          <>
+            <CheckCircle2 className="h-3 w-3" aria-hidden /> Submitted
+          </>
+        ) : (
+          <>
+            <Pencil className="h-3 w-3" aria-hidden /> Draft
+          </>
+        )}
+      </Badge>
+      <p className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--ink-muted)] tabular-nums">
+        {complete} / {total} candidates fully scored
+      </p>
+      {lastSavedAt ? (
+        <p className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--ink-muted)]">
+          Last saved {formatRelative(lastSavedAt)}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function Meta({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="space-y-1.5">
+      <dt className="font-mono text-[10px] uppercase tracking-[0.24em] text-[var(--ink-muted)]">
+        {label}
+      </dt>
+      <dd className="font-mono text-sm text-[var(--ink)] tabular-nums">
+        {value}
+      </dd>
+    </div>
   );
 }
 
@@ -625,10 +652,20 @@ function formatRelative(ms: number): string {
   if (diff < 60_000) return "just now";
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} min ago`;
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} h ago`;
-  return formatDate(ms);
+  return formatMYT(ms);
 }
 
-function formatDate(ms: number | null): string {
-  if (!ms) return "—";
-  return new Date(ms).toLocaleString();
+const MYT_FORMATTER = new Intl.DateTimeFormat("en-MY", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: "Asia/Kuala_Lumpur",
+});
+
+function formatMYT(ms: number): string {
+  return `${MYT_FORMATTER.format(new Date(ms))} MYT`;
 }
