@@ -129,7 +129,6 @@ function Body({ election }: { election: Doc<"elections"> }) {
     if (!c) return null;
     const initialAssignments: PositionAssignment[] = c.positions.map((p) => ({
       positionId: p.positionId,
-      fallbackOrder: p.fallbackOrder,
     }));
     return {
       candidateId: c._id,
@@ -336,10 +335,9 @@ function Body({ election }: { election: Doc<"elections"> }) {
           Roster and contending positions
         </h1>
         <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
-          Add every candidate running this cycle and pick the positions they
-          are contending, in their order of preference. The first position
-          on a candidate&apos;s list is their first choice; lower entries
-          are the cascade fallback if a higher-tier position fills first.
+          Add every candidate running this cycle and pick only the positions
+          they are contending for. Position precedence and ballot order are
+          configured on the Positions page.
         </p>
         <MetaGroup className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
           <Meta label="Cycle phase" value={PHASE_LABELS[election.phase]} />
@@ -458,7 +456,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
         open={adding && !noPositions}
         onClose={() => setAdding(false)}
         title="Add candidate"
-        description="Enter the candidate's name, pick the positions they are contending in order of preference, and attach a photo (upload or paste a Drive/image link)."
+        description="Enter the candidate's name, pick the positions they are contending for, and attach a photo (upload or paste a Drive/image link)."
       >
         <CandidateForm
           electionId={election._id}
@@ -601,7 +599,7 @@ function CandidateCard({
           {sortedPositions.length > 0 ? (
             <ol
               className="mt-2 grid gap-1"
-              aria-label="Contending positions in order of preference"
+              aria-label="Contending positions"
             >
               {sortedPositions.map((p, i) => (
                 <li

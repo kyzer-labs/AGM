@@ -21,7 +21,7 @@ export const list = query({
 /**
  * Per-position impact counts for destructive confirm copy. Returns the
  * number of candidates currently listing this position in their
- * preferences and the number of public votes already cast against this
+ * assignments and the number of public votes already cast against this
  * position. Lets the admin see "deleting Director of Technical: this
  * unassigns 4 candidates and discards 0 votes" instead of a generic
  * "this also unassigns it from every candidate" warning.

@@ -75,7 +75,9 @@ cycle, an admin must move the cycle back to `setup` (allowed only from
 5. **Add candidates** at `/admin/candidates`. Either add manually
    (with photo + bio) or upload a CSV with `fullName, matric, bio,
    positions` columns. The `positions` column accepts a `;`-separated list
-   of position names; their order is the candidate's preference list.
+   of position names. Position precedence is always controlled from
+   `/admin/positions`; CSV order only selects which positions the candidate
+   contests.
 6. **Import the internal whitelist** at `/admin/whitelist`. Each row
    needs an email **and** a class. Paste-box rows fall back to the
    "Default class" selector; CSV rows can include a `voterClass` column to
@@ -207,7 +209,7 @@ cycle, an admin must move the cycle back to `setup` (allowed only from
 | `fullName` | yes | Also accepted: `Full Name`, `name`, `Name`. 2–120 characters. |
 | `matric` | yes | Also accepted: `matricNumber`, `Matric`. 6–20 characters. Used for dedupe (case-insensitive). |
 | `bio` | no | Up to 1000 characters. Empty allowed. |
-| `positions` | no | `,` `;` or `\|`-separated list of position names. Names must match an existing position (case-insensitive). Position **order in the list = the candidate's preference order**, so the first one is their first choice. |
+| `positions` | no | `,` `;` or `\|`-separated list of position names. Names must match an existing position (case-insensitive). The order in this cell is ignored; position precedence is configured on `/admin/positions`. |
 
 Header row is required. Duplicate `matric` values across the CSV (or already in the database) are skipped — not overwritten — and reported in the toast summary as "skipped".
 

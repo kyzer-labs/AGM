@@ -144,7 +144,6 @@ interface ActiveSession {
     matric: string | null;
     bio: string | null;
     photoUrl: string | null;
-    fallbackOrder: number;
   }[];
 }
 

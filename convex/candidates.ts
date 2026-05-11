@@ -5,10 +5,45 @@ import { audit } from "./lib/audit";
 import { getElectionOrThrow, requireSetupPhase } from "./lib/setup";
 import { isHttpUrl, normalisePhotoUrl } from "./lib/photoUrl";
 import type { Doc, Id } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
 
 function generateAutoMatric(): string {
   const random = Math.random().toString(36).slice(2, 10);
   return `auto-${random}`;
+}
+
+async function normalisePositionAssignments(
+  ctx: { db: MutationCtx["db"] },
+  electionId: Id<"elections">,
+  assignments: { positionId: Id<"positions"> }[],
+): Promise<{ positionId: Id<"positions">; fallbackOrder: number }[]> {
+  const seen = new Set<Id<"positions">>();
+  const positions: Doc<"positions">[] = [];
+
+  for (const assignment of assignments) {
+    if (seen.has(assignment.positionId)) {
+      throw new ConvexError(
+        "Each position can only be assigned once per candidate.",
+      );
+    }
+    seen.add(assignment.positionId);
+
+    const position = await ctx.db.get(assignment.positionId);
+    if (!position || position.electionId !== electionId) {
+      throw new ConvexError("Position does not belong to this election.");
+    }
+    positions.push(position);
+  }
+
+  return positions
+    .sort(
+      (a, b) =>
+        a.tier - b.tier || a.order - b.order || a.name.localeCompare(b.name),
+    )
+    .map((position, index) => ({
+      positionId: position._id,
+      fallbackOrder: index,
+    }));
 }
 
 export const list = query({
@@ -27,19 +62,17 @@ export const list = query({
           .withIndex("by_candidate", (q) => q.eq("candidateId", c._id))
           .collect();
         const positions = await Promise.all(
-          links
-            .sort((a, b) => a.fallbackOrder - b.fallbackOrder)
-            .map(async (l) => {
-              const p = await ctx.db.get(l.positionId);
-              return p
-                ? {
-                    positionId: p._id,
-                    name: p.name,
-                    tier: p.tier,
-                    fallbackOrder: l.fallbackOrder,
-                  }
-                : null;
-            }),
+          links.map(async (l) => {
+            const p = await ctx.db.get(l.positionId);
+            return p
+              ? {
+                  positionId: p._id,
+                  name: p.name,
+                  tier: p.tier,
+                  order: p.order,
+                }
+              : null;
+          }),
         );
         const storageUrl = c.photoStorageId
           ? await ctx.storage.getUrl(c.photoStorageId)
@@ -54,9 +87,20 @@ export const list = query({
           photoStorageId: c.photoStorageId ?? null,
           photoLinkUrl: c.photoUrl ?? null,
           photoUrl,
-          positions: positions.filter(
-            (p): p is NonNullable<typeof p> => p !== null,
-          ),
+          positions: positions
+            .filter((p): p is NonNullable<typeof p> => p !== null)
+            .sort(
+              (a, b) =>
+                a.tier - b.tier ||
+                a.order - b.order ||
+                a.name.localeCompare(b.name),
+            )
+            .map((p, index) => ({
+              positionId: p.positionId,
+              name: p.name,
+              tier: p.tier,
+              fallbackOrder: index,
+            })),
         };
       }),
     );
@@ -77,7 +121,6 @@ export const add = mutation({
       v.array(
         v.object({
           positionId: v.id("positions"),
-          fallbackOrder: v.number(),
         }),
       ),
     ),
@@ -129,15 +172,16 @@ export const add = mutation({
     });
 
     if (args.positionAssignments) {
-      for (const pa of args.positionAssignments) {
-        const p = await ctx.db.get(pa.positionId);
-        if (!p || p.electionId !== args.electionId) {
-          throw new ConvexError("Position does not belong to this election.");
-        }
+      const assignments = await normalisePositionAssignments(
+        ctx,
+        args.electionId,
+        args.positionAssignments,
+      );
+      for (const assignment of assignments) {
         await ctx.db.insert("candidatePositions", {
           candidateId,
-          positionId: pa.positionId,
-          fallbackOrder: pa.fallbackOrder,
+          positionId: assignment.positionId,
+          fallbackOrder: assignment.fallbackOrder,
         });
       }
     }
@@ -283,7 +327,6 @@ export const setPositionAssignments = mutation({
     assignments: v.array(
       v.object({
         positionId: v.id("positions"),
-        fallbackOrder: v.number(),
       }),
     ),
   },
@@ -293,19 +336,11 @@ export const setPositionAssignments = mutation({
     if (!c) throw new ConvexError("Candidate not found.");
     await requireSetupPhase(ctx, c.electionId);
 
-    const seen = new Set<Id<"positions">>();
-    for (const a of args.assignments) {
-      if (seen.has(a.positionId)) {
-        throw new ConvexError(
-          "Each position can only be assigned once per candidate.",
-        );
-      }
-      seen.add(a.positionId);
-      const p = await ctx.db.get(a.positionId);
-      if (!p || p.electionId !== c.electionId) {
-        throw new ConvexError("Position does not belong to this election.");
-      }
-    }
+    const assignments = await normalisePositionAssignments(
+      ctx,
+      c.electionId,
+      args.assignments,
+    );
 
     const existing = await ctx.db
       .query("candidatePositions")
@@ -313,11 +348,11 @@ export const setPositionAssignments = mutation({
       .collect();
     for (const link of existing) await ctx.db.delete(link._id);
 
-    for (const a of args.assignments) {
+    for (const assignment of assignments) {
       await ctx.db.insert("candidatePositions", {
         candidateId: c._id,
-        positionId: a.positionId,
-        fallbackOrder: a.fallbackOrder,
+        positionId: assignment.positionId,
+        fallbackOrder: assignment.fallbackOrder,
       });
     }
 
@@ -326,7 +361,7 @@ export const setPositionAssignments = mutation({
       action: "candidate.positionsUpdated",
       entityType: "candidates",
       entityId: c._id,
-      payload: { count: args.assignments.length },
+      payload: { count: assignments.length },
     });
   },
 });
@@ -459,7 +494,7 @@ export const csvImport = mutation({
             .split(/[,;|]/)
             .map((n) => n.trim())
             .filter((n) => n.length > 0);
-          let order = 0;
+          const positionIds: Id<"positions">[] = [];
           for (const name of names) {
             const p = positionByName.get(name.toLowerCase());
             if (!p) {
@@ -469,10 +504,18 @@ export const csvImport = mutation({
               });
               continue;
             }
+            positionIds.push(p._id);
+          }
+          const assignments = await normalisePositionAssignments(
+            ctx,
+            args.electionId,
+            positionIds.map((positionId) => ({ positionId })),
+          );
+          for (const assignment of assignments) {
             await ctx.db.insert("candidatePositions", {
               candidateId,
-              positionId: p._id,
-              fallbackOrder: order++,
+              positionId: assignment.positionId,
+              fallbackOrder: assignment.fallbackOrder,
             });
           }
         }

@@ -113,7 +113,6 @@ export const getActiveSession = query({
             bio: c.bio ?? null,
             photoUrl:
               storageUrl ?? (c.photoUrl ? normalisePhotoUrl(c.photoUrl) : null),
-            fallbackOrder: l.fallbackOrder,
           };
         }),
     );
@@ -125,7 +124,7 @@ export const getActiveSession = query({
       sessionStartedAt: active.sessionStartedAt ?? null,
       candidates: candidates
         .filter((c): c is NonNullable<typeof c> => c !== null)
-        .sort((a, b) => a.fallbackOrder - b.fallbackOrder),
+        .sort((a, b) => a.fullName.localeCompare(b.fullName)),
     };
   },
 });
