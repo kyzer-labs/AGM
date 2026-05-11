@@ -12,6 +12,7 @@ import {
   Lock,
   Pencil,
   Plus,
+  SlidersHorizontal,
   Trash2,
   UploadCloud,
   UserCircle2,
@@ -40,6 +41,7 @@ import { SectionMarker } from "@/components/ui/section-marker";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { getConvexErrorMessage } from "@/lib/convex-error";
+import { cn } from "@/lib/utils";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 
 const PHASE_LABELS: Record<Doc<"elections">["phase"], string> = {
@@ -52,6 +54,28 @@ const PHASE_LABELS: Record<Doc<"elections">["phase"], string> = {
 };
 
 const ROSTER_PAGE_SIZE = 6;
+
+type RosterSort = "name" | "firstChoice" | "positionCount" | "matric";
+
+const ROSTER_SORTS: {
+  value: RosterSort;
+  label: string;
+  summary: string;
+}[] = [
+  { value: "name", label: "Name", summary: "Sorted by name" },
+  {
+    value: "firstChoice",
+    label: "First choice",
+    summary: "Sorted by first-choice position",
+  },
+  {
+    value: "positionCount",
+    label: "Most roles",
+    summary: "Sorted by contending roles",
+  },
+  { value: "matric", label: "ID", summary: "Sorted by candidate ID" },
+];
+const DEFAULT_ROSTER_SORT = ROSTER_SORTS[0]!;
 
 interface CandidateRow {
   _id: Id<"candidates">;
@@ -115,6 +139,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<Id<"candidates"> | null>(null);
   const [rosterPage, setRosterPage] = useState(0);
+  const [rosterSort, setRosterSort] = useState<RosterSort>("name");
   const [importing, setImporting] = useState(false);
   const [lastImport, setLastImport] = useState<
     | (ImportSummary & {
@@ -145,7 +170,35 @@ function Body({ election }: { election: Doc<"elections"> }) {
     };
   }, [candidates, editingId]);
 
-  const rosterCandidateCount = candidates?.length ?? 0;
+  const sortedCandidates = useMemo(() => {
+    const rows = candidates?.slice() ?? [];
+    const byName = (a: CandidateRow, b: CandidateRow) =>
+      a.fullName.localeCompare(b.fullName, "en");
+    const firstChoice = (c: CandidateRow) =>
+      c.positions
+        .slice()
+        .sort((a, b) => a.fallbackOrder - b.fallbackOrder)[0]?.name ?? "";
+
+    return rows.sort((a, b) => {
+      if (rosterSort === "firstChoice") {
+        return (
+          firstChoice(a).localeCompare(firstChoice(b), "en") || byName(a, b)
+        );
+      }
+      if (rosterSort === "positionCount") {
+        return b.positions.length - a.positions.length || byName(a, b);
+      }
+      if (rosterSort === "matric") {
+        return (
+          (a.matric ?? "").localeCompare(b.matric ?? "", "en") ||
+          byName(a, b)
+        );
+      }
+      return byName(a, b);
+    });
+  }, [candidates, rosterSort]);
+
+  const rosterCandidateCount = sortedCandidates.length;
   const rosterPageCount = Math.max(
     1,
     Math.ceil(rosterCandidateCount / ROSTER_PAGE_SIZE),
@@ -157,14 +210,24 @@ function Body({ election }: { election: Doc<"elections"> }) {
     }
   }, [rosterPage, rosterPageCount]);
 
+  useEffect(() => {
+    setRosterPage(0);
+  }, [rosterSort]);
+
   if (candidates === undefined || positions === undefined) {
     return <PageSkeleton />;
   }
 
   const safeRosterPage = Math.min(rosterPage, rosterPageCount - 1);
   const rosterStart = safeRosterPage * ROSTER_PAGE_SIZE;
-  const rosterEnd = Math.min(rosterStart + ROSTER_PAGE_SIZE, candidates.length);
-  const visibleCandidates = candidates.slice(rosterStart, rosterEnd);
+  const rosterEnd = Math.min(
+    rosterStart + ROSTER_PAGE_SIZE,
+    sortedCandidates.length,
+  );
+  const visibleCandidates = sortedCandidates.slice(rosterStart, rosterEnd);
+  const activeSort =
+    ROSTER_SORTS.find((option) => option.value === rosterSort) ??
+    DEFAULT_ROSTER_SORT;
 
   const onCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -524,47 +587,78 @@ function Body({ election }: { election: Doc<"elections"> }) {
                 secondary={`${candidates.length} ${candidates.length === 1 ? "candidate" : "candidates"}`}
               />
               <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
-                Sorted by name
+                {activeSort.summary}
               </p>
             </div>
-            {rosterPageCount > 1 ? (
-              <div className="flex items-center gap-2">
-                <p className="mr-1 font-mono text-[10.5px] uppercase tracking-[0.16em] tabular-nums text-[var(--ink-muted)]">
-                  {String(rosterStart + 1).padStart(2, "0")}-
-                  {String(rosterEnd).padStart(2, "0")} of{" "}
-                  {String(candidates.length).padStart(2, "0")}
-                </p>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  onClick={() =>
-                    setRosterPage((page) => Math.max(0, page - 1))
-                  }
-                  disabled={safeRosterPage === 0}
-                  aria-label="Previous candidate page"
-                >
-                  <ChevronLeft className="h-4 w-4" aria-hidden />
-                </Button>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  onClick={() =>
-                    setRosterPage((page) =>
-                      Math.min(rosterPageCount - 1, page + 1),
-                    )
-                  }
-                  disabled={safeRosterPage >= rosterPageCount - 1}
-                  aria-label="Next candidate page"
-                >
-                  <ChevronRight className="h-4 w-4" aria-hidden />
-                </Button>
+            <div className="flex flex-col gap-2 sm:items-end">
+              <div
+                className="flex flex-wrap items-center gap-1 rounded-lg border border-[var(--ink-line)] bg-[var(--paper)] p-1"
+                aria-label="Sort candidate roster"
+              >
+                <span className="grid h-7 w-7 place-items-center text-[var(--ink-muted)]">
+                  <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+                </span>
+                {ROSTER_SORTS.map((option) => {
+                  const selected = option.value === rosterSort;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setRosterSort(option.value)}
+                      className={cn(
+                        "h-7 rounded-md px-2.5 font-mono text-[10.5px] uppercase tracking-[0.12em]",
+                        "transition-[background-color,color,box-shadow,transform] duration-200 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]",
+                        selected
+                          ? "bg-[var(--ink)] text-[var(--paper)] shadow-sm"
+                          : "text-[var(--ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--ink)]",
+                      )}
+                      aria-pressed={selected}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
               </div>
-            ) : null}
+              {rosterPageCount > 1 ? (
+                <div className="flex items-center gap-2">
+                  <p className="mr-1 font-mono text-[10.5px] uppercase tracking-[0.16em] tabular-nums text-[var(--ink-muted)]">
+                    {String(rosterStart + 1).padStart(2, "0")}-
+                    {String(rosterEnd).padStart(2, "0")} of{" "}
+                    {String(candidates.length).padStart(2, "0")}
+                  </p>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    onClick={() =>
+                      setRosterPage((page) => Math.max(0, page - 1))
+                    }
+                    disabled={safeRosterPage === 0}
+                    aria-label="Previous candidate page"
+                  >
+                    <ChevronLeft className="h-4 w-4" aria-hidden />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    onClick={() =>
+                      setRosterPage((page) =>
+                        Math.min(rosterPageCount - 1, page + 1),
+                      )
+                    }
+                    disabled={safeRosterPage >= rosterPageCount - 1}
+                    aria-label="Next candidate page"
+                  >
+                    <ChevronRight className="h-4 w-4" aria-hidden />
+                  </Button>
+                </div>
+              ) : null}
+            </div>
           </header>
           <div
-            key={safeRosterPage}
+            key={`${rosterSort}-${safeRosterPage}`}
             className="grid min-h-[24rem] content-start gap-3 md:grid-cols-2"
           >
             {visibleCandidates.map((c, index) => (
