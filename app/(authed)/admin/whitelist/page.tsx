@@ -12,7 +12,15 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Papa from "papaparse";
 import { toast } from "sonner";
-import { Lock, Plus, Trash2, Upload, Users2 } from "lucide-react";
+import {
+  CheckCircle2,
+  Circle,
+  Lock,
+  Plus,
+  Trash2,
+  Upload,
+  Users2,
+} from "lucide-react";
 
 import { AuthGate } from "@/components/auth/auth-gate";
 import { AdminBreadcrumb } from "@/components/admin/admin-breadcrumb";
@@ -36,6 +44,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { formatMYT } from "@/lib/format";
 import { getConvexErrorMessage } from "@/lib/convex-error";
+import { cn } from "@/lib/utils";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 
 const USM_DOMAIN = "@student.usm.my";
@@ -298,13 +307,20 @@ function Body({ election }: { election: Doc<"elections"> }) {
         aria-label="Whitelist roster"
         className="space-y-4"
       >
-        <header className="flex flex-wrap items-center gap-3">
-          <SectionMarker
-            primary="Roster"
-            secondary={`${list.length} ${
-              list.length === 1 ? "evaluator" : "evaluators"
-            }`}
-          />
+        <header className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-1">
+            <SectionMarker
+              primary="Roster"
+              secondary={`${list.length} ${
+                list.length === 1 ? "evaluator" : "evaluators"
+              }`}
+            />
+            <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
+              {filterClass === "all"
+                ? "All evaluator classes"
+                : VOTER_CLASS_LABEL[filterClass]}
+            </p>
+          </div>
           <FilterChips
             current={filterClass}
             counts={countByClass}
@@ -390,11 +406,12 @@ function FilterChips({
             role="radio"
             aria-checked={active}
             onClick={() => onChange(c.value)}
-            className={
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-[10.5px] uppercase tracking-[0.18em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--paper)]",
               active
-                ? "inline-flex items-center gap-1.5 rounded-full border border-[var(--ink)] bg-[var(--ink)] px-3 py-1 font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--paper)]"
-                : "inline-flex items-center gap-1.5 rounded-full border border-[var(--ink-line)] px-3 py-1 font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink-muted)] hover:text-[var(--ink)]"
-            }
+                ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)] hover:bg-[color-mix(in_oklab,var(--ink)_92%,var(--paper)_8%)]"
+                : "border-[var(--ink-line)] text-[var(--ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--ink)]",
+            )}
           >
             <span>{c.label}</span>
             <span className="tabular-nums">{c.count}</span>
@@ -512,11 +529,17 @@ function WhitelistRow({
 
   return (
     <li className="flex flex-wrap items-center gap-3 px-3 py-2.5 text-sm">
-      <span className="flex-1 font-mono text-[13px] tabular-nums text-[var(--ink)]">
-        {row.email}
-      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-mono text-[13px] tabular-nums text-[var(--ink)]">
+          {row.email}
+        </p>
+        <p className="mt-0.5 font-mono text-[10.5px] uppercase tracking-[0.16em] text-[var(--ink-muted)]">
+          Added {formatMYT(row.addedAt)}
+        </p>
+      </div>
       {impact && impact.hasSignedIn && impact.submittedCount > 0 ? (
         <Badge tone="brand" className="text-[10px]">
+          <CheckCircle2 className="h-3 w-3" aria-hidden />
           <span className="font-mono tabular-nums">
             {impact.submittedCount}
           </span>{" "}
@@ -537,9 +560,7 @@ function WhitelistRow({
           ))}
         </Select>
       ) : (
-        <Badge tone={VOTER_CLASS_TONE[row.voterClass]}>
-          {VOTER_CLASS_LABEL[row.voterClass]}
-        </Badge>
+        <VoterClassBadge voterClass={row.voterClass} />
       )}
       {editable ? (
         <Button
@@ -556,6 +577,15 @@ function WhitelistRow({
         </Button>
       ) : null}
     </li>
+  );
+}
+
+function VoterClassBadge({ voterClass }: { voterClass: VoterClass }) {
+  return (
+    <Badge tone={VOTER_CLASS_TONE[voterClass]}>
+      <Circle className="h-2.5 w-2.5 fill-current" aria-hidden />
+      {VOTER_CLASS_LABEL[voterClass]}
+    </Badge>
   );
 }
 
