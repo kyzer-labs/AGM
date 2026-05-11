@@ -287,7 +287,7 @@ export function CandidateForm({
             {photoPreview ? (
               <CandidatePhoto
                 src={photoPreview}
-                className="h-full w-full object-cover"
+                className="h-full w-full object-contain"
                 iconClassName="h-6 w-6"
               />
             ) : (
@@ -296,44 +296,6 @@ export function CandidateForm({
                 aria-hidden
               />
             )}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              className="sr-only"
-              onChange={onPickFile}
-              aria-hidden="true"
-              tabIndex={-1}
-            />
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              loading={uploading}
-              onClick={() => fileRef.current?.click()}
-              aria-describedby={photoHintId}
-            >
-              {photoStorageId ? "Replace" : "Upload"}
-            </Button>
-            {photoStorageId || photoPreview ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setPhotoStorageId(null);
-                  if (photoPreview && photoPreview.startsWith("blob:")) {
-                    URL.revokeObjectURL(photoPreview);
-                  }
-                  setPhotoPreview(null);
-                  form.setValue("photoUrl", "", { shouldValidate: true });
-                }}
-              >
-                Remove
-              </Button>
-            ) : null}
           </div>
           <p
             id={photoHintId}
@@ -370,6 +332,44 @@ export function CandidateForm({
             ) : null}
           </div>
           <div className="grid gap-1.5">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="sr-only"
+                onChange={onPickFile}
+                aria-hidden="true"
+                tabIndex={-1}
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                loading={uploading}
+                onClick={() => fileRef.current?.click()}
+                aria-describedby={photoHintId}
+              >
+                {photoStorageId ? "Replace" : "Upload"}
+              </Button>
+              {photoStorageId || photoPreview ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setPhotoStorageId(null);
+                    if (photoPreview && photoPreview.startsWith("blob:")) {
+                      URL.revokeObjectURL(photoPreview);
+                    }
+                    setPhotoPreview(null);
+                    form.setValue("photoUrl", "", { shouldValidate: true });
+                  }}
+                >
+                  Remove
+                </Button>
+              ) : null}
+            </div>
             <Label
               htmlFor={photoUrlId}
               className="flex items-center gap-1.5"

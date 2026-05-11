@@ -300,7 +300,7 @@ function Ballot({ session }: { session: ActiveSession }) {
                 <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-md bg-[var(--color-muted)]">
                   <CandidatePhoto
                     src={c.photoUrl}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
                     iconClassName="h-6 w-6"
                   />
                 </div>

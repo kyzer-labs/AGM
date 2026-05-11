@@ -556,7 +556,7 @@ function CandidateCard({
         <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-lg bg-[var(--color-muted)]">
           <CandidatePhoto
             src={c.photoUrl}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain"
             iconClassName="h-8 w-8"
           />
         </div>

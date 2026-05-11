@@ -581,7 +581,7 @@ function ResultArticle({
           <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--color-muted)]">
             <CandidatePhoto
               src={winner.photoUrl}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain"
               iconClassName="h-6 w-6"
             />
           </div>
@@ -743,7 +743,7 @@ function BreakdownTable({
                     <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded bg-[var(--color-muted)]">
                       <CandidatePhoto
                         src={b.photoUrl}
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-contain"
                         iconClassName="h-4 w-4"
                       />
                     </span>

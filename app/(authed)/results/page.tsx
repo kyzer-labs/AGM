@@ -185,7 +185,7 @@ function ResultBlock({ row, index }: { row: PublicRow; index: number }) {
           <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--color-muted)] ring-1 ring-[var(--ink-line)]">
             <CandidatePhoto
               src={winner.photoUrl}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain"
               iconClassName="h-7 w-7"
             />
           </div>
@@ -273,7 +273,7 @@ function ResultBlock({ row, index }: { row: PublicRow; index: number }) {
                         <span className="grid h-6 w-6 shrink-0 place-items-center overflow-hidden rounded bg-[var(--color-muted)]">
                           <CandidatePhoto
                             src={b.photoUrl}
-                            className="h-full w-full object-cover"
+                            className="h-full w-full object-contain"
                             iconClassName="h-4 w-4"
                           />
                         </span>
