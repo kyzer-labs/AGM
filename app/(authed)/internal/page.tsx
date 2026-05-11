@@ -164,6 +164,7 @@ function Standby({
 }
 
 type View = "score" | "review";
+type WidthMode = "full" | "workbench";
 
 interface CandidateRow {
   _id: Id<"candidates">;
@@ -202,6 +203,7 @@ function ActiveEvaluation({
   const [saving, setSaving] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [view, setView] = useState<View>("score");
+  const [widthMode, setWidthMode] = useState<WidthMode>("full");
   const [activeCandidateIdx, setActiveCandidateIdx] = useState(0);
   const [activeCriterionIdx, setActiveCriterionIdx] = useState(0);
 
@@ -570,6 +572,32 @@ function ActiveEvaluation({
               </p>
             </div>
             <div className="internal-strip-status">
+              <div
+                role="radiogroup"
+                aria-label="Evaluation width"
+                className="inline-flex border border-[var(--ink-line)] bg-[var(--paper)]"
+              >
+                {(["full", "workbench"] as const).map((mode) => {
+                  const active = widthMode === mode;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => setWidthMode(mode)}
+                      className={cn(
+                        "border-r border-[var(--ink-line)] px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em] transition-colors duration-200 last:border-r-0 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--paper)]",
+                        active
+                          ? "bg-[var(--ink)] text-[var(--paper)]"
+                          : "bg-[var(--paper)] text-[var(--ink-muted)] hover:bg-[var(--paper-2)] hover:text-[var(--ink)]",
+                      )}
+                    >
+                      {mode === "full" ? "Full width" : "Workbench"}
+                    </button>
+                  );
+                })}
+              </div>
               <span className="internal-draft" aria-live="polite">
                 {isSubmitted ? (
                   <>
@@ -817,7 +845,7 @@ function ActiveEvaluation({
     </main>
   );
 
-  return renderSurface("internal-wide-v4");
+  return renderSurface(widthMode === "full" ? "internal-wide-v4" : "");
 }
 
 function ReviewView({
