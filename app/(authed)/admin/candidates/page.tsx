@@ -164,16 +164,15 @@ function Body({ election }: { election: Doc<"elections"> }) {
     const rows = candidates?.slice() ?? [];
     const byName = (a: CandidateRow, b: CandidateRow) =>
       a.fullName.localeCompare(b.fullName, "en");
-    const firstChoice = (c: CandidateRow) =>
-      c.positions
-        .slice()
-        .sort((a, b) => a.fallbackOrder - b.fallbackOrder)[0]?.name ?? "";
+    const precedence = (c: CandidateRow) =>
+      Math.min(
+        ...c.positions.map((position) => position.fallbackOrder),
+        Number.POSITIVE_INFINITY,
+      );
 
     return rows.sort((a, b) => {
       if (rosterSort === "position") {
-        return (
-          firstChoice(a).localeCompare(firstChoice(b), "en") || byName(a, b)
-        );
+        return precedence(a) - precedence(b) || byName(a, b);
       }
       return byName(a, b);
     });
