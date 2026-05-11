@@ -55,7 +55,7 @@ const PHASE_LABELS: Record<Doc<"elections">["phase"], string> = {
 
 const ROSTER_PAGE_SIZE = 6;
 
-type RosterSort = "name" | "firstChoice" | "positionCount" | "matric";
+type RosterSort = "name" | "position";
 
 const ROSTER_SORTS: {
   value: RosterSort;
@@ -63,17 +63,7 @@ const ROSTER_SORTS: {
   summary: string;
 }[] = [
   { value: "name", label: "Name", summary: "Sorted by name" },
-  {
-    value: "firstChoice",
-    label: "First choice",
-    summary: "Sorted by first-choice position",
-  },
-  {
-    value: "positionCount",
-    label: "Most roles",
-    summary: "Sorted by contending roles",
-  },
-  { value: "matric", label: "ID", summary: "Sorted by candidate ID" },
+  { value: "position", label: "Position", summary: "Sorted by position" },
 ];
 const DEFAULT_ROSTER_SORT = ROSTER_SORTS[0]!;
 
@@ -180,18 +170,9 @@ function Body({ election }: { election: Doc<"elections"> }) {
         .sort((a, b) => a.fallbackOrder - b.fallbackOrder)[0]?.name ?? "";
 
     return rows.sort((a, b) => {
-      if (rosterSort === "firstChoice") {
+      if (rosterSort === "position") {
         return (
           firstChoice(a).localeCompare(firstChoice(b), "en") || byName(a, b)
-        );
-      }
-      if (rosterSort === "positionCount") {
-        return b.positions.length - a.positions.length || byName(a, b);
-      }
-      if (rosterSort === "matric") {
-        return (
-          (a.matric ?? "").localeCompare(b.matric ?? "", "en") ||
-          byName(a, b)
         );
       }
       return byName(a, b);
@@ -580,8 +561,8 @@ function Body({ election }: { election: Doc<"elections"> }) {
         />
       ) : (
         <section aria-label="Candidate roster">
-          <header className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div className="flex items-baseline gap-3">
+          <header className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <SectionMarker
                 primary="Roster"
                 secondary={`${candidates.length} ${candidates.length === 1 ? "candidate" : "candidates"}`}
@@ -590,35 +571,37 @@ function Body({ election }: { election: Doc<"elections"> }) {
                 {activeSort.summary}
               </p>
             </div>
-            <div className="flex flex-col gap-2 sm:items-end">
-              <div
-                className="flex flex-wrap items-center gap-1 rounded-lg border border-[var(--ink-line)] bg-[var(--paper)] p-1"
-                aria-label="Sort candidate roster"
-              >
-                <span className="grid h-7 w-7 place-items-center text-[var(--ink-muted)]">
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+              <div className="flex items-center gap-1.5">
+                <span className="grid h-8 w-8 place-items-center rounded-md border border-[var(--ink-line)] bg-[var(--paper)] text-[var(--ink-muted)]">
                   <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
                 </span>
-                {ROSTER_SORTS.map((option) => {
-                  const selected = option.value === rosterSort;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setRosterSort(option.value)}
-                      className={cn(
-                        "h-7 rounded-md px-2.5 font-mono text-[10.5px] uppercase tracking-[0.12em]",
-                        "transition-[background-color,color,box-shadow,transform] duration-200 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]",
-                        selected
-                          ? "bg-[var(--ink)] text-[var(--paper)] shadow-sm"
-                          : "text-[var(--ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--ink)]",
-                      )}
-                      aria-pressed={selected}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
+                <div
+                  className="flex items-center rounded-md border border-[var(--ink-line)] bg-[var(--paper)] p-0.5"
+                  aria-label="Sort candidate roster"
+                >
+                  {ROSTER_SORTS.map((option) => {
+                    const selected = option.value === rosterSort;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setRosterSort(option.value)}
+                        className={cn(
+                          "h-7 rounded px-3 font-mono text-[10.5px] uppercase tracking-[0.12em]",
+                          "transition-[background-color,color,box-shadow] duration-200 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]",
+                          selected
+                            ? "bg-[var(--ink)] text-[var(--paper)] shadow-sm"
+                            : "text-[var(--ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--ink)]",
+                        )}
+                        aria-pressed={selected}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               {rosterPageCount > 1 ? (
                 <div className="flex items-center gap-2">
