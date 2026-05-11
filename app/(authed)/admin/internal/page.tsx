@@ -23,7 +23,6 @@ import { cn } from "@/lib/utils";
 import type { Doc } from "@/convex/_generated/dataModel";
 
 type VoterClass = "topCommittee" | "headExecutive" | "year2Committee";
-type LayoutVariant = "matrix" | "split";
 
 const VOTER_CLASS_LABEL: Record<VoterClass, string> = {
   topCommittee: "Top Committee",
@@ -77,7 +76,7 @@ function Inner() {
 
 function PageSkeleton() {
   return (
-    <main className="container-wide space-y-6 py-12">
+    <main className="container-workbench space-y-6 py-12">
       <Skeleton className="h-3 w-44" />
       <Skeleton className="h-10 w-2/3" />
       <Skeleton className="h-4 w-1/2" />
@@ -95,9 +94,6 @@ function Body({ election }: { election: Doc<"elections"> }) {
   });
 
   const [activeTab, setActiveTab] = useState<VoterClass | "all">("all");
-  const [layoutVariant, setLayoutVariant] =
-    useState<LayoutVariant>("split");
-
   if (completion === undefined || aggregate === undefined) {
     return <PageSkeleton />;
   }
@@ -133,7 +129,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
   );
 
   return (
-    <main className="mx-auto w-full max-w-[min(110rem,calc(100vw-2rem))] space-y-4 px-4 py-8">
+    <main className="container-workbench space-y-6 py-8">
       <header className="space-y-4 border-b border-[var(--ink-line)] pb-4">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="space-y-3">
@@ -145,7 +141,6 @@ function Body({ election }: { election: Doc<"elections"> }) {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {phaseBadge}
-            <LayoutToggle value={layoutVariant} onChange={setLayoutVariant} />
           </div>
         </div>
 
@@ -157,108 +152,30 @@ function Body({ election }: { election: Doc<"elections"> }) {
         />
       </header>
 
-      {layoutVariant === "matrix" ? (
-        <section
-          aria-label="Probe 4 ledger-first matrix"
-          className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(330px,390px)]"
-        >
-          <EvaluatorLedger
-            rows={filteredCompletion}
-            activeTab={activeTab}
-            counts={countsByClass}
-            total={completion.length}
-            onFilterChange={setActiveTab}
-            title="Evaluator status"
-            description={`${filteredCompletion.length} visible`}
+      <section
+        aria-label="Evaluator completion tracking"
+        className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(340px,390px)]"
+      >
+        <EvaluatorLedger
+          rows={filteredCompletion}
+          activeTab={activeTab}
+          counts={countsByClass}
+          total={completion.length}
+          onFilterChange={setActiveTab}
+          title="Evaluator completion ledger"
+          description={`${filteredCompletion.length} visible`}
+        />
+        <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
+          <ClassProgressPanel
+            aggregate={aggregate}
+            countsByClass={countsByClass}
+            classWeightLookup={classWeightLookup}
           />
-          <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
-            <ClassProgressPanel
-              aggregate={aggregate}
-              countsByClass={countsByClass}
-              classWeightLookup={classWeightLookup}
-            />
-            <AggregatePanel aggregate={aggregate} activeTab={activeTab} />
-          </aside>
-        </section>
-      ) : (
-        <section
-          aria-label="Probe 5 split-pane register"
-          className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(420px,520px)]"
-        >
-          <EvaluatorLedger
-            rows={filteredCompletion}
-            activeTab={activeTab}
-            counts={countsByClass}
-            total={completion.length}
-            onFilterChange={setActiveTab}
-            title="Evaluator completion ledger"
-            description={`${completion.length} whitelisted`}
-            dense
-          />
-          <div className="space-y-4 xl:sticky xl:top-4 xl:self-start">
-            <section className="rounded-md border border-[var(--ink-line)] bg-[var(--paper)] p-4">
-              <SectionMarker primary="Control rail" secondary="Class filter" />
-              <div className="mt-4">
-                <FilterChips
-                  current={activeTab}
-                  counts={countsByClass}
-                  total={completion.length}
-                  onChange={setActiveTab}
-                />
-              </div>
-            </section>
-            <ClassProgressPanel
-              aggregate={aggregate}
-              countsByClass={countsByClass}
-              classWeightLookup={classWeightLookup}
-            />
-            <AggregatePanel aggregate={aggregate} activeTab={activeTab} />
-          </div>
-        </section>
-      )}
+        </aside>
+      </section>
+
+      <AggregatePanel aggregate={aggregate} activeTab={activeTab} />
     </main>
-  );
-}
-
-function LayoutToggle({
-  value,
-  onChange,
-}: {
-  value: LayoutVariant;
-  onChange: (value: LayoutVariant) => void;
-}) {
-  const options: { value: LayoutVariant; label: string }[] = [
-    { value: "split", label: "Split register" },
-    { value: "matrix", label: "Matrix view" },
-  ];
-
-  return (
-    <div
-      role="radiogroup"
-      aria-label="Layout variant"
-      className="inline-flex border border-[var(--ink-line)] bg-[var(--paper)]"
-    >
-      {options.map((option) => {
-        const active = option.value === value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            onClick={() => onChange(option.value)}
-            className={cn(
-              "border-r border-[var(--ink-line)] px-3 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.16em] transition-colors last:border-r-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--paper)]",
-              active
-                ? "bg-[var(--ink)] text-[var(--paper)]"
-                : "bg-[var(--paper)] text-[var(--ink-muted)] hover:bg-[var(--paper-2)] hover:text-[var(--ink)]",
-            )}
-          >
-            {option.label}
-          </button>
-        );
-      })}
-    </div>
   );
 }
 
@@ -319,7 +236,6 @@ function EvaluatorLedger({
   onFilterChange,
   title,
   description,
-  dense = false,
 }: {
   rows: NonNullable<ReturnType<typeof useQuery<typeof api.internal.adminCompletionList>>>;
   activeTab: VoterClass | "all";
@@ -328,7 +244,6 @@ function EvaluatorLedger({
   onFilterChange: (cls: VoterClass | "all") => void;
   title: string;
   description: string;
-  dense?: boolean;
 }) {
   return (
     <section
@@ -337,14 +252,12 @@ function EvaluatorLedger({
     >
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--ink-line)] bg-[var(--paper-2)] px-4 py-3">
         <SectionMarker primary={title} secondary={description} />
-        {!dense ? (
-          <FilterChips
-            current={activeTab}
-            counts={counts}
-            total={total}
-            onChange={onFilterChange}
-          />
-        ) : null}
+        <FilterChips
+          current={activeTab}
+          counts={counts}
+          total={total}
+          onChange={onFilterChange}
+        />
       </header>
 
       {rows.length === 0 ? (
@@ -362,12 +275,7 @@ function EvaluatorLedger({
           }
         />
       ) : (
-        <div
-          className={cn(
-            "overflow-auto",
-            dense ? "max-h-[calc(100dvh-15rem)]" : "max-h-[calc(100dvh-19rem)]",
-          )}
-        >
+        <div className="max-h-[calc(100dvh-19rem)] overflow-auto">
           <table className="w-full min-w-[760px] text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="border-b border-[var(--ink-line)] bg-[var(--paper-2)] text-left">

@@ -135,7 +135,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
 
 function PageSkeleton() {
   return (
-    <main className="container-wide space-y-6 py-12">
+    <main className="container-workbench space-y-6 py-12">
       <Skeleton className="h-3 w-48" />
       <Skeleton className="h-10 w-2/3" />
       <Skeleton className="h-3 w-1/2" />
@@ -552,7 +552,7 @@ function ActiveEvaluation({
   );
 
   const renderSurface = (surfaceClassName = "") => (
-    <main className={cn("container-wide", surfaceClassName)}>
+    <main className={cn("container-workbench", surfaceClassName)}>
       {view === "score" ? (
         <>
           <div className="internal-strip internal-strip-distill-v1">
