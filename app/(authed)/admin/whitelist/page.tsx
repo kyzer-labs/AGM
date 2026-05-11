@@ -404,7 +404,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
         ) : (
           <ul
             key={`${filterClass}-${safeWhitelistPage}`}
-            className="min-h-[24rem] divide-y divide-[var(--ink-line)] rounded-md border border-[var(--ink-line)] bg-[var(--paper)]"
+            className="divide-y divide-[var(--ink-line)] rounded-md border border-[var(--ink-line)] bg-[var(--paper)]"
             aria-busy={importing ? "true" : undefined}
           >
             {visibleList.map((row) => (
@@ -412,6 +412,15 @@ function Body({ election }: { election: Doc<"elections"> }) {
                 key={row._id}
                 row={row}
                 editable={editable}
+              />
+            ))}
+            {Array.from({
+              length: WHITELIST_PAGE_SIZE - visibleList.length,
+            }).map((_, index) => (
+              <li
+                key={`empty-${index}`}
+                className="h-[4.75rem]"
+                aria-hidden="true"
               />
             ))}
           </ul>
