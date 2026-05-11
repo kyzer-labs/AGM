@@ -24,6 +24,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { requireAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
+import { normalisePhotoUrl } from "./lib/photoUrl";
 import { getElectionOrThrow } from "./lib/setup";
 import { VOTER_CLASSES, type VoterClass } from "./lib/cycle";
 
@@ -1376,7 +1377,7 @@ export const loadTestCandidates = mutation({
         );
         continue;
       }
-      const photoUrl = spec.photoUrl.trim();
+      const photoUrl = normalisePhotoUrl(spec.photoUrl);
       const bio = `${TEST_BIO_PREFIX} Auto-loaded fixture for ${position.name} (tier ${spec.positionTier}, order ${spec.positionOrder}).`;
       const existing =
         existingTestByMatric.get(spec.matric) ??

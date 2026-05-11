@@ -157,7 +157,7 @@ export const add = mutation({
             "Photo link must start with http:// or https://.",
           );
         }
-        photoUrl = raw;
+        photoUrl = normalisePhotoUrl(raw);
       }
     }
 
@@ -273,7 +273,7 @@ export const update = mutation({
               "Photo link must start with http:// or https://.",
             );
           }
-          patch.photoUrl = raw;
+          patch.photoUrl = normalisePhotoUrl(raw);
           if (c.photoStorageId && patch.photoStorageId === undefined) {
             await ctx.storage.delete(c.photoStorageId);
             patch.photoStorageId = undefined;
@@ -473,7 +473,7 @@ export const csvImport = mutation({
                 message: "photoUrl must start with http:// or https://.",
               });
             } else {
-              photoUrl = raw;
+              photoUrl = normalisePhotoUrl(raw);
             }
           }
         }
