@@ -568,7 +568,7 @@ function CandidateCard({
                   ? c.matric
                   : "Candidate"}
               </p>
-              <h3 className="mt-0.5 truncate text-base font-semibold leading-[1.18] text-[var(--ink)]">
+              <h3 className="mt-1 truncate font-serif text-lg font-semibold leading-[1.08] text-[var(--ink)]">
                 {c.fullName}
               </h3>
             </div>
@@ -598,7 +598,7 @@ function CandidateCard({
           </div>
           {sortedPositions.length > 0 ? (
             <ol
-              className="mt-2.5 grid gap-1.5"
+              className="mt-3.5 grid gap-1.5"
               aria-label="Contending positions"
             >
               {sortedPositions.map((p, i) => (
@@ -609,7 +609,7 @@ function CandidateCard({
                   <span className="font-mono text-[0.6875rem] leading-[1.2] tabular-nums text-[var(--ink-muted)]">
                     {String(i + 1).padStart(2, "0")}
                   </span>
-                  <span className="truncate text-[0.8125rem] leading-[1.2] text-[var(--ink)]">
+                  <span className="truncate text-[0.8125rem] leading-[1.2] text-[var(--ink-muted)]">
                     {p.name}
                   </span>
                 </li>
