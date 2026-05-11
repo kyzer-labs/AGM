@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useForm } from "react-hook-form";
@@ -10,6 +10,8 @@ import { toast } from "sonner";
 import {
   ArrowDown,
   ArrowUp,
+  ChevronLeft,
+  ChevronRight,
   Lock,
   Pencil,
   Plus,
@@ -52,6 +54,8 @@ const PHASE_LABELS: Record<Doc<"elections">["phase"], string> = {
   resultsPreview: "Results preview",
   published: "Published",
 };
+
+const POSITION_PAGE_SIZE = 6;
 
 const DEFAULT_TIER_FOR_NAME = (name: string): number => {
   const n = name.toLowerCase();
@@ -125,6 +129,7 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
 
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Doc<"positions"> | null>(null);
+  const [positionPage, setPositionPage] = useState(0);
 
   const lockedToSetup = election.phase !== "setup";
 
@@ -157,25 +162,58 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
     }
   };
 
-  if (positions === undefined) {
-    return <PageSkeleton />;
-  }
-
-  const grouped = positions.reduce<Record<number, typeof positions>>(
-    (acc, p) => {
-      const tier = p.tier;
-      const arr = acc[tier] ?? [];
-      arr.push(p);
-      acc[tier] = arr;
-      return acc;
-    },
-    {},
+  const orderedPositions = useMemo(
+    () =>
+      (positions ?? [])
+        .slice()
+        .sort(
+          (a, b) =>
+            a.tier - b.tier ||
+            a.order - b.order ||
+            a.name.localeCompare(b.name),
+        ),
+    [positions],
+  );
+  const grouped = useMemo(
+    () =>
+      orderedPositions.reduce<Record<number, typeof orderedPositions>>(
+        (acc, p) => {
+          const tier = p.tier;
+          const arr = acc[tier] ?? [];
+          arr.push(p);
+          acc[tier] = arr;
+          return acc;
+        },
+        {},
+      ),
+    [orderedPositions],
   );
   const tierKeys = Object.keys(grouped)
     .map((k) => Number(k))
     .sort((a, b) => a - b);
 
-  const totalCandidates = positions.length;
+  const totalPositions = orderedPositions.length;
+  const positionPageCount = Math.max(
+    1,
+    Math.ceil(totalPositions / POSITION_PAGE_SIZE),
+  );
+  const safePositionPage = Math.min(positionPage, positionPageCount - 1);
+  const positionStart = safePositionPage * POSITION_PAGE_SIZE;
+  const positionEnd = Math.min(
+    positionStart + POSITION_PAGE_SIZE,
+    totalPositions,
+  );
+  const visiblePositions = orderedPositions.slice(positionStart, positionEnd);
+
+  useEffect(() => {
+    if (positionPage > positionPageCount - 1) {
+      setPositionPage(Math.max(0, positionPageCount - 1));
+    }
+  }, [positionPage, positionPageCount]);
+
+  if (positions === undefined) {
+    return <PageSkeleton />;
+  }
 
   return (
     <main className="container-wide space-y-10 py-12">
@@ -183,37 +221,32 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
 
       <header className="space-y-5">
         <SectionMarker primary="Positions" secondary={election.name} />
-        <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
-          Hierarchy and ballot order
-        </h1>
-        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
-          Higher tier numbers vote later on AGM day; within a tier, the
-          order column controls the exact ballot order voters see. Tier and
-          order also drive the cascade: when a candidate wins a higher-tier
-          position, they are removed from every lower-tier ballot they
-          listed.
-        </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
+            Hierarchy and ballot order
+          </h1>
+          {!lockedToSetup ? (
+            <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+              <Button onClick={() => setShowAdd(true)}>
+                <Plus className="h-4 w-4" aria-hidden /> Add position
+              </Button>
+              {positions.length === 0 ? (
+                <Button variant="outline" onClick={onSeedDefaults}>
+                  <Plus className="h-4 w-4" aria-hidden /> Seed 9 defaults
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
         <MetaGroup className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
           <Meta label="Cycle phase" value={PHASE_LABELS[election.phase]} />
           <Meta label="Tiers" value={tierKeys.length} />
-          <Meta label="Positions" value={totalCandidates} />
+          <Meta label="Positions" value={totalPositions} />
           <Meta
             label="Edits"
             value={lockedToSetup ? "Locked" : "Allowed"}
           />
         </MetaGroup>
-        {!lockedToSetup ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => setShowAdd(true)}>
-              <Plus className="h-4 w-4" aria-hidden /> Add position
-            </Button>
-            {positions.length === 0 ? (
-              <Button variant="outline" onClick={onSeedDefaults}>
-                <Plus className="h-4 w-4" aria-hidden /> Seed 9 defaults
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
       </header>
 
       {lockedToSetup ? (
@@ -280,63 +313,107 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
           description="Add a position with the button above, or seed the 9 defaults to get started."
         />
       ) : (
-        <div className="space-y-8">
-          {tierKeys.map((tier) => {
-            const tierPositions = grouped[tier] ?? [];
-            return (
-              <section key={tier} className="space-y-3">
-                <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <SectionMarker
-                    primary={`Tier ${tier}`}
-                    secondary={TIER_LABELS[tier] ?? "Other"}
-                  />
-                  <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
-                    {tierPositions.length}{" "}
-                    {tierPositions.length === 1 ? "position" : "positions"}
-                  </p>
-                </header>
-                <ul className="divide-y divide-[var(--ink-line)] rounded-md border border-[var(--ink-line)] bg-[var(--paper)]">
-                  {tierPositions.map((p, idx) => (
-                    <PositionRow
-                      key={p._id}
-                      position={p}
-                      ordinal={idx + 1}
-                      isFirst={idx === 0}
-                      isLast={idx === tierPositions.length - 1}
-                      locked={lockedToSetup}
-                      onEdit={() => setEditing(p)}
-                      onMove={async (direction) => {
-                        try {
-                          await move({ positionId: p._id, direction });
-                        } catch (err) {
-                          toast.error("Reorder failed", {
-                            description: getConvexErrorMessage(
-                              err,
-                              "Reorder failed.",
-                            ),
-                          });
-                        }
-                      }}
-                      onConfirmedRemove={async () => {
-                        try {
-                          await remove({ positionId: p._id });
-                          toast.success("Position deleted");
-                        } catch (err) {
-                          toast.error("Delete failed", {
-                            description: getConvexErrorMessage(
-                              err,
-                              "Delete failed.",
-                            ),
-                          });
-                        }
-                      }}
-                    />
-                  ))}
-                </ul>
-              </section>
-            );
-          })}
-        </div>
+        <section aria-label="Position hierarchy">
+          <header className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <SectionMarker
+                primary="Ballot order"
+                secondary={`${positions.length} ${positions.length === 1 ? "position" : "positions"}`}
+              />
+              <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
+                Grouped by tier and precedence
+              </p>
+            </div>
+            {positionPageCount > 1 ? (
+              <div className="flex items-center gap-2">
+                <p className="mr-1 font-mono text-[10.5px] uppercase tracking-[0.16em] tabular-nums text-[var(--ink-muted)]">
+                  {String(positionStart + 1).padStart(2, "0")}-
+                  {String(positionEnd).padStart(2, "0")} of{" "}
+                  {String(positions.length).padStart(2, "0")}
+                </p>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={() =>
+                    setPositionPage((page) => Math.max(0, page - 1))
+                  }
+                  disabled={safePositionPage === 0}
+                  aria-label="Previous position page"
+                >
+                  <ChevronLeft className="h-4 w-4" aria-hidden />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={() =>
+                    setPositionPage((page) =>
+                      Math.min(positionPageCount - 1, page + 1),
+                    )
+                  }
+                  disabled={safePositionPage >= positionPageCount - 1}
+                  aria-label="Next position page"
+                >
+                  <ChevronRight className="h-4 w-4" aria-hidden />
+                </Button>
+              </div>
+            ) : null}
+          </header>
+          <ul
+            key={safePositionPage}
+            className="grid min-h-[24rem] content-start gap-3 md:grid-cols-2"
+          >
+            {visiblePositions.map((p, index) => {
+              const tierPositions = grouped[p.tier] ?? [];
+              const tierIndex = tierPositions.findIndex(
+                (position) => position._id === p._id,
+              );
+              const globalIndex = orderedPositions.findIndex(
+                (position) => position._id === p._id,
+              );
+              return (
+                <PositionRow
+                  key={p._id}
+                  position={p}
+                  ordinal={globalIndex + 1}
+                  tierOrdinal={tierIndex + 1}
+                  tierTotal={tierPositions.length}
+                  isFirst={tierIndex === 0}
+                  isLast={tierIndex === tierPositions.length - 1}
+                  locked={lockedToSetup}
+                  index={index}
+                  onEdit={() => setEditing(p)}
+                  onMove={async (direction) => {
+                    try {
+                      await move({ positionId: p._id, direction });
+                    } catch (err) {
+                      toast.error("Reorder failed", {
+                        description: getConvexErrorMessage(
+                          err,
+                          "Reorder failed.",
+                        ),
+                      });
+                    }
+                  }}
+                  onConfirmedRemove={async () => {
+                    try {
+                      await remove({ positionId: p._id });
+                      toast.success("Position deleted");
+                    } catch (err) {
+                      toast.error("Delete failed", {
+                        description: getConvexErrorMessage(
+                          err,
+                          "Delete failed.",
+                        ),
+                      });
+                    }
+                  }}
+                />
+              );
+            })}
+          </ul>
+        </section>
       )}
     </main>
   );
@@ -345,18 +422,24 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
 function PositionRow({
   position,
   ordinal,
+  tierOrdinal,
+  tierTotal,
   isFirst,
   isLast,
   locked,
+  index,
   onEdit,
   onMove,
   onConfirmedRemove,
 }: {
   position: Doc<"positions">;
   ordinal: number;
+  tierOrdinal: number;
+  tierTotal: number;
   isFirst: boolean;
   isLast: boolean;
   locked: boolean;
+  index: number;
   onEdit: () => void;
   onMove: (direction: "up" | "down") => void | Promise<void>;
   onConfirmedRemove: () => Promise<void>;
@@ -417,64 +500,82 @@ function PositionRow({
   };
 
   return (
-    <li className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm">
-      <span
-        className="grid h-7 w-9 place-items-center rounded-md bg-[var(--color-secondary)] font-mono text-xs tabular-nums text-[var(--ink-muted)]"
-        aria-hidden
-      >
-        {String(ordinal).padStart(2, "0")}
-      </span>
-      <span className="flex-1 font-medium text-[var(--ink)]">
-        {position.name}
-      </span>
-      {impact !== undefined &&
-      impact !== null &&
-      impact.candidateCount > 0 ? (
-        <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
-          {impact.candidateCount}{" "}
-          {impact.candidateCount === 1 ? "candidate" : "candidates"}
+    <li
+      className="tile-enter flex min-h-32 flex-col justify-between rounded-xl border bg-[var(--color-card)] p-4 text-sm text-[var(--color-card-foreground)] shadow-sm"
+      style={{ ["--index" as never]: index }}
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-[var(--color-secondary)] font-mono text-sm tabular-nums text-[var(--ink-muted)]"
+          aria-hidden
+        >
+          {String(ordinal).padStart(2, "0")}
         </span>
-      ) : null}
-      {!locked ? (
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            disabled={isFirst}
-            onClick={() => void onMove("up")}
-            aria-label={`Move ${position.name} up`}
-          >
-            <ArrowUp className="h-4 w-4" aria-hidden />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            disabled={isLast}
-            onClick={() => void onMove("down")}
-            aria-label={`Move ${position.name} down`}
-          >
-            <ArrowDown className="h-4 w-4" aria-hidden />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onEdit}>
-            <Pencil className="h-3.5 w-3.5" aria-hidden /> Edit
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onRemove}
-            aria-label={`Delete ${position.name}`}
-          >
-            <Trash2
-              className="h-4 w-4 text-[var(--color-destructive)]"
-              aria-hidden
-            />
-          </Button>
+        <div className="min-w-0 flex-1">
+          <p className="font-mono text-[0.6875rem] uppercase leading-[1.2] tracking-[0.14em] text-[var(--ink-muted)]">
+            Tier {position.tier} · {TIER_LABELS[position.tier] ?? "Other"}
+          </p>
+          <h3 className="mt-1 truncate font-serif text-lg font-semibold leading-[1.08] text-[var(--ink)]">
+            {position.name}
+          </h3>
         </div>
-      ) : (
-        <Badge tone="muted">
-          <Lock className="h-3 w-3" aria-hidden /> Locked
-        </Badge>
-      )}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--ink-line)] pt-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] tabular-nums text-[var(--ink-muted)]">
+            Tier order {tierOrdinal}/{tierTotal}
+          </span>
+          {impact !== undefined &&
+          impact !== null &&
+          impact.candidateCount > 0 ? (
+            <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] tabular-nums text-[var(--ink-muted)]">
+              {impact.candidateCount}{" "}
+              {impact.candidateCount === 1 ? "candidate" : "candidates"}
+            </span>
+          ) : null}
+        </div>
+        {!locked ? (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={isFirst}
+              onClick={() => void onMove("up")}
+              aria-label={`Move ${position.name} up`}
+            >
+              <ArrowUp className="h-4 w-4" aria-hidden />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={isLast}
+              onClick={() => void onMove("down")}
+              aria-label={`Move ${position.name} down`}
+            >
+              <ArrowDown className="h-4 w-4" aria-hidden />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onEdit}>
+              <Pencil className="h-3.5 w-3.5" aria-hidden /> Edit
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onRemove}
+              aria-label={`Delete ${position.name}`}
+            >
+              <Trash2
+                className="h-4 w-4 text-[var(--color-destructive)]"
+                aria-hidden
+              />
+            </Button>
+          </div>
+        ) : (
+          <Badge tone="muted">
+            <Lock className="h-3 w-3" aria-hidden /> Locked
+          </Badge>
+        )}
+      </div>
     </li>
   );
 }
