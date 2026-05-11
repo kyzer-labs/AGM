@@ -16,8 +16,6 @@ import { AdminBreadcrumb } from "@/components/admin/admin-breadcrumb";
 import { NoElection } from "@/components/admin/no-election";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { LinkButton } from "@/components/ui/link-button";
-import { Meta, MetaGroup } from "@/components/ui/meta";
 import { SectionMarker } from "@/components/ui/section-marker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatMYT } from "@/lib/format";
@@ -25,17 +23,12 @@ import { cn } from "@/lib/utils";
 import type { Doc } from "@/convex/_generated/dataModel";
 
 type VoterClass = "topCommittee" | "headExecutive" | "year2Committee";
+type LayoutVariant = "matrix" | "split";
 
 const VOTER_CLASS_LABEL: Record<VoterClass, string> = {
   topCommittee: "Top Committee",
   headExecutive: "Head Executive",
   year2Committee: "Year 2 Committee",
-};
-
-const VOTER_CLASS_TONE: Record<VoterClass, "brand" | "copper" | "muted"> = {
-  topCommittee: "brand",
-  headExecutive: "copper",
-  year2Committee: "muted",
 };
 
 const VOTER_CLASSES: VoterClass[] = [
@@ -102,6 +95,8 @@ function Body({ election }: { election: Doc<"elections"> }) {
   });
 
   const [activeTab, setActiveTab] = useState<VoterClass | "all">("all");
+  const [layoutVariant, setLayoutVariant] =
+    useState<LayoutVariant>("split");
 
   if (completion === undefined || aggregate === undefined) {
     return <PageSkeleton />;
@@ -133,77 +128,313 @@ function Body({ election }: { election: Doc<"elections"> }) {
   };
   for (const row of completion) countsByClass[row.voterClass] += 1;
 
-  return (
-    <main className="container-wide space-y-12 py-12">
-      <AdminBreadcrumb items={[{ label: "Internal evaluation" }]} />
+  const phaseBadge = (
+    <Badge tone={PHASE_TONE[election.phase]}>{PHASE_LABELS[election.phase]}</Badge>
+  );
 
-      <header className="space-y-5">
-        <SectionMarker
-          primary="Internal evaluation"
-          secondary={election.name}
-        />
-        <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
-          Class-aware completion and aggregate scores
-        </h1>
-        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
-          Tracks which Year 2 evaluators have submitted, broken down by
-          class. Class shares feed the weighted final score; drafts are
-          ignored until the evaluator submits. Open or close the internal
-          window from the{" "}
-          <LinkButton
-            href="/admin/election"
-            variant="link"
-            size="sm"
-            className="h-auto p-0 text-sm"
-          >
-            Election cycle
-          </LinkButton>{" "}
-          page.
-        </p>
-        <MetaGroup className="grid-cols-2 sm:grid-cols-4">
-          <Meta label="Cycle phase" value={PHASE_LABELS[election.phase]} />
-          <Meta label="On whitelist" value={completion.length} />
-          <Meta label="Submitted" value={submittedCount} />
-          <Meta label="Pending" value={draftCount + notStartedCount} />
-        </MetaGroup>
-        <div>
-          <Badge tone={PHASE_TONE[election.phase]}>
-            {PHASE_LABELS[election.phase]}
-          </Badge>
+  return (
+    <main className="mx-auto w-full max-w-[min(110rem,calc(100vw-2rem))] space-y-4 px-4 py-8">
+      <header className="space-y-4 border-b border-[var(--ink-line)] pb-4">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="space-y-3">
+            <AdminBreadcrumb items={[{ label: "Internal evaluation" }]} />
+            <SectionMarker primary="Internal evaluation" secondary={election.name} />
+            <h1 className="font-display text-2xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-3xl">
+              Internal evaluation register
+            </h1>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {phaseBadge}
+            <LayoutToggle value={layoutVariant} onChange={setLayoutVariant} />
+          </div>
         </div>
+
+        <MetricBand
+          completion={completion.length}
+          submitted={submittedCount}
+          draft={draftCount}
+          notStarted={notStartedCount}
+        />
       </header>
 
-      <section
-        aria-label="Submission status counts"
-        className="grid gap-3 sm:grid-cols-3"
-      >
-        <Stat
-          label="Submitted"
-          value={submittedCount}
-          tone="success"
-          icon={<CheckCircle2 className="h-4 w-4" aria-hidden />}
-          hint="Counted in the weighted aggregate."
-        />
-        <Stat
-          label="Draft only"
-          value={draftCount}
-          tone="warning"
-          icon={<PenLine className="h-4 w-4" aria-hidden />}
-          hint="Saved but not submitted; not in the aggregate."
-        />
-        <Stat
-          label="Not started"
-          value={notStartedCount}
-          tone="muted"
-          icon={<Circle className="h-4 w-4" aria-hidden />}
-          hint="No draft yet, or evaluator has not signed in."
-        />
-      </section>
+      {layoutVariant === "matrix" ? (
+        <section
+          aria-label="Probe 4 ledger-first matrix"
+          className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(330px,390px)]"
+        >
+          <EvaluatorLedger
+            rows={filteredCompletion}
+            activeTab={activeTab}
+            counts={countsByClass}
+            total={completion.length}
+            onFilterChange={setActiveTab}
+            title="Evaluator status"
+            description={`${filteredCompletion.length} visible`}
+          />
+          <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
+            <ClassProgressPanel
+              aggregate={aggregate}
+              countsByClass={countsByClass}
+              classWeightLookup={classWeightLookup}
+            />
+            <AggregatePanel aggregate={aggregate} activeTab={activeTab} />
+          </aside>
+        </section>
+      ) : (
+        <section
+          aria-label="Probe 5 split-pane register"
+          className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(420px,520px)]"
+        >
+          <EvaluatorLedger
+            rows={filteredCompletion}
+            activeTab={activeTab}
+            counts={countsByClass}
+            total={completion.length}
+            onFilterChange={setActiveTab}
+            title="Evaluator completion ledger"
+            description={`${completion.length} whitelisted`}
+            dense
+          />
+          <div className="space-y-4 xl:sticky xl:top-4 xl:self-start">
+            <section className="rounded-md border border-[var(--ink-line)] bg-[var(--paper)] p-4">
+              <SectionMarker primary="Control rail" secondary="Class filter" />
+              <div className="mt-4">
+                <FilterChips
+                  current={activeTab}
+                  counts={countsByClass}
+                  total={completion.length}
+                  onChange={setActiveTab}
+                />
+              </div>
+            </section>
+            <ClassProgressPanel
+              aggregate={aggregate}
+              countsByClass={countsByClass}
+              classWeightLookup={classWeightLookup}
+            />
+            <AggregatePanel aggregate={aggregate} activeTab={activeTab} />
+          </div>
+        </section>
+      )}
+    </main>
+  );
+}
 
-      <section
-        aria-label="Class submission progress"
-        className="grid gap-3 sm:grid-cols-3"
-      >
+function LayoutToggle({
+  value,
+  onChange,
+}: {
+  value: LayoutVariant;
+  onChange: (value: LayoutVariant) => void;
+}) {
+  const options: { value: LayoutVariant; label: string }[] = [
+    { value: "split", label: "Split register" },
+    { value: "matrix", label: "Matrix view" },
+  ];
+
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Layout variant"
+      className="inline-flex border border-[var(--ink-line)] bg-[var(--paper)]"
+    >
+      {options.map((option) => {
+        const active = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(option.value)}
+            className={cn(
+              "border-r border-[var(--ink-line)] px-3 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.16em] transition-colors last:border-r-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--paper)]",
+              active
+                ? "bg-[var(--ink)] text-[var(--paper)]"
+                : "bg-[var(--paper)] text-[var(--ink-muted)] hover:bg-[var(--paper-2)] hover:text-[var(--ink)]",
+            )}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function MetricBand({
+  completion,
+  submitted,
+  draft,
+  notStarted,
+}: {
+  completion: number;
+  submitted: number;
+  draft: number;
+  notStarted: number;
+}) {
+  const metrics = [
+    { label: "Whitelist", value: completion, icon: Users },
+    { label: "Submitted", value: submitted, icon: CheckCircle2 },
+    { label: "Draft", value: draft, icon: PenLine },
+    { label: "Not started", value: notStarted, icon: Circle },
+  ];
+
+  return (
+    <section
+      aria-label="Internal evaluation metrics"
+      className="grid overflow-hidden rounded-md border border-[var(--ink-line)] bg-[var(--paper)] sm:grid-cols-2 xl:grid-cols-4"
+    >
+      {metrics.map(({ label, value, icon: Icon }, index) => (
+        <div
+          key={label}
+          className={cn(
+            "flex items-center justify-between gap-4 p-4",
+            index > 0
+              ? "border-t border-[var(--ink-line)] sm:border-l sm:border-t-0"
+              : "",
+            index === 2 ? "xl:border-l" : "",
+          )}
+        >
+          <div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--ink-muted)]">
+              {label}
+            </div>
+            <div className="mt-1 font-display text-2xl font-medium tabular-nums text-[var(--ink)]">
+              {value}
+            </div>
+          </div>
+          <Icon className="h-4 w-4 text-[var(--ink-muted)]" aria-hidden />
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function EvaluatorLedger({
+  rows,
+  activeTab,
+  counts,
+  total,
+  onFilterChange,
+  title,
+  description,
+  dense = false,
+}: {
+  rows: NonNullable<ReturnType<typeof useQuery<typeof api.internal.adminCompletionList>>>;
+  activeTab: VoterClass | "all";
+  counts: Record<VoterClass, number>;
+  total: number;
+  onFilterChange: (cls: VoterClass | "all") => void;
+  title: string;
+  description: string;
+  dense?: boolean;
+}) {
+  return (
+    <section
+      aria-label={title}
+      className="overflow-hidden rounded-md border border-[var(--ink-line)] bg-[var(--paper)]"
+    >
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--ink-line)] bg-[var(--paper-2)] px-4 py-3">
+        <SectionMarker primary={title} secondary={description} />
+        {!dense ? (
+          <FilterChips
+            current={activeTab}
+            counts={counts}
+            total={total}
+            onChange={onFilterChange}
+          />
+        ) : null}
+      </header>
+
+      {rows.length === 0 ? (
+        <EmptyState
+          icon={<Users className="h-5 w-5" aria-hidden />}
+          title={
+            activeTab === "all"
+              ? "Whitelist is empty"
+              : `No evaluators in ${VOTER_CLASS_LABEL[activeTab]}`
+          }
+          description={
+            activeTab === "all"
+              ? "Add internal evaluators on the Whitelist page before opening evaluation."
+              : "Change the class filter or add evaluators in this class from the Whitelist page."
+          }
+        />
+      ) : (
+        <div
+          className={cn(
+            "overflow-auto",
+            dense ? "max-h-[calc(100dvh-15rem)]" : "max-h-[calc(100dvh-19rem)]",
+          )}
+        >
+          <table className="w-full min-w-[760px] text-sm">
+            <thead className="sticky top-0 z-10">
+              <tr className="border-b border-[var(--ink-line)] bg-[var(--paper-2)] text-left">
+                <th className="px-3 py-2 font-mono text-[10.5px] font-medium uppercase tracking-[0.18em] text-[var(--ink-muted)]">
+                  Evaluator
+                </th>
+                <th className="px-3 py-2 font-mono text-[10.5px] font-medium uppercase tracking-[0.18em] text-[var(--ink-muted)]">
+                  Class
+                </th>
+                <th className="px-3 py-2 font-mono text-[10.5px] font-medium uppercase tracking-[0.18em] text-[var(--ink-muted)]">
+                  Status
+                </th>
+                <th className="px-3 py-2 font-mono text-[10.5px] font-medium uppercase tracking-[0.18em] text-[var(--ink-muted)]">
+                  Last update (MYT)
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr
+                  key={row.email}
+                  className="border-b border-[var(--ink-line)] last:border-b-0"
+                >
+                  <td className="px-3 py-2">
+                    <div className="font-mono text-xs tabular-nums text-[var(--ink)]">
+                      {row.email}
+                    </div>
+                    <div className="mt-1 text-xs text-[var(--ink-muted)]">
+                      {row.fullName ?? "Not signed in"}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2">
+                    <ClassLabel voterClass={row.voterClass} />
+                  </td>
+                  <td className="px-3 py-2">
+                    <StatusBadge status={row.status} />
+                  </td>
+                  <td className="px-3 py-2 font-mono text-xs tabular-nums text-[var(--ink-muted)]">
+                    {row.submittedAt
+                      ? `Submitted ${formatMYT(row.submittedAt)}`
+                      : row.updatedAt
+                        ? formatMYT(row.updatedAt)
+                        : "Not yet"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ClassProgressPanel({
+  aggregate,
+  countsByClass,
+  classWeightLookup,
+}: {
+  aggregate: NonNullable<ReturnType<typeof useQuery<typeof api.internal.adminAggregate>>>;
+  countsByClass: Record<VoterClass, number>;
+  classWeightLookup: Map<VoterClass, number>;
+}) {
+  return (
+    <section aria-label="Class submission progress" className="space-y-3">
+      <SectionMarker primary="Class progress" secondary="Weighted evaluator groups" />
+      <div className="grid gap-3">
         {VOTER_CLASSES.map((cls) => {
           const submitted =
             aggregate.evaluatorsByClass.find((r) => r.voterClass === cls)
@@ -222,136 +453,37 @@ function Body({ election }: { election: Doc<"elections"> }) {
             />
           );
         })}
-      </section>
+      </div>
+    </section>
+  );
+}
 
-      <section
-        aria-label="Whitelist completion"
-        className="space-y-4"
-      >
-        <header className="flex flex-wrap items-center gap-3">
-          <SectionMarker
-            primary="Whitelist completion"
-            secondary={`${completion.length} ${completion.length === 1 ? "evaluator" : "evaluators"}`}
-          />
-          <FilterChips
-            current={activeTab}
-            counts={countsByClass}
-            total={completion.length}
-            onChange={setActiveTab}
-          />
-        </header>
-        <p className="max-w-[68ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
-          Per-evaluator status. Voters who have not signed in yet show as
-          <em> Not signed in</em>; their evaluation status falls back to
-          <em> Not started</em>.
-        </p>
-
-        {filteredCompletion.length === 0 ? (
-          <EmptyState
-            icon={<Users className="h-5 w-5" aria-hidden />}
-            title={
-              activeTab === "all"
-                ? "Whitelist is empty"
-                : `No evaluators in ${VOTER_CLASS_LABEL[activeTab]}`
-            }
-            description={
-              activeTab === "all"
-                ? "Internal evaluation cannot start until at least one evaluator is on the whitelist. Add them on the Whitelist page."
-                : "Add evaluators with this class on the Whitelist page, or change the filter above to All classes."
-            }
-          />
-        ) : (
-          <div className="overflow-x-auto rounded-md border border-[var(--ink-line)] bg-[var(--paper)]">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--ink-line)] bg-[var(--paper-2)] text-left">
-                  <th className="px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
-                    Email
-                  </th>
-                  <th className="px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
-                    Class
-                  </th>
-                  <th className="px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
-                    Name
-                  </th>
-                  <th className="px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
-                    Status
-                  </th>
-                  <th className="px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
-                    Last update (MYT)
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCompletion.map((row) => (
-                  <tr
-                    key={row.email}
-                    className="border-b border-[var(--ink-line)] last:border-b-0"
-                  >
-                    <td className="px-3 py-2 font-mono text-xs tabular-nums text-[var(--ink)]">
-                      {row.email}
-                    </td>
-                    <td className="px-3 py-2">
-                      <Badge tone={VOTER_CLASS_TONE[row.voterClass]}>
-                        {VOTER_CLASS_LABEL[row.voterClass]}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-2 text-[var(--ink)]">
-                      {row.fullName ?? (
-                        <span className="italic text-[var(--ink-muted)]">
-                          Not signed in
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2">
-                      <StatusBadge status={row.status} />
-                    </td>
-                    <td className="px-3 py-2 font-mono text-xs tabular-nums text-[var(--ink-muted)]">
-                      {row.submittedAt
-                        ? `Submitted ${formatMYT(row.submittedAt)}`
-                        : row.updatedAt
-                          ? formatMYT(row.updatedAt)
-                          : "Not yet"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      <section aria-label="Aggregate scores by class" className="space-y-4">
-        <header className="space-y-2">
-          <SectionMarker
-            primary="Aggregate scores"
-            secondary="Submitted only"
-          />
-          <h2 className="font-display text-xl font-medium tracking-[-0.01em] text-[var(--ink)] sm:text-2xl">
-            <ClipboardCheck
-              className="mr-2 inline-block h-5 w-5 text-[var(--ink-muted)]"
-              aria-hidden
-            />
-            Class share by candidate
-          </h2>
-          <p className="max-w-[68ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
-            Sum of totals share per class. Drafts are not counted. The
-            class share is the candidate&apos;s rubric total divided by
-            the total awarded by every submitted evaluator of that class.
-          </p>
-        </header>
-        {aggregate.candidates.length === 0 ||
-        aggregate.criteria.length === 0 ? (
-          <EmptyState
-            icon={<ClipboardCheck className="h-5 w-5" aria-hidden />}
-            title="No data yet"
-            description="Add candidates and configure rubric criteria first. Once internal evaluators submit, this table fills in."
-          />
-        ) : (
-          <ClassAggregateTable aggregate={aggregate} activeTab={activeTab} />
-        )}
-      </section>
-    </main>
+function AggregatePanel({
+  aggregate,
+  activeTab,
+}: {
+  aggregate: NonNullable<ReturnType<typeof useQuery<typeof api.internal.adminAggregate>>>;
+  activeTab: VoterClass | "all";
+}) {
+  return (
+    <section
+      aria-label="Aggregate scores by class"
+      className="space-y-3 rounded-md border border-[var(--ink-line)] bg-[var(--paper)] p-4"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SectionMarker primary="Aggregate scores" secondary="Submitted only" />
+        <ClipboardCheck className="h-5 w-5 text-[var(--ink-muted)]" aria-hidden />
+      </div>
+      {aggregate.candidates.length === 0 || aggregate.criteria.length === 0 ? (
+        <EmptyState
+          icon={<ClipboardCheck className="h-5 w-5" aria-hidden />}
+          title="No data yet"
+          description="Add candidates and configure rubric criteria first. Once internal evaluators submit, this table fills in."
+        />
+      ) : (
+        <ClassAggregateTable aggregate={aggregate} activeTab={activeTab} />
+      )}
+    </section>
   );
 }
 
@@ -409,9 +541,7 @@ function ClassAggregateTable({
         return (
           <div key={cls} className="space-y-3">
             <div className="flex flex-wrap items-baseline gap-2 text-sm">
-              <Badge tone={VOTER_CLASS_TONE[cls]}>
-                {VOTER_CLASS_LABEL[cls]}
-              </Badge>
+              <ClassLabel voterClass={cls} />
               <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink-muted)]">
                 weight{" "}
                 <span className="tabular-nums">{weight}%</span>
@@ -519,19 +649,22 @@ function ClassStatCard({
   return (
     <div className="space-y-2 rounded-md border border-[var(--ink-line)] bg-[var(--paper)] p-4">
       <div className="flex items-center justify-between">
-        <Badge tone={VOTER_CLASS_TONE[voterClass]}>
-          {VOTER_CLASS_LABEL[voterClass]}
-        </Badge>
+        <ClassLabel voterClass={voterClass} />
         <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
           {weight}% weight
         </span>
       </div>
-      <div className="font-display text-2xl font-medium tabular-nums text-[var(--ink)]">
-        {submitted}
-        <span className="text-base font-normal text-[var(--ink-muted)]">
-          {" "}
-          / {total}
-        </span>
+      <div className="flex items-end justify-between gap-3">
+        <div className="font-display text-2xl font-medium tabular-nums text-[var(--ink)]">
+          {submitted}
+          <span className="text-base font-normal text-[var(--ink-muted)]">
+            {" "}
+            / {total}
+          </span>
+        </div>
+        <div className="font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
+          {pct}%
+        </div>
       </div>
       <div
         className="h-1.5 overflow-hidden rounded-full bg-[var(--paper-2)]"
@@ -545,9 +678,6 @@ function ClassStatCard({
           className="h-full bg-[var(--copper)]"
           style={{ width: `${pct}%` }}
         />
-      </div>
-      <div className="font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
-        {pct}% submitted
       </div>
     </div>
   );
@@ -587,7 +717,7 @@ function FilterChips({
     <div
       role="radiogroup"
       aria-label="Filter by class"
-      className="flex flex-wrap items-center gap-1.5"
+      className="inline-flex flex-wrap border border-[var(--ink-line)] bg-[var(--paper)]"
     >
       {chips.map((c) => {
         const active = current === c.value;
@@ -599,10 +729,10 @@ function FilterChips({
             aria-checked={active}
             onClick={() => onChange(c.value)}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-[10.5px] uppercase tracking-[0.18em]",
+              "inline-flex items-center gap-2 border-r border-[var(--ink-line)] px-3 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.18em] last:border-r-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--paper)]",
               active
-                ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]"
-                : "border-[var(--ink-line)] text-[var(--ink-muted)] hover:text-[var(--ink)]",
+                ? "bg-[var(--ink)] text-[var(--paper)]"
+                : "bg-[var(--paper)] text-[var(--ink-muted)] hover:bg-[var(--paper-2)] hover:text-[var(--ink)]",
             )}
           >
             <span>{c.label}</span>
@@ -614,52 +744,40 @@ function FilterChips({
   );
 }
 
-function Stat({
-  label,
-  value,
-  tone,
-  icon,
-  hint,
-}: {
-  label: string;
-  value: number;
-  tone: "success" | "warning" | "muted";
-  icon: React.ReactNode;
-  hint: string;
-}) {
+function ClassLabel({ voterClass }: { voterClass: VoterClass }) {
   return (
-    <div className="space-y-2 rounded-md border border-[var(--ink-line)] bg-[var(--paper)] p-4">
-      <div className="flex items-center justify-between">
-        <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink-muted)]">
-          {label}
-        </span>
-        <Badge tone={tone}>{icon}</Badge>
-      </div>
-      <div className="font-display text-2xl font-medium tabular-nums text-[var(--ink)]">
-        {value}
-      </div>
-      <p className="text-[11px] leading-relaxed text-[var(--ink-muted)]">
-        {hint}
-      </p>
-    </div>
+    <span className="inline-flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.16em] text-[var(--ink)]">
+      <span
+        aria-hidden
+        className={cn(
+          "h-2 w-2 rounded-[2px]",
+          voterClass === "topCommittee"
+            ? "bg-[var(--teal)]"
+            : voterClass === "headExecutive"
+              ? "bg-[var(--copper)]"
+              : "bg-[var(--ink-muted)]",
+        )}
+      />
+      {VOTER_CLASS_LABEL[voterClass]}
+    </span>
   );
 }
 
 function StatusBadge({ status }: { status: string }) {
   if (status === "submitted")
     return (
-      <Badge tone="success">
+      <Badge tone="success" className="rounded-[3px]">
         <CheckCircle2 className="h-3 w-3" aria-hidden /> Submitted
       </Badge>
     );
   if (status === "draft")
     return (
-      <Badge tone="warning">
+      <Badge tone="warning" className="rounded-[3px]">
         <PenLine className="h-3 w-3" aria-hidden /> Draft
       </Badge>
     );
   return (
-    <Badge tone="muted">
+    <Badge tone="muted" className="rounded-[3px]">
       <Circle className="h-3 w-3" aria-hidden /> Not started
     </Badge>
   );
