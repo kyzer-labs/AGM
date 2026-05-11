@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { ArrowLeft, CheckCircle2, Pencil } from "lucide-react";
 
 import { AuthGate } from "@/components/auth/auth-gate";
+import { CandidatePhoto } from "@/components/candidate-photo";
 import { useDialog } from "@/components/dialog/dialog-provider";
 import { Button } from "@/components/ui/button";
 import { SectionMarker } from "@/components/ui/section-marker";
@@ -599,10 +600,7 @@ function ActiveEvaluation({
             >
               <div className="internal-card-head">
                 <div className="internal-photo" aria-hidden>
-                  {activeCand?.photoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={activeCand.photoUrl} alt="" />
-                  ) : null}
+                  <CandidatePhoto src={activeCand?.photoUrl} />
                 </div>
                 <div>
                   <p className="internal-bio-step">

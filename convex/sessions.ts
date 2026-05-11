@@ -9,6 +9,7 @@ import {
   getResolvedWinnerCandidateIds,
   getUnresolvedTiePositionIds,
 } from "./lib/results";
+import { normalisePhotoUrl } from "./lib/photoUrl";
 import type { Doc, Id } from "./_generated/dataModel";
 
 async function getPositionsOrdered(
@@ -110,7 +111,8 @@ export const getActiveSession = query({
             fullName: c.fullName,
             matric: c.matric ?? null,
             bio: c.bio ?? null,
-            photoUrl: storageUrl ?? c.photoUrl ?? null,
+            photoUrl:
+              storageUrl ?? (c.photoUrl ? normalisePhotoUrl(c.photoUrl) : null),
             fallbackOrder: l.fallbackOrder,
           };
         }),

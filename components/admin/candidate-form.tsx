@@ -15,6 +15,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
+import { CandidatePhoto } from "@/components/candidate-photo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,6 +49,28 @@ const candidateSchema = z.object({
     ),
 });
 export type CandidateFormValues = z.infer<typeof candidateSchema>;
+
+function normaliseCandidatePhotoPreview(input: string): string {
+  const trimmed = input.trim();
+  if (trimmed.length === 0) return trimmed;
+
+  try {
+    const url = new URL(trimmed);
+    if (url.hostname === "drive.google.com") {
+      const fileMatch = url.pathname.match(/^\/file\/d\/([a-zA-Z0-9_-]+)/);
+      const id =
+        fileMatch?.[1] ??
+        (["/open", "/uc", "/thumbnail"].includes(url.pathname)
+          ? url.searchParams.get("id")
+          : null);
+      if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w800`;
+    }
+  } catch {
+    return trimmed;
+  }
+
+  return trimmed;
+}
 
 export interface PositionAssignment {
   positionId: Id<"positions">;
@@ -276,11 +299,10 @@ export function CandidateForm({
             )}
           >
             {photoPreview ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <CandidatePhoto
                 src={photoPreview}
-                alt=""
                 className="h-full w-full object-cover"
+                iconClassName="h-6 w-6"
               />
             ) : (
               <ImagePlus
@@ -389,7 +411,11 @@ export function CandidateForm({
                   setPhotoStorageId(null);
                 }
                 if (!photoStorageId) {
-                  setPhotoPreview(e.target.value || null);
+                  setPhotoPreview(
+                    e.target.value
+                      ? normaliseCandidatePhotoPreview(e.target.value)
+                      : null,
+                  );
                 }
               }}
             />

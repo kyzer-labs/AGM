@@ -18,6 +18,7 @@ import {
 
 import { AuthGate } from "@/components/auth/auth-gate";
 import { AdminBreadcrumb } from "@/components/admin/admin-breadcrumb";
+import { CandidatePhoto } from "@/components/candidate-photo";
 import { ImportSummaryStrip } from "@/components/admin/import-summary-strip";
 import { NoElection } from "@/components/admin/no-election";
 import { useDialog } from "@/components/dialog/dialog-provider";
@@ -26,7 +27,6 @@ import {
   type PositionAssignment,
 } from "@/components/admin/candidate-form";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -556,19 +556,11 @@ function CandidateCard({
     <Card>
       <CardContent className="flex gap-4 p-4">
         <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-lg bg-[var(--color-muted)]">
-          {c.photoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={c.photoUrl}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <UserCircle2
-              className="h-8 w-8 text-[var(--color-muted-foreground)]"
-              aria-hidden
-            />
-          )}
+          <CandidatePhoto
+            src={c.photoUrl}
+            className="h-full w-full object-cover"
+            iconClassName="h-8 w-8"
+          />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">

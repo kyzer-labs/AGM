@@ -24,7 +24,6 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { requireAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
-import { normalisePhotoUrl } from "./lib/photoUrl";
 import { getElectionOrThrow } from "./lib/setup";
 import { VOTER_CLASSES, type VoterClass } from "./lib/cycle";
 
@@ -1175,7 +1174,7 @@ const TEST_CANDIDATES: ReadonlyArray<TestCandidateSpec> = [
     positionTier: 1,
     positionOrder: 0,
     photoUrl:
-      "https://drive.google.com/file/d/1QYwdEiiOpW6rpBMzACqvSG2oNVJUcRtg/view?usp=drivesdk",
+      "https://drive.google.com/file/d/1QYwdEiiOpW6rpBMzACqvSG2oNVJUcRtg/view?usp=drive_link",
   },
   {
     fullName: "Tan Chin Qian",
@@ -1183,7 +1182,7 @@ const TEST_CANDIDATES: ReadonlyArray<TestCandidateSpec> = [
     positionTier: 1,
     positionOrder: 0,
     photoUrl:
-      "https://drive.google.com/file/d/1Zn5f3zBM5jbLG7ZDoXpLfcV6bUWfy6WT/view?usp=drivesdk",
+      "https://drive.google.com/file/d/1Zn5f3zBM5jbLG7ZDoXpLfcV6bUWfy6WT/view?usp=drive_link",
   },
 
   // Tier 2 - Vice Presidents (2 positions)
@@ -1193,7 +1192,7 @@ const TEST_CANDIDATES: ReadonlyArray<TestCandidateSpec> = [
     positionTier: 2,
     positionOrder: 0,
     photoUrl:
-      "https://drive.google.com/file/d/1A9NqzhdPkoInA34oLF8jLSPWsAxypscI/view?usp=drivesdk",
+      "https://drive.google.com/file/d/1A9NqzhdPkoInA34oLF8jLSPWsAxypscI/view?usp=drive_link",
   },
   {
     fullName: "Lim Jie Shen",
@@ -1201,7 +1200,7 @@ const TEST_CANDIDATES: ReadonlyArray<TestCandidateSpec> = [
     positionTier: 2,
     positionOrder: 0,
     photoUrl:
-      "https://drive.google.com/file/d/1NINWvOT4sl72xyb9CuYzzjvpzRwkRxt2/view?usp=drivesdk",
+      "https://drive.google.com/file/d/1NINWvOT4sl72xyb9CuYzzjvpzRwkRxt2/view?usp=drive_link",
   },
   {
     fullName: "Doris Yee Wai Lee",
@@ -1209,7 +1208,7 @@ const TEST_CANDIDATES: ReadonlyArray<TestCandidateSpec> = [
     positionTier: 2,
     positionOrder: 1,
     photoUrl:
-      "https://drive.google.com/file/d/1Zn-f8pqm2aLFrFi3s2igTjLWjwi2XK9x/view?usp=drivesdk",
+      "https://drive.google.com/file/d/1Zn-f8pqm2aLFrFi3s2igTjLWjwi2XK9x/view?usp=drive_link",
   },
   {
     fullName: "Auni Amira Binti Md Fauzi",
@@ -1217,7 +1216,7 @@ const TEST_CANDIDATES: ReadonlyArray<TestCandidateSpec> = [
     positionTier: 2,
     positionOrder: 1,
     photoUrl:
-      "https://drive.google.com/file/d/16XVsA4PnCVqaUZ-o7qFmU5bcETSF3LxP/view?usp=drivesdk",
+      "https://drive.google.com/file/d/16XVsA4PnCVqaUZ-o7qFmU5bcETSF3LxP/view?usp=drive_link",
   },
 
   // Tier 3 - Directors (6 positions)
@@ -1227,7 +1226,7 @@ const TEST_CANDIDATES: ReadonlyArray<TestCandidateSpec> = [
     positionTier: 3,
     positionOrder: 0,
     photoUrl:
-      "https://drive.google.com/file/d/1dzytCdjqpLlG-sbMKD3uLhWV5ipm-4Lk/view?usp=drivesdk",
+      "https://drive.google.com/file/d/1dzytCdjqpLlG-sbMKD3uLhWV5ipm-4Lk/view?usp=drive_link",
   },
   {
     fullName: "Koay Ke Ying",
@@ -1235,7 +1234,7 @@ const TEST_CANDIDATES: ReadonlyArray<TestCandidateSpec> = [
     positionTier: 3,
     positionOrder: 0,
     photoUrl:
-      "https://drive.google.com/file/d/1kHWUxjJgpt_2shk-VaqENSES6kPQweI2/view?usp=drivesdk",
+      "https://drive.google.com/file/d/1kHWUxjJgpt_2shk-VaqENSES6kPQweI2/view?usp=drive_link",
   },
   {
     fullName: "Nurul Shafina Ashikin Binti Mohd Redda Udin",
@@ -1243,7 +1242,7 @@ const TEST_CANDIDATES: ReadonlyArray<TestCandidateSpec> = [
     positionTier: 3,
     positionOrder: 1,
     photoUrl:
-      "https://drive.google.com/file/d/1P3-aO-mn87tbOoYb_oLDc89dfUIOohf7/view?usp=drivesdk",
+      "https://drive.google.com/file/d/1P3-aO-mn87tbOoYb_oLDc89dfUIOohf7/view?usp=drive_link",
   },
   {
     fullName: "Nurrul Shahiratulnazwa",
@@ -1251,7 +1250,7 @@ const TEST_CANDIDATES: ReadonlyArray<TestCandidateSpec> = [
     positionTier: 3,
     positionOrder: 1,
     photoUrl:
-      "https://drive.google.com/file/d/1vUOiBwynrATpCAYwEXe_wo_iFXClYtHV/view?usp=drivesdk",
+      "https://drive.google.com/file/d/1vUOiBwynrATpCAYwEXe_wo_iFXClYtHV/view?usp=drive_link",
   },
   {
     fullName: "Loh Wei Chuen",
@@ -1259,7 +1258,7 @@ const TEST_CANDIDATES: ReadonlyArray<TestCandidateSpec> = [
     positionTier: 3,
     positionOrder: 2,
     photoUrl:
-      "https://drive.google.com/file/d/1ALveRb-PZryydA6bf9KujPQepB2AaF5b/view?usp=drivesdk",
+      "https://drive.google.com/file/d/1ALveRb-PZryydA6bf9KujPQepB2AaF5b/view?usp=drive_link",
   },
   {
     fullName: "Chong Han Zheng",
@@ -1267,7 +1266,7 @@ const TEST_CANDIDATES: ReadonlyArray<TestCandidateSpec> = [
     positionTier: 3,
     positionOrder: 2,
     photoUrl:
-      "https://drive.google.com/file/d/1HbvB2aEEnNsLTSFMGUXHjbXBlGXEnrvs/view?usp=drivesdk",
+      "https://drive.google.com/file/d/1HbvB2aEEnNsLTSFMGUXHjbXBlGXEnrvs/view?usp=drive_link",
   },
   {
     fullName: "Lau Jun Hao",
@@ -1275,7 +1274,7 @@ const TEST_CANDIDATES: ReadonlyArray<TestCandidateSpec> = [
     positionTier: 3,
     positionOrder: 3,
     photoUrl:
-      "https://drive.google.com/file/d/13X2_35uXBZXBUdXhbViCLiD6R1WN5cuM/view?usp=drivesdk",
+      "https://drive.google.com/file/d/13X2_35uXBZXBUdXhbViCLiD6R1WN5cuM/view?usp=drive_link",
   },
   {
     fullName: "Mohamad Nazrul Hakim Bin Noor Hamzah",
@@ -1283,7 +1282,7 @@ const TEST_CANDIDATES: ReadonlyArray<TestCandidateSpec> = [
     positionTier: 3,
     positionOrder: 3,
     photoUrl:
-      "https://drive.google.com/file/d/1hi_577Vvj_Hf3_V3nbBop2T48WeVhbXm/view?usp=drivesdk",
+      "https://drive.google.com/file/d/1hi_577Vvj_Hf3_V3nbBop2T48WeVhbXm/view?usp=drive_link",
   },
   {
     fullName: "Cheng Xin Yi",
@@ -1291,7 +1290,7 @@ const TEST_CANDIDATES: ReadonlyArray<TestCandidateSpec> = [
     positionTier: 3,
     positionOrder: 4,
     photoUrl:
-      "https://drive.google.com/file/d/10O11lBj7NOXk9wJXKK74AfEwveLLZO-9/view?usp=drivesdk",
+      "https://drive.google.com/file/d/10O11lBj7NOXk9wJXKK74AfEwveLLZO-9/view?usp=drive_link",
   },
   {
     fullName: "Yap Han Lim",
@@ -1299,7 +1298,7 @@ const TEST_CANDIDATES: ReadonlyArray<TestCandidateSpec> = [
     positionTier: 3,
     positionOrder: 4,
     photoUrl:
-      "https://drive.google.com/file/d/1QJzVBM59e157E9XEcr7kSWaN3YJ5EPkM/view?usp=drivesdk",
+      "https://drive.google.com/file/d/1QJzVBM59e157E9XEcr7kSWaN3YJ5EPkM/view?usp=drive_link",
   },
   {
     fullName: "Muhammad Adam Zayani Bin Mohd Huzainy",
@@ -1307,7 +1306,7 @@ const TEST_CANDIDATES: ReadonlyArray<TestCandidateSpec> = [
     positionTier: 3,
     positionOrder: 5,
     photoUrl:
-      "https://drive.google.com/file/d/1CD0fz1NGKt0FC2H7rT8Yptesmw0FJHTE/view?usp=drivesdk",
+      "https://drive.google.com/file/d/1CD0fz1NGKt0FC2H7rT8Yptesmw0FJHTE/view?usp=drive_link",
   },
   {
     fullName: "Calvin Khoo Zhen Chen",
@@ -1315,7 +1314,7 @@ const TEST_CANDIDATES: ReadonlyArray<TestCandidateSpec> = [
     positionTier: 3,
     positionOrder: 5,
     photoUrl:
-      "https://drive.google.com/file/d/1U2XM0jBrfP6ZV4Xg0Qf8LVyUvpxeuNNj/view?usp=drivesdk",
+      "https://drive.google.com/file/d/1U2XM0jBrfP6ZV4Xg0Qf8LVyUvpxeuNNj/view?usp=drive_link",
   },
 ];
 
@@ -1377,7 +1376,7 @@ export const loadTestCandidates = mutation({
         );
         continue;
       }
-      const photoUrl = normalisePhotoUrl(spec.photoUrl);
+      const photoUrl = spec.photoUrl.trim();
       const bio = `${TEST_BIO_PREFIX} Auto-loaded fixture for ${position.name} (tier ${spec.positionTier}, order ${spec.positionOrder}).`;
       const existing =
         existingTestByMatric.get(spec.matric) ??

@@ -44,7 +44,8 @@ export const list = query({
         const storageUrl = c.photoStorageId
           ? await ctx.storage.getUrl(c.photoStorageId)
           : null;
-        const photoUrl = storageUrl ?? c.photoUrl ?? null;
+        const photoUrl =
+          storageUrl ?? (c.photoUrl ? normalisePhotoUrl(c.photoUrl) : null);
         return {
           _id: c._id,
           fullName: c.fullName,
@@ -113,7 +114,7 @@ export const add = mutation({
             "Photo link must start with http:// or https://.",
           );
         }
-        photoUrl = normalisePhotoUrl(raw);
+        photoUrl = raw;
       }
     }
 
@@ -228,7 +229,7 @@ export const update = mutation({
               "Photo link must start with http:// or https://.",
             );
           }
-          patch.photoUrl = normalisePhotoUrl(raw);
+          patch.photoUrl = raw;
           if (c.photoStorageId && patch.photoStorageId === undefined) {
             await ctx.storage.delete(c.photoStorageId);
             patch.photoStorageId = undefined;
@@ -437,7 +438,7 @@ export const csvImport = mutation({
                 message: "photoUrl must start with http:// or https://.",
               });
             } else {
-              photoUrl = normalisePhotoUrl(raw);
+              photoUrl = raw;
             }
           }
         }

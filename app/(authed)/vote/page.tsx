@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
-import { CheckCircle2, UserCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 
 import { AuthGate } from "@/components/auth/auth-gate";
+import { CandidatePhoto } from "@/components/candidate-photo";
 import { Button } from "@/components/ui/button";
 import { SectionMarker } from "@/components/ui/section-marker";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -298,19 +299,11 @@ function Ballot({ session }: { session: ActiveSession }) {
             >
               <div className="flex w-full items-start gap-3">
                 <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-md bg-[var(--color-muted)]">
-                  {c.photoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={c.photoUrl}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <UserCircle2
-                      className="h-6 w-6 text-[var(--color-muted-foreground)]"
-                      aria-hidden
-                    />
-                  )}
+                  <CandidatePhoto
+                    src={c.photoUrl}
+                    className="h-full w-full object-cover"
+                    iconClassName="h-6 w-6"
+                  />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium">{c.fullName}</div>
@@ -442,4 +435,3 @@ function Standby({
     />
   );
 }
-
