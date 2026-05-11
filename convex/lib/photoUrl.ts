@@ -2,9 +2,10 @@
  * Normalise a user-pasted candidate photo URL into something the browser can
  * render directly with `<img src>`.
  *
- * Mostly turns Google Drive share URLs into a thumbnail endpoint that is
- * reliable in normal browser `<img>` tags. Anything that doesn't look like a
- * Drive URL is returned unchanged after being trimmed.
+ * Mostly turns Google Drive share URLs into an app-local image URL so browser
+ * rendering doesn't depend on Google's cross-origin thumbnail redirect path.
+ * Anything that doesn't look like a Drive URL is returned unchanged after
+ * being trimmed.
  */
 export function normalisePhotoUrl(input: string): string {
   const trimmed = input.trim();
@@ -12,17 +13,27 @@ export function normalisePhotoUrl(input: string): string {
 
   const driveFileId = extractDriveFileId(trimmed);
   if (driveFileId) {
-    return `https://drive.google.com/thumbnail?id=${driveFileId}&sz=w800`;
+    return `/api/drive-photo?id=${driveFileId}`;
   }
 
   return trimmed;
 }
 
 export function isHttpUrl(input: string): boolean {
-  return /^https?:\/\//i.test(input.trim());
+  const trimmed = input.trim();
+  return /^https?:\/\//i.test(trimmed) || isDrivePhotoProxyUrl(trimmed);
 }
 
 function extractDriveFileId(input: string): string | null {
+  if (isDrivePhotoProxyUrl(input)) {
+    try {
+      const url = new URL(input, "https://agm.local");
+      return url.searchParams.get("id");
+    } catch {
+      return null;
+    }
+  }
+
   let url: URL;
   try {
     url = new URL(input);
@@ -56,4 +67,17 @@ function extractDriveFileId(input: string): string | null {
   }
 
   return null;
+}
+
+function isDrivePhotoProxyUrl(input: string): boolean {
+  try {
+    const url = new URL(input, "https://agm.local");
+    return (
+      url.origin === "https://agm.local" &&
+      url.pathname === "/api/drive-photo" &&
+      /^[a-zA-Z0-9_-]{10,}$/.test(url.searchParams.get("id") ?? "")
+    );
+  } catch {
+    return false;
+  }
 }

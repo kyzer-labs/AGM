@@ -154,7 +154,7 @@ export const add = mutation({
       if (raw.length > 0) {
         if (!isHttpUrl(raw)) {
           throw new ConvexError(
-            "Photo link must start with http:// or https://.",
+            "Photo link must start with http://, https://, or the saved Drive photo path.",
           );
         }
         photoUrl = normalisePhotoUrl(raw);
@@ -270,7 +270,7 @@ export const update = mutation({
         } else {
           if (!isHttpUrl(raw)) {
             throw new ConvexError(
-              "Photo link must start with http:// or https://.",
+              "Photo link must start with http://, https://, or the saved Drive photo path.",
             );
           }
           patch.photoUrl = normalisePhotoUrl(raw);
@@ -470,7 +470,8 @@ export const csvImport = mutation({
             if (!isHttpUrl(raw)) {
               summary.errors.push({
                 row: i + 2,
-                message: "photoUrl must start with http:// or https://.",
+                message:
+                  "photoUrl must start with http://, https://, or the saved Drive photo path.",
               });
             } else {
               photoUrl = normalisePhotoUrl(raw);

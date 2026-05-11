@@ -38,8 +38,8 @@ const candidateSchema = z.object({
     .max(500, "URL is too long")
     .optional()
     .refine(
-      (v) => !v || /^https?:\/\//i.test(v),
-      "Photo link must start with http:// or https://",
+      (v) => !v || /^https?:\/\//i.test(v) || isDrivePhotoProxyUrl(v),
+      "Photo link must start with http://, https://, or the saved Drive photo path",
     ),
 });
 export type CandidateFormValues = z.infer<typeof candidateSchema>;
@@ -57,13 +57,26 @@ function normaliseCandidatePhotoPreview(input: string): string {
         (["/open", "/uc", "/thumbnail"].includes(url.pathname)
           ? url.searchParams.get("id")
           : null);
-      if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w800`;
+      if (id) return `/api/drive-photo?id=${id}`;
     }
   } catch {
     return trimmed;
   }
 
   return trimmed;
+}
+
+function isDrivePhotoProxyUrl(input: string): boolean {
+  try {
+    const url = new URL(input, "https://agm.local");
+    return (
+      url.origin === "https://agm.local" &&
+      url.pathname === "/api/drive-photo" &&
+      /^[a-zA-Z0-9_-]{10,}$/.test(url.searchParams.get("id") ?? "")
+    );
+  } catch {
+    return false;
+  }
 }
 
 export interface PositionAssignment {
@@ -467,10 +480,10 @@ export function CandidateForm({
                     type="button"
                     onClick={() => togglePosition(p._id)}
                     className={cn(
-                      "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors hover:bg-[var(--color-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--paper)]",
+                      "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--paper)]",
                       selected
-                        ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]"
-                        : "border-[var(--ink-line)] text-[var(--ink)]",
+                        ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)] hover:bg-[color-mix(in_oklab,var(--ink)_92%,var(--paper)_8%)]"
+                        : "border-[var(--ink-line)] text-[var(--ink)] hover:bg-[var(--color-muted)]",
                     )}
                     aria-pressed={selected}
                     aria-label={`${selected ? "Remove" : "Add"} ${p.name} ${selected ? "from" : "to"} contending positions`}

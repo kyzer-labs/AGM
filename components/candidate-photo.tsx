@@ -55,13 +55,15 @@ function normaliseCandidatePhotoSrc(input: string): string {
 
   const driveFileId = extractDriveFileId(trimmed);
   if (driveFileId) {
-    return `https://drive.google.com/thumbnail?id=${driveFileId}&sz=w800`;
+    return `/api/drive-photo?id=${driveFileId}`;
   }
 
   return trimmed;
 }
 
 function extractDriveFileId(input: string): string | null {
+  if (input.startsWith("/api/drive-photo")) return null;
+
   let url: URL;
   try {
     url = new URL(input);
