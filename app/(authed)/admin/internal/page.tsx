@@ -207,10 +207,10 @@ function MetricBand({
           key={label}
           className={cn(
             "flex items-center justify-between gap-4 p-4",
-            index > 0
-              ? "border-t border-[var(--ink-line)] sm:border-l sm:border-t-0"
-              : "",
-            index === 2 ? "xl:border-l" : "",
+            index > 0 ? "border-t border-[var(--ink-line)]" : "",
+            index % 2 === 1 ? "sm:border-l" : "",
+            index > 1 ? "sm:border-t" : "sm:border-t-0",
+            index > 0 ? "xl:border-l xl:border-t-0" : "",
           )}
         >
           <div>
@@ -637,7 +637,7 @@ function FilterChips({
             aria-checked={active}
             onClick={() => onChange(c.value)}
             className={cn(
-              "inline-flex items-center gap-2 border-r border-[var(--ink-line)] px-3 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.18em] last:border-r-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--paper)]",
+              "inline-flex items-center gap-2 border-r border-[var(--ink-line)] px-3 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.18em] transition-colors duration-200 last:border-r-0 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--paper)]",
               active
                 ? "bg-[var(--ink)] text-[var(--paper)]"
                 : "bg-[var(--paper)] text-[var(--ink-muted)] hover:bg-[var(--paper-2)] hover:text-[var(--ink)]",
