@@ -47,6 +47,7 @@ convex/_generated/ai/
 
 # AI / agent tooling artifacts (per-developer, not shared)
 .agents/
+.impeccable/
 .cursor/
 AGENTS.md
 CLAUDE.md
