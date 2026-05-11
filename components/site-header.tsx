@@ -48,7 +48,7 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-30 border-b bg-[var(--color-background)]/90 backdrop-blur">
-      <div className="mx-auto grid min-h-14 w-[min(96vw,104rem)] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-5 gap-y-2 px-4 py-2 sm:px-6">
+      <div className="container-workbench grid min-h-14 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-5 gap-y-2 py-2">
         <Link
           href={brandHref}
           className="flex shrink-0 items-center gap-2 justify-self-start font-semibold tracking-tight"
