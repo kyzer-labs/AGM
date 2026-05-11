@@ -79,6 +79,7 @@ interface CandidateRow {
     positionId: Id<"positions">;
     name: string;
     tier: number;
+    order: number;
     fallbackOrder: number;
   }[];
 }
@@ -164,15 +165,34 @@ function Body({ election }: { election: Doc<"elections"> }) {
     const rows = candidates?.slice() ?? [];
     const byName = (a: CandidateRow, b: CandidateRow) =>
       a.fullName.localeCompare(b.fullName, "en");
-    const precedence = (c: CandidateRow) =>
-      Math.min(
-        ...c.positions.map((position) => position.fallbackOrder),
-        Number.POSITIVE_INFINITY,
-      );
+    const precedence = (c: CandidateRow) => {
+      const primary = c.positions
+        .slice()
+        .sort(
+          (a, b) =>
+            a.tier - b.tier ||
+            a.order - b.order ||
+            a.name.localeCompare(b.name),
+        )[0];
+      return primary
+        ? { tier: primary.tier, order: primary.order, name: primary.name }
+        : {
+            tier: Number.POSITIVE_INFINITY,
+            order: Number.POSITIVE_INFINITY,
+            name: "",
+          };
+    };
 
     return rows.sort((a, b) => {
       if (rosterSort === "position") {
-        return precedence(a) - precedence(b) || byName(a, b);
+        const aPrecedence = precedence(a);
+        const bPrecedence = precedence(b);
+        return (
+          aPrecedence.tier - bPrecedence.tier ||
+          aPrecedence.order - bPrecedence.order ||
+          aPrecedence.name.localeCompare(bPrecedence.name, "en") ||
+          byName(a, b)
+        );
       }
       return byName(a, b);
     });

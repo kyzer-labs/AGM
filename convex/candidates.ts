@@ -99,6 +99,7 @@ export const list = query({
               positionId: p.positionId,
               name: p.name,
               tier: p.tier,
+              order: p.order,
               fallbackOrder: index,
             })),
         };
