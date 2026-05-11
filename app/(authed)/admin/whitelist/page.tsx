@@ -14,6 +14,8 @@ import Papa from "papaparse";
 import { toast } from "sonner";
 import {
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Circle,
   Lock,
   Plus,
@@ -78,6 +80,8 @@ const PHASE_LABELS: Record<Doc<"elections">["phase"], string> = {
   published: "Published",
 };
 
+const WHITELIST_PAGE_SIZE = 6;
+
 interface BulkRow {
   displayRow: string;
   email: string;
@@ -141,6 +145,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
   const [bulkDefaultClass, setBulkDefaultClass] =
     useState<VoterClass>("year2Committee");
   const [filterClass, setFilterClass] = useState<VoterClass | "all">("all");
+  const [whitelistPage, setWhitelistPage] = useState(0);
   const [importing, setImporting] = useState(false);
   const [lastImport, setLastImport] = useState<
     | (BulkSummary & {
@@ -169,6 +174,31 @@ function Body({ election }: { election: Doc<"elections"> }) {
     for (const row of list) counts[row.voterClass] += 1;
     return counts;
   }, [list]);
+
+  const whitelistPageCount = Math.max(
+    1,
+    Math.ceil(filteredList.length / WHITELIST_PAGE_SIZE),
+  );
+  const safeWhitelistPage = Math.min(
+    whitelistPage,
+    whitelistPageCount - 1,
+  );
+  const whitelistStart = safeWhitelistPage * WHITELIST_PAGE_SIZE;
+  const whitelistEnd = Math.min(
+    whitelistStart + WHITELIST_PAGE_SIZE,
+    filteredList.length,
+  );
+  const visibleList = filteredList.slice(whitelistStart, whitelistEnd);
+
+  useEffect(() => {
+    setWhitelistPage(0);
+  }, [filterClass]);
+
+  useEffect(() => {
+    if (whitelistPage > whitelistPageCount - 1) {
+      setWhitelistPage(Math.max(0, whitelistPageCount - 1));
+    }
+  }, [whitelistPage, whitelistPageCount]);
 
   const sendBulk = async (rows: BulkRow[], sourceLabel: string) => {
     setImporting(true);
@@ -320,6 +350,41 @@ function Body({ election }: { election: Doc<"elections"> }) {
               total={list.length}
               onChange={setFilterClass}
             />
+            {whitelistPageCount > 1 ? (
+              <div className="flex items-center gap-2">
+                <p className="mr-1 font-mono text-[10.5px] uppercase tracking-[0.16em] tabular-nums text-[var(--ink-muted)]">
+                  {String(whitelistStart + 1).padStart(2, "0")}-
+                  {String(whitelistEnd).padStart(2, "0")} of{" "}
+                  {String(filteredList.length).padStart(2, "0")}
+                </p>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={() =>
+                    setWhitelistPage((page) => Math.max(0, page - 1))
+                  }
+                  disabled={safeWhitelistPage === 0}
+                  aria-label="Previous whitelist page"
+                >
+                  <ChevronLeft className="h-4 w-4" aria-hidden />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={() =>
+                    setWhitelistPage((page) =>
+                      Math.min(whitelistPageCount - 1, page + 1),
+                    )
+                  }
+                  disabled={safeWhitelistPage >= whitelistPageCount - 1}
+                  aria-label="Next whitelist page"
+                >
+                  <ChevronRight className="h-4 w-4" aria-hidden />
+                </Button>
+              </div>
+            ) : null}
           </div>
         </header>
         {filteredList.length === 0 ? (
@@ -338,10 +403,11 @@ function Body({ election }: { election: Doc<"elections"> }) {
           />
         ) : (
           <ul
-            className="divide-y divide-[var(--ink-line)] rounded-md border border-[var(--ink-line)] bg-[var(--paper)]"
+            key={`${filterClass}-${safeWhitelistPage}`}
+            className="min-h-[24rem] divide-y divide-[var(--ink-line)] rounded-md border border-[var(--ink-line)] bg-[var(--paper)]"
             aria-busy={importing ? "true" : undefined}
           >
-            {filteredList.map((row) => (
+            {visibleList.map((row) => (
               <WhitelistRow
                 key={row._id}
                 row={row}
