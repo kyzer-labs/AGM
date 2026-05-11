@@ -578,7 +578,7 @@ function ResultArticle({
 
       {winner ? (
         <div className="flex items-start gap-4">
-          <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--color-muted)]">
+          <div className="grid h-20 w-14 shrink-0 place-items-center overflow-hidden rounded-md bg-[var(--paper)] ring-1 ring-[var(--ink-line)]">
             <CandidatePhoto
               src={winner.photoUrl}
               className="h-full w-full object-contain"
@@ -586,14 +586,14 @@ function ResultArticle({
             />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-2 text-base font-semibold text-[var(--ink)] sm:text-lg">
+            <p className="flex items-center gap-2 text-[1.0625rem] font-semibold leading-[1.18] text-[var(--ink)] sm:text-[1.1875rem]">
               <Trophy
                 className="h-4 w-4 text-[var(--teal)]"
                 aria-label="Winner"
               />
               {winner.fullName}
             </p>
-            <p className="mt-0.5 font-mono text-[11px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
+            <p className="mt-1 font-mono text-[0.6875rem] uppercase leading-[1.25] tracking-[0.16em] tabular-nums text-[var(--ink-muted)]">
               {winner.matric && !winner.matric.startsWith("auto-")
                 ? `${winner.matric} · `
                 : ""}
@@ -740,7 +740,7 @@ function BreakdownTable({
                   className="px-2 py-2 text-left font-normal align-top"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded bg-[var(--color-muted)]">
+                    <span className="grid h-10 w-7 shrink-0 place-items-center overflow-hidden rounded bg-[var(--paper)] ring-1 ring-[var(--ink-line)]">
                       <CandidatePhoto
                         src={b.photoUrl}
                         className="h-full w-full object-contain"
@@ -748,7 +748,7 @@ function BreakdownTable({
                       />
                     </span>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 text-sm font-medium text-[var(--ink)]">
+                      <div className="flex items-center gap-1.5 text-[0.9375rem] font-medium leading-[1.2] text-[var(--ink)]">
                         <span className="truncate">{b.fullName}</span>
                         {isWinner ? (
                           <Trophy

@@ -332,51 +332,53 @@ export function CandidateForm({
             ) : null}
           </div>
           <div className="grid gap-1.5">
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                className="sr-only"
-                onChange={onPickFile}
-                aria-hidden="true"
-                tabIndex={-1}
-              />
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                loading={uploading}
-                onClick={() => fileRef.current?.click()}
-                aria-describedby={photoHintId}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label
+                htmlFor={photoUrlId}
+                className="flex items-center gap-1.5"
               >
-                {photoStorageId ? "Replace" : "Upload"}
-              </Button>
-              {photoStorageId || photoPreview ? (
+                <LinkIcon className="h-3.5 w-3.5" aria-hidden /> Or paste a
+                photo link
+              </Label>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="sr-only"
+                  onChange={onPickFile}
+                  aria-hidden="true"
+                  tabIndex={-1}
+                />
                 <Button
                   type="button"
                   size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setPhotoStorageId(null);
-                    if (photoPreview && photoPreview.startsWith("blob:")) {
-                      URL.revokeObjectURL(photoPreview);
-                    }
-                    setPhotoPreview(null);
-                    form.setValue("photoUrl", "", { shouldValidate: true });
-                  }}
+                  variant="outline"
+                  loading={uploading}
+                  onClick={() => fileRef.current?.click()}
+                  aria-describedby={photoHintId}
                 >
-                  Remove
+                  {photoStorageId ? "Replace" : "Upload"}
                 </Button>
-              ) : null}
+                {photoStorageId || photoPreview ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setPhotoStorageId(null);
+                      if (photoPreview && photoPreview.startsWith("blob:")) {
+                        URL.revokeObjectURL(photoPreview);
+                      }
+                      setPhotoPreview(null);
+                      form.setValue("photoUrl", "", { shouldValidate: true });
+                    }}
+                  >
+                    Remove
+                  </Button>
+                ) : null}
+              </div>
             </div>
-            <Label
-              htmlFor={photoUrlId}
-              className="flex items-center gap-1.5"
-            >
-              <LinkIcon className="h-3.5 w-3.5" aria-hidden /> Or paste a
-              photo link
-            </Label>
             <Input
               id={photoUrlId}
               type="url"

@@ -297,17 +297,19 @@ function Ballot({ session }: { session: ActiveSession }) {
               )}
             >
               <div className="flex w-full items-start gap-3">
-                <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-md bg-[var(--color-muted)]">
+                <div className="grid h-[4.5rem] w-14 shrink-0 place-items-center overflow-hidden rounded-md bg-[var(--paper)] ring-1 ring-[var(--ink-line)]">
                   <CandidatePhoto
                     src={c.photoUrl}
                     className="h-full w-full object-contain"
                     iconClassName="h-6 w-6"
                   />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium">{c.fullName}</div>
+                <div className="min-w-0 flex-1 pt-0.5">
+                  <div className="truncate text-base font-semibold leading-[1.2] text-[var(--ink)]">
+                    {c.fullName}
+                  </div>
                   {c.matric && !c.matric.startsWith("auto-") ? (
-                    <div className="truncate font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--ink-muted)]">
+                    <div className="mt-1 truncate font-mono text-[0.6875rem] uppercase leading-[1.2] tracking-[0.14em] text-[var(--ink-muted)]">
                       {c.matric}
                     </div>
                   ) : null}

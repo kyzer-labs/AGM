@@ -553,7 +553,7 @@ function CandidateCard({
   return (
     <Card>
       <CardContent className="flex gap-4 p-4">
-        <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-lg bg-[var(--color-muted)]">
+        <div className="grid h-28 w-20 shrink-0 place-items-center overflow-hidden rounded-lg bg-[var(--paper)] ring-1 ring-[var(--ink-line)]">
           <CandidatePhoto
             src={c.photoUrl}
             className="h-full w-full object-contain"
@@ -563,12 +563,12 @@ function CandidateCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="font-mono text-[0.6375rem] uppercase leading-[1.15] tracking-[0.16em] text-[var(--ink-muted)]">
+              <p className="font-mono text-[0.6875rem] uppercase leading-[1.2] tracking-[0.14em] text-[var(--ink-muted)]">
                 {c.matric && !c.matric.startsWith("auto-")
                   ? c.matric
                   : "Candidate"}
               </p>
-              <h3 className="truncate text-[0.875rem] font-semibold leading-[1.14] text-[var(--ink)]">
+              <h3 className="mt-0.5 truncate text-base font-semibold leading-[1.18] text-[var(--ink)]">
                 {c.fullName}
               </h3>
             </div>
@@ -598,7 +598,7 @@ function CandidateCard({
           </div>
           {sortedPositions.length > 0 ? (
             <ol
-              className="mt-2 grid gap-1"
+              className="mt-2.5 grid gap-1.5"
               aria-label="Contending positions"
             >
               {sortedPositions.map((p, i) => (
@@ -606,10 +606,10 @@ function CandidateCard({
                   key={p.positionId}
                   className="flex min-w-0 items-center gap-1.5"
                 >
-                  <span className="font-mono text-[0.6375rem] leading-[1.15] tabular-nums text-[var(--ink-muted)]">
+                  <span className="font-mono text-[0.6875rem] leading-[1.2] tabular-nums text-[var(--ink-muted)]">
                     {String(i + 1).padStart(2, "0")}
                   </span>
-                  <span className="truncate text-[11px] font-medium text-[var(--ink)]">
+                  <span className="truncate text-[0.8125rem] leading-[1.2] text-[var(--ink)]">
                     {p.name}
                   </span>
                 </li>
