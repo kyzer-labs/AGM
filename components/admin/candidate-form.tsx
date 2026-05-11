@@ -276,12 +276,12 @@ export function CandidateForm({
 
   return (
     <form onSubmit={onSubmit} className="grid gap-5" noValidate>
-      <div className="grid gap-5 sm:grid-cols-[120px_1fr]">
+      <div className="grid gap-5 sm:grid-cols-[176px_1fr]">
         <div>
           <Label className="mb-1.5 block">Photo</Label>
           <div
             className={cn(
-              "grid aspect-square w-30 place-items-center overflow-hidden rounded-lg border bg-[var(--color-muted)]",
+              "grid aspect-[3/4] w-44 place-items-center overflow-hidden rounded-lg border bg-[var(--paper)]",
             )}
           >
             {photoPreview ? (
