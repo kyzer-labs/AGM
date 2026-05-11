@@ -2,9 +2,9 @@
  * Normalise a user-pasted candidate photo URL into something the browser can
  * render directly with `<img src>`.
  *
- * Mostly turns Google Drive share URLs into a thumbnail endpoint that is
- * reliable in normal browser `<img>` tags. Anything that doesn't look like a
- * Drive URL is returned unchanged after being trimmed.
+ * Mostly turns Google Drive share URLs into the final googleusercontent image
+ * endpoint that Drive's thumbnail route redirects to. Anything that doesn't
+ * look like a Drive URL is returned unchanged after being trimmed.
  */
 export function normalisePhotoUrl(input: string): string {
   const trimmed = input.trim();
@@ -12,7 +12,7 @@ export function normalisePhotoUrl(input: string): string {
 
   const driveFileId = extractDriveFileId(trimmed);
   if (driveFileId) {
-    return `https://drive.google.com/thumbnail?id=${driveFileId}&sz=w800`;
+    return `https://lh3.googleusercontent.com/d/${driveFileId}=w800`;
   }
 
   return trimmed;

@@ -57,7 +57,7 @@ function normaliseCandidatePhotoPreview(input: string): string {
         (["/open", "/uc", "/thumbnail"].includes(url.pathname)
           ? url.searchParams.get("id")
           : null);
-      if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w800`;
+      if (id) return `https://lh3.googleusercontent.com/d/${id}=w800`;
     }
   } catch {
     return trimmed;
