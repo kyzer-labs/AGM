@@ -404,7 +404,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
         ) : (
           <ul
             key={`${filterClass}-${safeWhitelistPage}`}
-            className="min-h-[38rem] divide-y divide-[var(--ink-line)] rounded-md border border-[var(--ink-line)] bg-[var(--paper)]"
+            className="min-h-[30rem] divide-y divide-[var(--ink-line)] rounded-md border border-[var(--ink-line)] bg-[var(--paper)]"
             aria-busy={importing ? "true" : undefined}
           >
             {visibleList.map((row) => (
