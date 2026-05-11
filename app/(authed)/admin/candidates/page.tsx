@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Papa from "papaparse";
 import { toast } from "sonner";
 import {
   AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
   Lock,
   Pencil,
   Plus,
@@ -48,6 +50,8 @@ const PHASE_LABELS: Record<Doc<"elections">["phase"], string> = {
   resultsPreview: "Results preview",
   published: "Published",
 };
+
+const ROSTER_PAGE_SIZE = 6;
 
 interface CandidateRow {
   _id: Id<"candidates">;
@@ -110,6 +114,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
 
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<Id<"candidates"> | null>(null);
+  const [rosterPage, setRosterPage] = useState(0);
   const [importing, setImporting] = useState(false);
   const [lastImport, setLastImport] = useState<
     | (ImportSummary & {
@@ -140,9 +145,26 @@ function Body({ election }: { election: Doc<"elections"> }) {
     };
   }, [candidates, editingId]);
 
+  const rosterCandidateCount = candidates?.length ?? 0;
+  const rosterPageCount = Math.max(
+    1,
+    Math.ceil(rosterCandidateCount / ROSTER_PAGE_SIZE),
+  );
+
+  useEffect(() => {
+    if (rosterPage > rosterPageCount - 1) {
+      setRosterPage(Math.max(0, rosterPageCount - 1));
+    }
+  }, [rosterPage, rosterPageCount]);
+
   if (candidates === undefined || positions === undefined) {
     return <PageSkeleton />;
   }
+
+  const safeRosterPage = Math.min(rosterPage, rosterPageCount - 1);
+  const rosterStart = safeRosterPage * ROSTER_PAGE_SIZE;
+  const rosterEnd = Math.min(rosterStart + ROSTER_PAGE_SIZE, candidates.length);
+  const visibleCandidates = candidates.slice(rosterStart, rosterEnd);
 
   const onCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -331,14 +353,35 @@ function Body({ election }: { election: Doc<"elections"> }) {
 
       <header className="space-y-5">
         <SectionMarker primary="Candidates" secondary={election.name} />
-        <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
-          Roster and contending positions
-        </h1>
-        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
-          Add every candidate running this cycle and pick only the positions
-          they are contending for. Position precedence and ballot order are
-          configured on the Positions page.
-        </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
+            Roster and contending positions
+          </h1>
+          {editable && !noPositions ? (
+            <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+              <Button onClick={() => setAdding(true)}>
+                <Plus className="h-4 w-4" aria-hidden /> Add candidate
+              </Button>
+              <Button
+                variant="outline"
+                loading={importing}
+                onClick={() => csvInputRef.current?.click()}
+              >
+                <UploadCloud className="h-4 w-4" aria-hidden /> Import CSV
+              </Button>
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="sr-only"
+                onChange={onCsvUpload}
+                disabled={importing}
+                aria-hidden="true"
+                tabIndex={-1}
+              />
+            </div>
+          ) : null}
+        </div>
         <MetaGroup className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
           <Meta label="Cycle phase" value={PHASE_LABELS[election.phase]} />
           <Meta label="Positions defined" value={positions.length} />
@@ -348,30 +391,6 @@ function Body({ election }: { election: Doc<"elections"> }) {
             value={totalPositionsCovered}
           />
         </MetaGroup>
-        {editable && !noPositions ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => setAdding(true)}>
-              <Plus className="h-4 w-4" aria-hidden /> Add candidate
-            </Button>
-            <Button
-              variant="outline"
-              loading={importing}
-              onClick={() => csvInputRef.current?.click()}
-            >
-              <UploadCloud className="h-4 w-4" aria-hidden /> Import CSV
-            </Button>
-            <input
-              ref={csvInputRef}
-              type="file"
-              accept=".csv,text/csv"
-              className="sr-only"
-              onChange={onCsvUpload}
-              disabled={importing}
-              aria-hidden="true"
-              tabIndex={-1}
-            />
-          </div>
-        ) : null}
       </header>
 
       {!editable ? (
@@ -498,23 +517,64 @@ function Body({ election }: { election: Doc<"elections"> }) {
         />
       ) : (
         <section aria-label="Candidate roster">
-          <header className="mb-3 flex items-baseline gap-3">
-            <SectionMarker
-              primary="Roster"
-              secondary={`${candidates.length} ${candidates.length === 1 ? "candidate" : "candidates"}`}
-            />
-            <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
-              Sorted by name
-            </p>
+          <header className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex items-baseline gap-3">
+              <SectionMarker
+                primary="Roster"
+                secondary={`${candidates.length} ${candidates.length === 1 ? "candidate" : "candidates"}`}
+              />
+              <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
+                Sorted by name
+              </p>
+            </div>
+            {rosterPageCount > 1 ? (
+              <div className="flex items-center gap-2">
+                <p className="mr-1 font-mono text-[10.5px] uppercase tracking-[0.16em] tabular-nums text-[var(--ink-muted)]">
+                  {String(rosterStart + 1).padStart(2, "0")}-
+                  {String(rosterEnd).padStart(2, "0")} of{" "}
+                  {String(candidates.length).padStart(2, "0")}
+                </p>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={() =>
+                    setRosterPage((page) => Math.max(0, page - 1))
+                  }
+                  disabled={safeRosterPage === 0}
+                  aria-label="Previous candidate page"
+                >
+                  <ChevronLeft className="h-4 w-4" aria-hidden />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={() =>
+                    setRosterPage((page) =>
+                      Math.min(rosterPageCount - 1, page + 1),
+                    )
+                  }
+                  disabled={safeRosterPage >= rosterPageCount - 1}
+                  aria-label="Next candidate page"
+                >
+                  <ChevronRight className="h-4 w-4" aria-hidden />
+                </Button>
+              </div>
+            ) : null}
           </header>
-          <div className="grid gap-3 md:grid-cols-2">
-            {candidates.map((c) => (
+          <div
+            key={safeRosterPage}
+            className="grid min-h-[24rem] content-start gap-3 md:grid-cols-2"
+          >
+            {visibleCandidates.map((c, index) => (
               <CandidateCard
                 key={c._id}
                 c={c}
                 editable={editable}
                 onEdit={() => setEditingId(c._id)}
                 onRemove={() => onRemove(c)}
+                index={index}
               />
             ))}
           </div>
@@ -538,11 +598,13 @@ function CandidateCard({
   editable,
   onEdit,
   onRemove,
+  index,
 }: {
   c: CandidateRow;
   editable: boolean;
   onEdit: () => void;
   onRemove: () => void;
+  index: number;
 }) {
   const sortedPositions = useMemo(
     () =>
@@ -551,7 +613,7 @@ function CandidateCard({
   );
 
   return (
-    <Card>
+    <Card className="tile-enter" style={{ ["--index" as never]: index }}>
       <CardContent className="flex gap-4 p-4">
         <div className="grid h-28 w-20 shrink-0 place-items-center overflow-hidden rounded-lg bg-[var(--paper)] ring-1 ring-[var(--ink-line)]">
           <CandidatePhoto
