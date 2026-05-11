@@ -363,26 +363,15 @@ function PhaseCommandCenter({
         </div>
       </div>
 
-      <div className="space-y-8">
+      <div className="space-y-6">
         {election.phase === "setup" ? (
-          <SetupChecklist readiness={readiness} />
-        ) : null}
-
-        <div>
-          <SectionMarker
-            primary={isPublished ? "Post-cycle" : "Phase work"}
-            secondary={`${actions.length} ${
-              actions.length === 1 ? "page" : "pages"
-            }`}
-          />
-          <ol className="mt-4 space-y-0" aria-label="Current phase actions">
-            {actions.map((tile, index) => (
-              <li key={tile.href}>
-                <AdminIndexItem tile={tile} index={index} compact />
-              </li>
-            ))}
-          </ol>
-        </div>
+          <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(16rem,0.82fr)]">
+            <SetupChecklist readiness={readiness} />
+            <PhaseWorkIndex actions={actions} isPublished={isPublished} />
+          </div>
+        ) : (
+          <PhaseWorkIndex actions={actions} isPublished={isPublished} />
+        )}
       </div>
     </section>
   );
@@ -532,17 +521,41 @@ function SetupChecklist({
       </ol>
 
       {readiness && readiness.warnings.length > 0 ? (
-        <div className="mt-4 rounded-md border border-[var(--ink-line)] bg-[var(--paper-2)] p-4">
+        <div className="mt-3 rounded-md border border-[var(--ink-line)] bg-[var(--paper-2)] p-3">
           <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink-muted)]">
             Blocking notes
           </p>
-          <ul className="mt-2 space-y-1.5 text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+          <ul className="mt-2 space-y-1 text-xs leading-relaxed text-[var(--color-muted-foreground)]">
             {readiness.warnings.slice(0, 4).map((warning) => (
               <li key={warning}>{warning}</li>
             ))}
           </ul>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function PhaseWorkIndex({
+  actions,
+  isPublished,
+}: {
+  actions: AdminTile[];
+  isPublished: boolean;
+}) {
+  return (
+    <div>
+      <SectionMarker
+        primary={isPublished ? "Post-cycle" : "Phase work"}
+        secondary={`${actions.length} ${actions.length === 1 ? "page" : "pages"}`}
+      />
+      <ol className="mt-3 space-y-0" aria-label="Current phase actions">
+        {actions.map((tile, index) => (
+          <li key={tile.href}>
+            <AdminIndexItem tile={tile} index={index} compact />
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
@@ -559,35 +572,59 @@ function AdminIndexItem({
   return (
     <Link
       href={tile.href}
-      className="group block border-t border-[var(--ink-line)] py-5 transition-colors duration-200 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] hover:border-[var(--ink)] focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--paper)]"
+      className={
+        compact
+          ? "group block border-t border-[var(--ink-line)] py-3 transition-colors duration-200 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] hover:border-[var(--ink)] focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--paper)]"
+          : "group block border-t border-[var(--ink-line)] py-5 transition-colors duration-200 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] hover:border-[var(--ink)] focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--paper)]"
+      }
     >
-      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1.5">
+      <div
+        className={
+          compact
+            ? "grid grid-cols-[2rem_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1"
+            : "flex flex-wrap items-baseline gap-x-4 gap-y-1.5"
+        }
+      >
         <span
-          className="font-mono text-xl font-medium tabular-nums text-[var(--ink-muted)]"
+          className={
+            compact
+              ? "font-mono text-sm font-medium tabular-nums text-[var(--ink-muted)]"
+              : "font-mono text-xl font-medium tabular-nums text-[var(--ink-muted)]"
+          }
           aria-hidden
         >
           {String(index + 1).padStart(2, "0")}
         </span>
-        <SectionMarker primary={tile.technique} />
-        <h3 className="font-display text-lg font-medium tracking-[-0.01em] text-[var(--ink)] transition-colors group-hover:text-[var(--teal)] sm:text-xl">
-          {tile.title}
-        </h3>
-        {tile.badge ? (
-          <Badge tone="muted">
-            <Circle className="h-3 w-3" aria-hidden />
-            {tile.badge}
-          </Badge>
-        ) : null}
+        <span className="min-w-0">
+          <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <SectionMarker primary={tile.technique} />
+            {tile.badge ? (
+              <Badge tone="muted">
+                <Circle className="h-3 w-3" aria-hidden />
+                {tile.badge}
+              </Badge>
+            ) : null}
+          </span>
+          <h3
+            className={
+              compact
+                ? "mt-1 font-display text-sm font-medium tracking-[-0.01em] text-[var(--ink)] transition-colors group-hover:text-[var(--teal)]"
+                : "mt-1 font-display text-lg font-medium tracking-[-0.01em] text-[var(--ink)] transition-colors group-hover:text-[var(--teal)] sm:text-xl"
+            }
+          >
+            {tile.title}
+          </h3>
+        </span>
       </div>
-      <p
-        className={
-          compact
-            ? "mt-2 max-w-[58ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]"
-            : "mt-2 max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]"
-        }
-      >
-        {tile.body}
-      </p>
+      {compact ? (
+        <p className="mt-1.5 max-w-[58ch] pl-11 text-xs leading-relaxed text-[var(--color-muted-foreground)]">
+          {tile.body}
+        </p>
+      ) : (
+        <p className="mt-2 max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+          {tile.body}
+        </p>
+      )}
     </Link>
   );
 }
