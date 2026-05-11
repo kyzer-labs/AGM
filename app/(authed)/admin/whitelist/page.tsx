@@ -80,7 +80,7 @@ const PHASE_LABELS: Record<Doc<"elections">["phase"], string> = {
   published: "Published",
 };
 
-const WHITELIST_PAGE_SIZE = 6;
+const WHITELIST_PAGE_SIZE = 8;
 
 interface BulkRow {
   displayRow: string;
