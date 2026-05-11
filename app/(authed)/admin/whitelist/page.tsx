@@ -216,16 +216,21 @@ function Body({ election }: { election: Doc<"elections"> }) {
           primary="Internal whitelist"
           secondary={election.name}
         />
-        <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
-          Evaluator allowlist and class assignment
-        </h1>
-        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
-          Committee members on this list are the only people who can submit
-          internal evaluations during the rubric window. Each evaluator is
-          assigned to a class (Top Committee, Head Executive, or Year 2
-          Committee); the cycle&apos;s configured weight for that class
-          applies to every score they submit.
-        </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
+            Evaluator allowlist and class assignment
+          </h1>
+          {editable ? (
+            <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+              <Button onClick={() => setShowAdd(true)}>
+                <Plus className="h-4 w-4" aria-hidden /> Add evaluator
+              </Button>
+              <Button variant="outline" onClick={() => setShowBulk(true)}>
+                <Upload className="h-4 w-4" aria-hidden /> Bulk import
+              </Button>
+            </div>
+          ) : null}
+        </div>
         <MetaGroup className="grid-cols-2 sm:grid-cols-4">
           <Meta
             label="Cycle phase"
@@ -238,16 +243,6 @@ function Body({ election }: { election: Doc<"elections"> }) {
             value={countByClass.year2Committee}
           />
         </MetaGroup>
-        {editable ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => setShowAdd(true)}>
-              <Plus className="h-4 w-4" aria-hidden /> Add evaluator
-            </Button>
-            <Button variant="outline" onClick={() => setShowBulk(true)}>
-              <Upload className="h-4 w-4" aria-hidden /> Bulk import
-            </Button>
-          </div>
-        ) : null}
       </header>
 
       {!editable ? (
@@ -303,12 +298,9 @@ function Body({ election }: { election: Doc<"elections"> }) {
         onSubmitCsv={(rows, fileName) => sendBulk(rows, fileName)}
       />
 
-      <section
-        aria-label="Whitelist roster"
-        className="space-y-4"
-      >
-        <header className="flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-1">
+      <section aria-label="Whitelist roster">
+        <header className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <SectionMarker
               primary="Roster"
               secondary={`${list.length} ${
@@ -321,12 +313,14 @@ function Body({ election }: { election: Doc<"elections"> }) {
                 : VOTER_CLASS_LABEL[filterClass]}
             </p>
           </div>
-          <FilterChips
-            current={filterClass}
-            counts={countByClass}
-            total={list.length}
-            onChange={setFilterClass}
-          />
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            <FilterChips
+              current={filterClass}
+              counts={countByClass}
+              total={list.length}
+              onChange={setFilterClass}
+            />
+          </div>
         </header>
         {filteredList.length === 0 ? (
           <EmptyState
