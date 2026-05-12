@@ -1,8 +1,8 @@
 "use client";
 
 import { SectionMarker } from "@/components/ui/section-marker";
-import { api } from "@/convex/_generated/api";
-import { useQuery } from "convex/react";
+import type { api } from "@/convex/_generated/api";
+import type { useQuery } from "convex/react";
 import {
   VOTER_CLASSES,
   VOTER_CLASS_LABEL,

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useConvex } from "convex/react";
+import type { useConvex } from "convex/react";
 import { FileSearch, FileSpreadsheet, Users } from "lucide-react";
 
 import { api } from "@/convex/_generated/api";

@@ -1,4 +1,4 @@
-import { useQuery } from "convex/react";
+import type { useQuery } from "convex/react";
 import { FlaskConical, Sparkles, Wand2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { SectionMarker } from "@/components/ui/section-marker";
 import { Select } from "@/components/ui/select";
-import { api } from "@/convex/_generated/api";
+import type { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { NumberField } from "./number-field";
 import {

@@ -2,7 +2,7 @@
 
 import { useId } from "react";
 import type { BaseSyntheticEvent } from "react";
-import { useForm } from "react-hook-form";
+import type { useForm } from "react-hook-form";
 import { UserPlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";

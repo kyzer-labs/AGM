@@ -1,4 +1,4 @@
-import { useQuery } from "convex/react";
+import type { useQuery } from "convex/react";
 import { Flame, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { api } from "@/convex/_generated/api";
+import type { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
 
 type DevStats = ReturnType<typeof useQuery<typeof api.dev.stats>>;

@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
-import { useQuery } from "convex/react";
+import type { useQuery } from "convex/react";
 import { ClipboardCheck } from "lucide-react";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionMarker } from "@/components/ui/section-marker";
-import { api } from "@/convex/_generated/api";
+import type { api } from "@/convex/_generated/api";
 import { VOTER_CLASSES, type VoterClass } from "./internal-model";
 import { ClassLabel } from "./internal-badges";
 

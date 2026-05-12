@@ -1,8 +1,8 @@
-import { useQuery } from "convex/react";
+import type { useQuery } from "convex/react";
 
 import { SectionMarker } from "@/components/ui/section-marker";
 import { Skeleton } from "@/components/ui/skeleton";
-import { api } from "@/convex/_generated/api";
+import type { api } from "@/convex/_generated/api";
 import { Stat } from "./stat";
 
 type DevStats = ReturnType<typeof useQuery<typeof api.dev.stats>>;

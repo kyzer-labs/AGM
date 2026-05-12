@@ -1,11 +1,11 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import type { useQuery } from "convex/react";
 import { Users } from "lucide-react";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionMarker } from "@/components/ui/section-marker";
-import { api } from "@/convex/_generated/api";
+import type { api } from "@/convex/_generated/api";
 import { formatMYT } from "@/lib/format";
 import {
   VOTER_CLASS_LABEL,

@@ -1,4 +1,4 @@
-import { useQuery } from "convex/react";
+import type { useQuery } from "convex/react";
 import { CheckCircle2, Sparkles, Users2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { api } from "@/convex/_generated/api";
+import type { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { SessionBadge } from "./session-badge";
 
