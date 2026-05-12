@@ -28,6 +28,7 @@ const CYCLE_NAV: AdminNavItem[] = [
 ];
 
 const RECORD_NAV: AdminNavItem[] = [
+  { href: "/admin/election/archives", label: "Cycle archives" },
   { href: "/admin/results", label: "Published results" },
   { href: "/admin/exports", label: "Exports and audit" },
 ];

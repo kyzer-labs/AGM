@@ -34,6 +34,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Meta, MetaGroup } from "@/components/ui/meta";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NoticeStrip } from "@/components/ui/notice-strip";
 import { SectionMarker } from "@/components/ui/section-marker";
@@ -54,6 +55,15 @@ const TALLY_LABEL: Record<VoteTallyKind, string> = {
   favorFirst: "Favor first candidate (~70%)",
 };
 
+const PHASE_LABELS: Record<Doc<"elections">["phase"], string> = {
+  setup: "Setup",
+  internalOpen: "Internal evaluation open",
+  internalClosed: "Internal evaluation closed",
+  publicVoting: "Public AGM voting",
+  resultsPreview: "Results preview",
+  published: "Published",
+};
+
 export default function DevSeedPage() {
   return (
     <AuthGate mode="profileComplete">
@@ -68,15 +78,17 @@ function Inner() {
 
   if (config === undefined || election === undefined) {
     return (
-      <main className="container-wide py-10 space-y-4">
-        <Skeleton className="h-8 w-1/3" />
-        <Skeleton className="h-40 w-full" />
+      <main className="container-wide space-y-6 py-12">
+        <Skeleton className="h-3 w-44" />
+        <Skeleton className="h-10 w-2/3" />
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-32 w-full" />
       </main>
     );
   }
   if (!config.enabled) {
     return (
-      <main className="container-wide space-y-8 py-12">
+      <main className="container-wide space-y-6 py-6">
         <AdminBreadcrumb items={[{ label: "Dev seeder" }]} />
         <NoticeStrip
           markerPrimary="Dev seeder"
@@ -335,49 +347,46 @@ function DevBody({ election }: { election: Doc<"elections"> }) {
   };
 
   return (
-    <main className="container-wide space-y-10 py-12">
+    <main className="container-wide space-y-6 py-6">
       <AdminBreadcrumb items={[{ label: "Dev seeder" }]} />
 
-      <header className="space-y-5">
+      <header className="space-y-3">
         <SectionMarker
           primary="Dev seeder"
           secondary={election.name}
         />
-        <div className="flex flex-wrap items-start gap-3">
-          <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
-            Synthetic data for end-to-end testing
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <h1 className="font-display text-2xl font-medium leading-tight text-[var(--ink)] sm:text-3xl">
+            Synthetic data and cycle fixtures
           </h1>
-          <Badge tone="warning">
+          <Badge tone="warning" className="shrink-0 sm:self-start">
             <Beaker className="h-3 w-3" aria-hidden /> Dev only
           </Badge>
         </div>
-        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
-          Populate synthetic voters, evaluations, and votes so the scoring
-          math, cascade, and tie ladder can be exercised without dozens of
-          real <code>@student.usm.my</code> accounts. Every seed mutation
-          checks <code>DEV_SEED_ALLOWED</code> server-side; this page is
-          gated behind the same flag.
-        </p>
-        <div>
-          <Badge tone="muted">
-            Phase: <span className="tabular-nums">{phase}</span>
-          </Badge>
-        </div>
+        <MetaGroup className="grid-cols-2 gap-4 pt-3 sm:grid-cols-3 lg:grid-cols-4">
+          <Meta label="Cycle phase" value={PHASE_LABELS[phase]} />
+          <Meta label="Positions" value={positionsCount} />
+          <Meta label="Candidates" value={candidatesCount} />
+          <Meta label="Dev flag" value="Enabled" />
+        </MetaGroup>
       </header>
 
       {stats === null ? null : stats === undefined ? (
         <Skeleton className="h-32 w-full" />
       ) : (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Seed inventory</CardTitle>
-              <CardDescription>
-                Election shard <code>{stats.shortElectionId}</code>. Live
-                snapshot of synthetic vs. real rows. Updates as you act.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <section aria-label="Seed inventory">
+          <header className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <SectionMarker
+                primary="Seed inventory"
+                secondary={stats.shortElectionId}
+              />
+              <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
+                Synthetic rows vs. live data
+              </p>
+            </div>
+          </header>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Stat
                 title="Seed voters"
                 value={stats.seedVoters}
@@ -421,57 +430,62 @@ function DevBody({ election }: { election: Doc<"elections"> }) {
                 value={stats.results}
                 footer={`After all positions close, this matches ${stats.positions}.`}
               />
-              <Stat
-                title="Cycle phase"
-                value={
-                  ({
-                    setup: 1,
-                    internalOpen: 2,
-                    internalClosed: 3,
-                    publicVoting: 4,
-                    resultsPreview: 5,
-                    published: 6,
-                  } as const)[phase]
-                }
-                footer={`Phase: ${phase}`}
-              />
-            </CardContent>
-          </Card>
-        </>
+          </div>
+        </section>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Test candidate fixtures</CardTitle>
+          <CardTitle className="text-base">Scenario runner</CardTitle>
           <CardDescription>
-            Load eighteen <code>[TEST_FIXTURE]</code> candidates (two per
-            position across all three tiers) so the rubric, ballot ops, and
-            tie-break ladder can be exercised without typing real names. Only
-            available during the Setup phase. Wipes here remove only fixtures;
-            real candidates entered through{" "}
-            <code>/admin/candidates</code> are never touched.
+            The normal path for a full local test run: load fixture
+            candidates, seed evaluator and public-voter data, then advance
+            the cycle through the admin screens.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+            <div className="rounded-md border border-[var(--ink-line)] bg-[var(--paper)] p-3">
+              <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink-muted)]">
+                Fixture candidates
+              </p>
+              <p className="mt-1 text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+                Eighteen <code>[TEST_FIXTURE]</code> rows, two per
+                position across all three tiers.
+              </p>
+              {stats !== undefined && stats !== null ? (
+                <p className="mt-2 font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
+                  Loaded {stats.candidates.test} of 18
+                </p>
+              ) : null}
+            </div>
+            <div className="rounded-md border border-[var(--ink-line)] bg-[var(--paper)] p-3">
+              <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink-muted)]">
+                Happy path
+              </p>
+              <p className="mt-1 text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+                Seeds evaluator voters, external voters, and submitted
+                evaluations using the configured defaults.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 md:flex-col md:items-stretch">
             <Button
               onClick={onLoadTestCandidates}
               disabled={phase !== "setup"}
             >
-              <Users2 className="h-4 w-4" /> Load test candidates
+              <Users2 className="h-4 w-4" /> Load fixtures
             </Button>
             <Button
               variant="outline"
-              onClick={onWipeTestCandidates}
-              disabled={phase === "published" || stats?.candidates.test === 0}
+              onClick={onHappyPath}
+              disabled={
+                candidatesCount === 0 ||
+                (phase !== "setup" && phase !== "internalOpen")
+              }
             >
-              <Trash2 className="h-4 w-4" /> Wipe test candidates
+              <Sparkles className="h-4 w-4" /> Run happy path
             </Button>
-            {stats !== undefined && stats !== null ? (
-              <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
-                Currently {stats.candidates.test} of {18} fixtures loaded
-              </span>
-            ) : null}
+            </div>
           </div>
 
           {stats !== undefined &&
@@ -541,68 +555,24 @@ function DevBody({ election }: { election: Doc<"elections"> }) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Phase quick-jump</CardTitle>
-          <CardDescription>
-            Where to go to drive the cycle through each phase. Open these
-            in another tab and watch this page&apos;s inventory update live.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          <PhaseLink
-            href="/admin/election"
-            label="Cycle controls"
-            hint="Open / close internal evaluation, advance to public voting, publish."
-          />
-          <PhaseLink
-            href="/admin/positions"
-            label="Positions"
-            hint="Seed defaults, ballot order, rubric weights."
-          />
-          <PhaseLink
-            href="/admin/candidates"
-            label="Candidates"
-            hint="Add real candidates here. Test candidates load via this page only."
-          />
-          <PhaseLink
-            href="/admin/whitelist"
-            label="Internal whitelist"
-            hint="Real evaluators are added here. Seed evaluators are added via this page."
-          />
-          <PhaseLink
-            href="/admin/internal"
-            label="Internal status"
-            hint="Watch class submission progress and aggregate scores live."
-          />
-          <PhaseLink
-            href="/admin/public"
-            label="Live ballot ops"
-            hint="Open / monitor / close each position one at a time."
-          />
-          <PhaseLink
-            href="/admin/results"
-            label="Results"
-            hint="Compute, resolve ties, publish the final breakdown."
-          />
-          <PhaseLink
-            href="/admin/exports"
-            label="Exports"
-            hint="CSV downloads of voters, evaluations, and the audit log."
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Voter pools</CardTitle>
-          <CardDescription>
-            Internal evaluators are added to the whitelist with a class.
-            External voters are not whitelisted and are drawn from when
-            seeding public votes.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+      <section aria-label="Advanced seed controls">
+        <header className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <SectionMarker
+              primary="Advanced seed controls"
+              secondary="Manual overrides"
+            />
+            <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
+              Expand only when you need a specific data shape
+            </p>
+          </div>
+        </header>
+        <div className="grid gap-2">
+          <details className="rounded-md border border-[var(--ink-line)] bg-[var(--paper)]">
+            <summary className="cursor-pointer px-4 py-3 font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--ink-muted)] hover:text-[var(--ink)]">
+              Voter pools
+            </summary>
+            <div className="grid gap-4 border-t border-[var(--ink-line)] p-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <NumberField
               label="Top Committee"
@@ -629,7 +599,7 @@ function DevBody({ election }: { election: Doc<"elections"> }) {
 
           <div className="border-t pt-6 grid gap-3">
             <NumberField
-              label="External voters (must be ≥ votes per position)"
+              label="External voters (must be >= votes per position)"
               value={externalCount}
               onChange={setExternalCount}
             />
@@ -637,10 +607,14 @@ function DevBody({ election }: { election: Doc<"elections"> }) {
               <Sparkles className="h-4 w-4" /> Seed external voters
             </Button>
           </div>
-        </CardContent>
-      </Card>
+            </div>
+          </details>
 
-      <Card>
+          <details className="rounded-md border border-[var(--ink-line)] bg-[var(--paper)]">
+            <summary className="cursor-pointer px-4 py-3 font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--ink-muted)] hover:text-[var(--ink)]">
+              Internal evaluations
+            </summary>
+      <Card className="rounded-none border-0 shadow-none">
         <CardHeader>
           <CardTitle className="text-base">Internal evaluations</CardTitle>
           <CardDescription>
@@ -694,7 +668,13 @@ function DevBody({ election }: { election: Doc<"elections"> }) {
         </CardContent>
       </Card>
 
-      <Card>
+          </details>
+
+          <details className="rounded-md border border-[var(--ink-line)] bg-[var(--paper)]">
+            <summary className="cursor-pointer px-4 py-3 font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--ink-muted)] hover:text-[var(--ink)]">
+              Public votes
+            </summary>
+      <Card className="rounded-none border-0 shadow-none">
         <CardHeader>
           <CardTitle className="text-base">Public votes</CardTitle>
           <CardDescription>
@@ -731,7 +711,13 @@ function DevBody({ election }: { election: Doc<"elections"> }) {
         </CardContent>
       </Card>
 
-      <Card>
+          </details>
+
+          <details className="rounded-md border border-[var(--ink-line)] bg-[var(--paper)]">
+            <summary className="cursor-pointer px-4 py-3 font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--ink-muted)] hover:text-[var(--ink)]">
+              Engineered tie
+            </summary>
+      <Card className="rounded-none border-0 shadow-none">
         <CardHeader>
           <CardTitle className="text-base">Engineered tie</CardTitle>
           <CardDescription>
@@ -751,7 +737,7 @@ function DevBody({ election }: { election: Doc<"elections"> }) {
                 setTiePositionId(e.target.value as Id<"positions"> | "")
               }
             >
-              <option value="">Select position…</option>
+              <option value="">Select position...</option>
               {(positions ?? []).map((p) => (
                 <option key={p._id} value={p._id}>
                   Tier {p.tier} · {p.name}
@@ -770,60 +756,29 @@ function DevBody({ election }: { election: Doc<"elections"> }) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Happy path scenario</CardTitle>
-          <CardDescription>
-            One-shot: seed evaluators in all three classes, seed external
-            voters, write submitted evaluations using the chosen
-            distribution. Run this in <code>setup</code> or{" "}
-            <code>internalOpen</code> to skip ahead to &ldquo;ready to open
-            public voting&rdquo;.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button
-            onClick={onHappyPath}
-            disabled={
-              candidatesCount === 0 ||
-              (phase !== "setup" && phase !== "internalOpen")
-            }
-          >
-            <Sparkles className="h-4 w-4" /> Run happy path scenario
-          </Button>
-        </CardContent>
-      </Card>
+          </details>
+        </div>
+      </section>
 
       <Card className="border-[var(--color-destructive)]">
         <CardHeader>
-          <CardTitle className="text-base">Wipe seed data</CardTitle>
+          <CardTitle className="text-base">Danger zone</CardTitle>
           <CardDescription>
-            Removes every <code>seed-*</code> row scoped to this cycle plus
-            existing result rows, and resets every position&apos;s session
-            status to <code>pending</code>. Real voter rows, real whitelist
-            entries, real candidates, and{" "}
-            <code>[TEST_FIXTURE]</code> candidates are kept.
+            Destructive cleanup tools. Confirmation dialogs list the exact
+            rows affected before anything is removed.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={onWipeTestCandidates}
+            disabled={phase === "published" || stats?.candidates.test === 0}
+          >
+            <Trash2 className="h-4 w-4" /> Wipe fixtures
+          </Button>
           <Button variant="destructive" onClick={onWipe}>
             <Trash2 className="h-4 w-4" /> Wipe seed data
           </Button>
-        </CardContent>
-      </Card>
-
-      <Card className="border-[var(--color-destructive)]">
-        <CardHeader>
-          <CardTitle className="text-base">Wipe everything</CardTitle>
-          <CardDescription>
-            One-shot teardown for the entire test setup: every{" "}
-            <code>seed-*</code> voter and downstream row, every{" "}
-            <code>[TEST_FIXTURE]</code> candidate, all results, and every
-            position session reset to <code>pending</code>. Real data is
-            untouched. Use this between full end-to-end runs.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
           <Button variant="destructive" onClick={onWipeAll}>
             <Flame className="h-4 w-4" /> Wipe everything
           </Button>
@@ -856,30 +811,6 @@ function SessionBadge({
     <Badge tone="muted" className="text-[9px]">
       <Circle className="h-2.5 w-2.5" aria-hidden /> Pending
     </Badge>
-  );
-}
-
-function PhaseLink({
-  href,
-  label,
-  hint,
-}: {
-  href: string;
-  label: string;
-  hint: string;
-}) {
-  return (
-    <a
-      href={href}
-      className="group block rounded-md border border-[var(--ink-line)] bg-[var(--paper)] p-3 transition-colors duration-200 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] hover:border-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
-    >
-      <div className="font-medium text-[var(--ink)] transition-colors group-hover:text-[var(--teal)]">
-        {label}
-      </div>
-      <p className="mt-1 text-xs leading-relaxed text-[var(--color-muted-foreground)]">
-        {hint}
-      </p>
-    </a>
   );
 }
 
@@ -920,12 +851,14 @@ function Stat({
   footer: string;
 }) {
   return (
-    <div className="rounded-lg border bg-[var(--color-card)] p-4">
-      <div className="text-xs text-[var(--color-muted-foreground)]">
+    <div className="rounded-md border border-[var(--ink-line)] bg-[var(--paper)] p-4">
+      <div className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink-muted)]">
         {title}
       </div>
-      <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
-      <div className="mt-1 text-xs text-[var(--color-muted-foreground)]">
+      <div className="mt-1 font-display text-2xl font-medium tabular-nums text-[var(--ink)]">
+        {value}
+      </div>
+      <div className="mt-1 text-xs leading-relaxed text-[var(--color-muted-foreground)]">
         {footer}
       </div>
     </div>

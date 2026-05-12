@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useForm } from "react-hook-form";
@@ -37,6 +37,7 @@ import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { getConvexErrorMessage } from "@/lib/convex-error";
+import { getGridPageSizeForMediaHeight } from "@/lib/viewport-pagination";
 import type { Doc } from "@/convex/_generated/dataModel";
 
 const TIER_LABELS: Record<number, string> = {
@@ -55,7 +56,12 @@ const PHASE_LABELS: Record<Doc<"elections">["phase"], string> = {
   published: "Published",
 };
 
-const POSITION_PAGE_SIZE = 6;
+const POSITION_FALLBACK_PAGE_SIZE = 6;
+const POSITION_MIN_ROWS = 1;
+const POSITION_CARD_ROW_HEIGHT = 140;
+const POSITION_BOTTOM_GUTTER = 48;
+const POSITION_DESKTOP_COLUMNS = 2;
+const POSITION_MOBILE_COLUMNS = 1;
 
 const DEFAULT_TIER_FOR_NAME = (name: string): number => {
   const n = name.toLowerCase();
@@ -130,6 +136,13 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Doc<"positions"> | null>(null);
   const [positionPage, setPositionPage] = useState(0);
+  const [positionMediaHeight, setPositionMediaHeight] = useState<
+    number | null
+  >(null);
+  const [positionColumns, setPositionColumns] = useState(
+    POSITION_DESKTOP_COLUMNS,
+  );
+  const positionMediaRef = useRef<HTMLUListElement | null>(null);
 
   const lockedToSetup = election.phase !== "setup";
 
@@ -193,14 +206,52 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
     .sort((a, b) => a - b);
 
   const totalPositions = orderedPositions.length;
+  useEffect(() => {
+    const measurePositionMedia = () => {
+      const media = positionMediaRef.current;
+      if (!media) return;
+
+      const { top } = media.getBoundingClientRect();
+      setPositionMediaHeight(
+        Math.max(0, window.innerHeight - top - POSITION_BOTTOM_GUTTER),
+      );
+      setPositionColumns(
+        window.innerWidth >= 768
+          ? POSITION_DESKTOP_COLUMNS
+          : POSITION_MOBILE_COLUMNS,
+      );
+    };
+
+    measurePositionMedia();
+    window.addEventListener("resize", measurePositionMedia);
+
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(measurePositionMedia);
+    if (observer) observer.observe(document.body);
+
+    return () => {
+      window.removeEventListener("resize", measurePositionMedia);
+      observer?.disconnect();
+    };
+  }, [totalPositions, lockedToSetup]);
+
+  const positionPageSize = getGridPageSizeForMediaHeight({
+    mediaHeight: positionMediaHeight,
+    rowHeight: POSITION_CARD_ROW_HEIGHT,
+    columns: positionColumns,
+    minRows: POSITION_MIN_ROWS,
+    fallbackRows: POSITION_FALLBACK_PAGE_SIZE,
+  });
   const positionPageCount = Math.max(
     1,
-    Math.ceil(totalPositions / POSITION_PAGE_SIZE),
+    Math.ceil(totalPositions / positionPageSize),
   );
   const safePositionPage = Math.min(positionPage, positionPageCount - 1);
-  const positionStart = safePositionPage * POSITION_PAGE_SIZE;
+  const positionStart = safePositionPage * positionPageSize;
   const positionEnd = Math.min(
-    positionStart + POSITION_PAGE_SIZE,
+    positionStart + positionPageSize,
     totalPositions,
   );
   const visiblePositions = orderedPositions.slice(positionStart, positionEnd);
@@ -216,13 +267,13 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
   }
 
   return (
-    <main className="container-wide space-y-10 py-12">
+    <main className="container-wide space-y-6 py-6">
       <AdminBreadcrumb items={[{ label: "Positions" }]} />
 
-      <header className="space-y-5">
+      <header className="space-y-3">
         <SectionMarker primary="Positions" secondary={election.name} />
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <h1 className="font-display text-2xl font-medium leading-tight text-[var(--ink)] sm:text-3xl">
             Hierarchy and ballot order
           </h1>
           {!lockedToSetup ? (
@@ -238,7 +289,7 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
             </div>
           ) : null}
         </div>
-        <MetaGroup className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+        <MetaGroup className="grid-cols-2 gap-4 pt-3 sm:grid-cols-3 lg:grid-cols-4">
           <Meta label="Cycle phase" value={PHASE_LABELS[election.phase]} />
           <Meta label="Tiers" value={tierKeys.length} />
           <Meta label="Positions" value={totalPositions} />
@@ -361,8 +412,9 @@ function PositionsBody({ election }: { election: Doc<"elections"> }) {
             ) : null}
           </header>
           <ul
+            ref={positionMediaRef}
             key={safePositionPage}
-            className="grid min-h-[24rem] content-start gap-3 md:grid-cols-2"
+            className="grid content-start gap-3 md:grid-cols-2"
           >
             {visiblePositions.map((p, index) => {
               const tierPositions = grouped[p.tier] ?? [];

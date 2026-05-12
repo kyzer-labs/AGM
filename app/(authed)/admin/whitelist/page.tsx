@@ -47,6 +47,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatMYT } from "@/lib/format";
 import { getConvexErrorMessage } from "@/lib/convex-error";
 import { cn } from "@/lib/utils";
+import { getPageSizeForMediaHeight } from "@/lib/viewport-pagination";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 
 const USM_DOMAIN = "@student.usm.my";
@@ -80,7 +81,10 @@ const PHASE_LABELS: Record<Doc<"elections">["phase"], string> = {
   published: "Published",
 };
 
-const WHITELIST_PAGE_SIZE = 8;
+const WHITELIST_FALLBACK_PAGE_SIZE = 8;
+const WHITELIST_MIN_PAGE_SIZE = 1;
+const WHITELIST_ROW_HEIGHT = 60;
+const WHITELIST_BOTTOM_GUTTER = 48;
 
 interface BulkRow {
   displayRow: string;
@@ -139,6 +143,7 @@ function PageSkeleton() {
 function Body({ election }: { election: Doc<"elections"> }) {
   const list = useQuery(api.whitelist.list, { electionId: election._id });
   const bulkAdd = useMutation(api.whitelist.bulkAdd);
+  const rosterMediaRef = useRef<HTMLUListElement | null>(null);
 
   const [showAdd, setShowAdd] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
@@ -146,6 +151,9 @@ function Body({ election }: { election: Doc<"elections"> }) {
     useState<VoterClass>("year2Committee");
   const [filterClass, setFilterClass] = useState<VoterClass | "all">("all");
   const [whitelistPage, setWhitelistPage] = useState(0);
+  const [whitelistMediaHeight, setWhitelistMediaHeight] = useState<
+    number | null
+  >(null);
   const [importing, setImporting] = useState(false);
   const [lastImport, setLastImport] = useState<
     | (BulkSummary & {
@@ -175,17 +183,50 @@ function Body({ election }: { election: Doc<"elections"> }) {
     return counts;
   }, [list]);
 
+  useEffect(() => {
+    const measureRosterMediaHeight = () => {
+      const media = rosterMediaRef.current;
+      if (!media) return;
+
+      const { top } = media.getBoundingClientRect();
+      setWhitelistMediaHeight(
+        Math.max(0, window.innerHeight - top - WHITELIST_BOTTOM_GUTTER),
+      );
+    };
+
+    measureRosterMediaHeight();
+    window.addEventListener("resize", measureRosterMediaHeight);
+
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(measureRosterMediaHeight);
+    if (observer) observer.observe(document.body);
+
+    return () => {
+      window.removeEventListener("resize", measureRosterMediaHeight);
+      observer?.disconnect();
+    };
+  }, [list?.length, lastImport, filterClass]);
+
+  const whitelistPageSize = getPageSizeForMediaHeight({
+    mediaHeight: whitelistMediaHeight,
+    rowHeight: WHITELIST_ROW_HEIGHT,
+    minRows: WHITELIST_MIN_PAGE_SIZE,
+    fallbackRows: WHITELIST_FALLBACK_PAGE_SIZE,
+  });
+
   const whitelistPageCount = Math.max(
     1,
-    Math.ceil(filteredList.length / WHITELIST_PAGE_SIZE),
+    Math.ceil(filteredList.length / whitelistPageSize),
   );
   const safeWhitelistPage = Math.min(
     whitelistPage,
     whitelistPageCount - 1,
   );
-  const whitelistStart = safeWhitelistPage * WHITELIST_PAGE_SIZE;
+  const whitelistStart = safeWhitelistPage * whitelistPageSize;
   const whitelistEnd = Math.min(
-    whitelistStart + WHITELIST_PAGE_SIZE,
+    whitelistStart + whitelistPageSize,
     filteredList.length,
   );
   const visibleList = filteredList.slice(whitelistStart, whitelistEnd);
@@ -238,16 +279,16 @@ function Body({ election }: { election: Doc<"elections"> }) {
   }
 
   return (
-    <main className="container-wide space-y-10 py-12">
+    <main className="container-wide space-y-6 py-6">
       <AdminBreadcrumb items={[{ label: "Internal whitelist" }]} />
 
-      <header className="space-y-5">
+      <header className="space-y-3">
         <SectionMarker
           primary="Internal whitelist"
           secondary={election.name}
         />
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <h1 className="font-display text-2xl font-medium leading-tight text-[var(--ink)] sm:text-3xl">
             Evaluator allowlist and class assignment
           </h1>
           {editable ? (
@@ -261,7 +302,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
             </div>
           ) : null}
         </div>
-        <MetaGroup className="grid-cols-2 sm:grid-cols-4">
+        <MetaGroup className="grid-cols-2 gap-4 pt-3 sm:grid-cols-4">
           <Meta
             label="Cycle phase"
             value={PHASE_LABELS[election.phase]}
@@ -403,8 +444,9 @@ function Body({ election }: { election: Doc<"elections"> }) {
           />
         ) : (
           <ul
+            ref={rosterMediaRef}
             key={`${filterClass}-${safeWhitelistPage}`}
-            className="min-h-[30rem] divide-y divide-[var(--ink-line)] rounded-md border border-[var(--ink-line)] bg-[var(--paper)]"
+            className="divide-y divide-[var(--ink-line)] rounded-md border border-[var(--ink-line)] bg-[var(--paper)]"
             aria-busy={importing ? "true" : undefined}
           >
             {visibleList.map((row) => (

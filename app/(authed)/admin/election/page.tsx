@@ -41,6 +41,10 @@ import { SectionMarker } from "@/components/ui/section-marker";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { getConvexErrorMessage } from "@/lib/convex-error";
+import {
+  canCreateWorkspaceCycle,
+  getCurrentWorkspaceCycle,
+} from "@/lib/election-cycles";
 import { formatMYT } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
@@ -93,26 +97,35 @@ function Inner() {
   }
 
   const existingYears = elections.map((e) => e.year);
+  const currentCycle = getCurrentWorkspaceCycle(elections);
+  const canCreateCycle = canCreateWorkspaceCycle(elections);
 
   return (
-    <main className="container-wide space-y-12 py-12">
+    <main className="container-wide space-y-6 py-6">
       <AdminBreadcrumb items={[{ label: "Election cycle" }]} />
 
-      <header className="space-y-5">
-        <SectionMarker primary="Election cycle" secondary="Annual cycles" />
-        <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
-          Election cycles
-        </h1>
-        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
-          Each cycle holds positions, candidates, the internal whitelist
-          (split across three voter classes), the rubric criteria, and the
-          weighted scoring configuration. AGM is annual: at most one cycle
-          per year.
-        </p>
-        <div>
+      <header className="space-y-3">
+        <SectionMarker primary="Election cycle" secondary="Current workspace" />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="max-w-[65ch] space-y-2">
+            <h1 className="font-display text-2xl font-medium leading-tight text-[var(--ink)] sm:text-3xl">
+              Current cycle controls
+            </h1>
+            <p className="text-sm leading-relaxed text-[var(--color-muted-foreground)]">
+              Configure the next active AGM cycle, then move it through
+              evaluation, live voting, preview, and publication. Published
+              cycles live under Records.
+            </p>
+          </div>
           <Button
             onClick={() => setShowCreate(true)}
-            disabled={!elections}
+            disabled={!canCreateCycle}
+            className="shrink-0 sm:self-start"
+            title={
+              canCreateCycle
+                ? undefined
+                : "Publish the active cycle before creating another one."
+            }
           >
             <CalendarPlus className="h-4 w-4" aria-hidden /> New cycle
           </Button>
@@ -120,25 +133,19 @@ function Inner() {
       </header>
 
       <CreateCycleModal
-        open={showCreate}
+        open={canCreateCycle && showCreate}
         onClose={() => setShowCreate(false)}
         existingYears={existingYears}
       />
 
-      {elections.length === 0 ? (
+      {currentCycle === null ? (
         <EmptyState
           icon={<CalendarPlus className="h-5 w-5" aria-hidden />}
-          title="No cycles yet"
-          description="Create the first one with the New cycle button above. The cycle starts in Setup with default weights and the standard 5-criterion rubric."
+          title="No active cycle workspace"
+          description="Create the next AGM cycle with the New cycle button above. Published cycles are kept separately in Records."
         />
       ) : (
-        <ol className="space-y-0" aria-label="Election cycles">
-          {elections.map((e, index) => (
-            <li key={e._id}>
-              <ElectionArticle election={e} index={index} />
-            </li>
-          ))}
-        </ol>
+        <ElectionArticle election={currentCycle} />
       )}
     </main>
   );
@@ -304,10 +311,10 @@ function CreateCycleModal({
 
 function ElectionArticle({
   election,
-  index,
+  index = 0,
 }: {
   election: Doc<"elections">;
-  index: number;
+  index?: number;
 }) {
   const dialog = useDialog();
   const readiness = useQuery(api.elections.setupReadiness, {

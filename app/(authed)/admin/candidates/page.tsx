@@ -42,6 +42,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import { getConvexErrorMessage } from "@/lib/convex-error";
 import { cn } from "@/lib/utils";
+import { getGridPageSizeForMediaHeight } from "@/lib/viewport-pagination";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 
 const PHASE_LABELS: Record<Doc<"elections">["phase"], string> = {
@@ -53,7 +54,12 @@ const PHASE_LABELS: Record<Doc<"elections">["phase"], string> = {
   published: "Published",
 };
 
-const ROSTER_PAGE_SIZE = 6;
+const ROSTER_FALLBACK_PAGE_SIZE = 6;
+const ROSTER_MIN_ROWS = 1;
+const ROSTER_CARD_ROW_HEIGHT = 158;
+const ROSTER_BOTTOM_GUTTER = 48;
+const ROSTER_DESKTOP_COLUMNS = 2;
+const ROSTER_MOBILE_COLUMNS = 1;
 
 type RosterSort = "name" | "position";
 
@@ -131,6 +137,10 @@ function Body({ election }: { election: Doc<"elections"> }) {
   const [editingId, setEditingId] = useState<Id<"candidates"> | null>(null);
   const [rosterPage, setRosterPage] = useState(0);
   const [rosterSort, setRosterSort] = useState<RosterSort>("name");
+  const [rosterMediaHeight, setRosterMediaHeight] = useState<number | null>(
+    null,
+  );
+  const [rosterColumns, setRosterColumns] = useState(ROSTER_DESKTOP_COLUMNS);
   const [importing, setImporting] = useState(false);
   const [lastImport, setLastImport] = useState<
     | (ImportSummary & {
@@ -141,6 +151,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
   >(null);
 
   const csvInputRef = useRef<HTMLInputElement>(null);
+  const rosterMediaRef = useRef<HTMLDivElement | null>(null);
 
   const editable = election.phase === "setup";
 
@@ -199,9 +210,47 @@ function Body({ election }: { election: Doc<"elections"> }) {
   }, [candidates, rosterSort]);
 
   const rosterCandidateCount = sortedCandidates.length;
+  useEffect(() => {
+    const measureRosterMedia = () => {
+      const media = rosterMediaRef.current;
+      if (!media) return;
+
+      const { top } = media.getBoundingClientRect();
+      setRosterMediaHeight(
+        Math.max(0, window.innerHeight - top - ROSTER_BOTTOM_GUTTER),
+      );
+      setRosterColumns(
+        window.innerWidth >= 768
+          ? ROSTER_DESKTOP_COLUMNS
+          : ROSTER_MOBILE_COLUMNS,
+      );
+    };
+
+    measureRosterMedia();
+    window.addEventListener("resize", measureRosterMedia);
+
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(measureRosterMedia);
+    if (observer) observer.observe(document.body);
+
+    return () => {
+      window.removeEventListener("resize", measureRosterMedia);
+      observer?.disconnect();
+    };
+  }, [rosterCandidateCount, lastImport, rosterSort]);
+
+  const rosterPageSize = getGridPageSizeForMediaHeight({
+    mediaHeight: rosterMediaHeight,
+    rowHeight: ROSTER_CARD_ROW_HEIGHT,
+    columns: rosterColumns,
+    minRows: ROSTER_MIN_ROWS,
+    fallbackRows: ROSTER_FALLBACK_PAGE_SIZE,
+  });
   const rosterPageCount = Math.max(
     1,
-    Math.ceil(rosterCandidateCount / ROSTER_PAGE_SIZE),
+    Math.ceil(rosterCandidateCount / rosterPageSize),
   );
 
   useEffect(() => {
@@ -219,9 +268,9 @@ function Body({ election }: { election: Doc<"elections"> }) {
   }
 
   const safeRosterPage = Math.min(rosterPage, rosterPageCount - 1);
-  const rosterStart = safeRosterPage * ROSTER_PAGE_SIZE;
+  const rosterStart = safeRosterPage * rosterPageSize;
   const rosterEnd = Math.min(
-    rosterStart + ROSTER_PAGE_SIZE,
+    rosterStart + rosterPageSize,
     sortedCandidates.length,
   );
   const visibleCandidates = sortedCandidates.slice(rosterStart, rosterEnd);
@@ -411,13 +460,13 @@ function Body({ election }: { election: Doc<"elections"> }) {
   );
 
   return (
-    <main className="container-wide space-y-10 py-12">
+    <main className="container-wide space-y-6 py-6">
       <AdminBreadcrumb items={[{ label: "Candidates" }]} />
 
-      <header className="space-y-5">
+      <header className="space-y-3">
         <SectionMarker primary="Candidates" secondary={election.name} />
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <h1 className="font-display text-2xl font-medium leading-tight text-[var(--ink)] sm:text-3xl">
             Roster and contending positions
           </h1>
           {editable && !noPositions ? (
@@ -445,7 +494,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
             </div>
           ) : null}
         </div>
-        <MetaGroup className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+        <MetaGroup className="grid-cols-2 gap-4 pt-3 sm:grid-cols-3 lg:grid-cols-4">
           <Meta label="Cycle phase" value={PHASE_LABELS[election.phase]} />
           <Meta label="Positions defined" value={positions.length} />
           <Meta label="Candidates" value={candidates.length} />
@@ -660,8 +709,9 @@ function Body({ election }: { election: Doc<"elections"> }) {
             </div>
           </header>
           <div
+            ref={rosterMediaRef}
             key={`${rosterSort}-${safeRosterPage}`}
-            className="grid min-h-[24rem] content-start gap-3 md:grid-cols-2"
+            className="grid content-start gap-3 md:grid-cols-2"
           >
             {visibleCandidates.map((c, index) => (
               <CandidateCard

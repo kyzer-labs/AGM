@@ -167,31 +167,20 @@ function Body({
   });
 
   return (
-    <main className="container-wide space-y-10 py-12">
+    <main className="container-wide space-y-6 py-6">
       <AdminBreadcrumb items={[{ label: "Admins" }]} />
 
-      <header className="space-y-5">
+      <header className="space-y-3">
         <SectionMarker
           primary="Admin allowlist"
           secondary="Super admin only"
         />
-        <h1 className="font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-4xl">
-          Manage who can run the AGM
-        </h1>
-        <p className="max-w-[60ch] text-sm leading-relaxed text-[var(--color-muted-foreground)]">
-          Grant or revoke admin access by USM student email. Grants for
-          accounts that have not signed in yet are queued, and activate
-          automatically the first time the recipient signs in. Every grant,
-          role change, and revocation is written to the audit log.
-        </p>
-        <MetaGroup className="grid-cols-2 sm:grid-cols-4">
-          <Meta label="Super admins" value={counts.supers} />
-          <Meta label="Admins" value={counts.admins} />
-          <Meta label="Pending sign-in" value={counts.pending} />
-          <Meta label="Total" value={counts.total} />
-        </MetaGroup>
-        <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <h1 className="font-display text-2xl font-medium leading-tight text-[var(--ink)] sm:text-3xl">
+            Access control and operator succession
+          </h1>
           <Button
+            className="shrink-0 sm:self-start"
             onClick={() => {
               form.reset({ email: "", role: "admin" });
               setShowGrant(true);
@@ -200,6 +189,12 @@ function Body({
             <UserPlus className="h-4 w-4" aria-hidden /> Grant admin
           </Button>
         </div>
+        <MetaGroup className="grid-cols-2 gap-4 pt-3 sm:grid-cols-4">
+          <Meta label="Super admins" value={counts.supers} />
+          <Meta label="Admins" value={counts.admins} />
+          <Meta label="Pending sign-in" value={counts.pending} />
+          <Meta label="Total" value={counts.total} />
+        </MetaGroup>
       </header>
 
       {onlyOneSuper ? (
@@ -243,15 +238,15 @@ function Body({
         />
       </Modal>
 
-      <section
-        aria-label="Admin allowlist"
-        className="space-y-4"
-      >
-        <header>
+      <section aria-label="Admin allowlist">
+        <header className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <SectionMarker
             primary="Allowlist"
             secondary={`${counts.total} ${counts.total === 1 ? "entry" : "entries"}`}
           />
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-[var(--ink-muted)]">
+            Grants activate on first sign-in
+          </p>
         </header>
         {list.length === 0 ? (
           <EmptyState
