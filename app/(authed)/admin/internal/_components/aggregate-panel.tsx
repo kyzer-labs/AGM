@@ -4,10 +4,22 @@ import { useMemo } from "react";
 import type { useQuery } from "convex/react";
 import { ClipboardCheck } from "lucide-react";
 
+import {
+  AdminDataTable,
+  AdminDataTableCell,
+  AdminDataTableHead,
+  AdminDataTableHeader,
+  AdminDataTableRow,
+  AdminDataTableRowHead,
+} from "@/components/admin/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionMarker } from "@/components/ui/section-marker";
 import type { api } from "@/convex/_generated/api";
-import { VOTER_CLASSES, type VoterClass } from "./internal-model";
+import {
+  VOTER_CLASSES,
+  VOTER_CLASS_LABEL,
+  type VoterClass,
+} from "./internal-model";
 import { ClassLabel } from "./internal-badges";
 
 export function AggregatePanel({
@@ -107,39 +119,36 @@ function ClassAggregateTable({
                 <span className="tabular-nums">{grandTotal}</span> total points
               </span>
             </div>
-            <div className="overflow-x-auto rounded-md border border-[var(--ink-line)] bg-[var(--paper)]">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--ink-line)] bg-[var(--paper-2)] text-left">
-                    <th className="px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
-                      Candidate
-                    </th>
-                    <th className="px-3 py-2 text-right font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
+            <AdminDataTable
+              caption={`${VOTER_CLASS_LABEL[cls]} aggregate scores, submitted evaluations only.`}
+              tableClassName="min-w-[720px]"
+            >
+              <AdminDataTableHeader>
+                <AdminDataTableRow className="bg-[var(--paper-2)] text-left">
+                    <AdminDataTableHead>Candidate</AdminDataTableHead>
+                    <AdminDataTableHead className="text-right">
                       Evaluators
-                    </th>
-                    <th className="px-3 py-2 text-right font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
+                    </AdminDataTableHead>
+                    <AdminDataTableHead className="text-right">
                       Sum
-                    </th>
+                    </AdminDataTableHead>
                     {aggregate.criteria.map((cr) => (
-                      <th
+                      <AdminDataTableHead
                         key={cr._id}
-                        className="px-3 py-2 text-right font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)] whitespace-nowrap"
+                        className="whitespace-nowrap text-right"
                       >
                         {cr.name}
-                      </th>
+                      </AdminDataTableHead>
                     ))}
-                    <th className="px-3 py-2 text-right font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
+                    <AdminDataTableHead className="text-right">
                       Share
-                    </th>
-                  </tr>
-                </thead>
+                    </AdminDataTableHead>
+                  </AdminDataTableRow>
+                </AdminDataTableHeader>
                 <tbody>
                   {candidateRows.map((row) => (
-                    <tr
-                      key={row.candidateId}
-                      className="border-b border-[var(--ink-line)] last:border-b-0"
-                    >
-                      <td className="px-3 py-2">
+                    <AdminDataTableRow key={row.candidateId}>
+                      <AdminDataTableRowHead>
                         <div className="font-medium text-[var(--ink)]">
                           {row.fullName}
                         </div>
@@ -148,36 +157,35 @@ function ClassAggregateTable({
                             {row.matric}
                           </div>
                         ) : null}
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink)]">
+                      </AdminDataTableRowHead>
+                      <AdminDataTableCell className="text-right font-mono tabular-nums text-[var(--ink)]">
                         {row.evaluatorCount}
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink)]">
+                      </AdminDataTableCell>
+                      <AdminDataTableCell className="text-right font-mono tabular-nums text-[var(--ink)]">
                         {row.totalSum}
-                      </td>
+                      </AdminDataTableCell>
                       {aggregate.criteria.map((cr) => {
                         const cell = row.perCriterion.find(
                           (p) => p.criterionId === cr._id,
                         );
                         return (
-                          <td
+                          <AdminDataTableCell
                             key={cr._id}
-                            className="px-3 py-2 text-right font-mono tabular-nums text-[var(--ink-muted)]"
+                            className="text-right font-mono tabular-nums text-[var(--ink-muted)]"
                           >
                             {cell && cell.count > 0
                               ? cell.average.toFixed(2)
                               : "-"}
-                          </td>
+                          </AdminDataTableCell>
                         );
                       })}
-                      <td className="px-3 py-2 text-right font-mono font-medium tabular-nums text-[var(--ink)]">
+                      <AdminDataTableCell className="text-right font-mono font-medium tabular-nums text-[var(--ink)]">
                         {(row.share * 100).toFixed(1)}%
-                      </td>
-                    </tr>
+                      </AdminDataTableCell>
+                    </AdminDataTableRow>
                   ))}
                 </tbody>
-              </table>
-            </div>
+            </AdminDataTable>
           </div>
         );
       })}

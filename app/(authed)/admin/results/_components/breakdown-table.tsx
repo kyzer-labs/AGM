@@ -1,5 +1,13 @@
 import { Trophy } from "lucide-react";
 
+import {
+  AdminDataTable,
+  AdminDataTableCell,
+  AdminDataTableHead,
+  AdminDataTableHeader,
+  AdminDataTableRow,
+  AdminDataTableRowHead,
+} from "@/components/admin/data-table";
 import { CandidatePhoto } from "@/components/candidate-photo";
 import { cn } from "@/lib/utils";
 import type { PreviewRow } from "./results-model";
@@ -14,73 +22,52 @@ export function BreakdownTable({
   publicShare: number;
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <caption className="sr-only">
+    <AdminDataTable
+      caption={
+        <>
           Per-candidate breakdown for {row.positionName}. Internal share is{" "}
           {internalShare}%, public share is {publicShare}%.
-        </caption>
-        <thead>
-          <tr className="border-b border-[var(--ink-line)] text-left">
-            <th
-              scope="col"
-              className="px-2 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-muted)]"
-            >
+        </>
+      }
+      tableClassName="min-w-[760px]"
+      className="border-0"
+    >
+        <AdminDataTableHeader>
+          <AdminDataTableRow className="text-left">
+            <AdminDataTableHead className="px-2">
               Candidate
-            </th>
-            <th
-              scope="col"
-              className="px-2 py-2 text-right font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-muted)] tabular-nums"
-            >
+            </AdminDataTableHead>
+            <AdminDataTableHead className="px-2 text-right tabular-nums">
               TC ({row.weights.topCommittee}%)
-            </th>
-            <th
-              scope="col"
-              className="px-2 py-2 text-right font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-muted)] tabular-nums"
-            >
+            </AdminDataTableHead>
+            <AdminDataTableHead className="px-2 text-right tabular-nums">
               HE ({row.weights.headExecutive}%)
-            </th>
-            <th
-              scope="col"
-              className="px-2 py-2 text-right font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-muted)] tabular-nums"
-            >
+            </AdminDataTableHead>
+            <AdminDataTableHead className="px-2 text-right tabular-nums">
               Y2 ({row.weights.year2Committee}%)
-            </th>
-            <th
-              scope="col"
-              className="px-2 py-2 text-right font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-muted)] tabular-nums"
-            >
+            </AdminDataTableHead>
+            <AdminDataTableHead className="px-2 text-right tabular-nums">
               Public ({row.weights.public}%)
-            </th>
-            <th
-              scope="col"
-              className="px-2 py-2 text-right font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-muted)]"
-            >
+            </AdminDataTableHead>
+            <AdminDataTableHead className="px-2 text-right">
               Internal agg
-            </th>
-            <th
-              scope="col"
-              className="px-2 py-2 text-right font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-muted)]"
-            >
+            </AdminDataTableHead>
+            <AdminDataTableHead className="px-2 text-right">
               Final
-            </th>
-          </tr>
-        </thead>
+            </AdminDataTableHead>
+          </AdminDataTableRow>
+        </AdminDataTableHeader>
         <tbody>
           {row.breakdown.map((b) => {
             const isWinner = b.candidateId === row.winnerCandidateId;
             return (
-              <tr
+              <AdminDataTableRow
                 key={b.candidateId}
                 className={cn(
-                  "border-b border-[var(--ink-line)] last:border-b-0",
                   isWinner ? "bg-[var(--color-success)]/10" : null,
                 )}
               >
-                <th
-                  scope="row"
-                  className="px-2 py-2 text-left font-normal align-top"
-                >
+                <AdminDataTableRowHead className="px-2">
                   <div className="flex items-center gap-2">
                     <span className="grid h-10 w-7 shrink-0 place-items-center overflow-hidden rounded bg-[var(--paper)] ring-1 ring-[var(--ink-line)]">
                       <CandidatePhoto
@@ -106,30 +93,29 @@ export function BreakdownTable({
                       ) : null}
                     </div>
                   </div>
-                </th>
-                <td className="px-2 py-2 text-right tabular-nums">
+                </AdminDataTableRowHead>
+                <AdminDataTableCell className="px-2 text-right tabular-nums">
                   {(b.tcShare * 100).toFixed(1)}%
-                </td>
-                <td className="px-2 py-2 text-right tabular-nums">
+                </AdminDataTableCell>
+                <AdminDataTableCell className="px-2 text-right tabular-nums">
                   {(b.heShare * 100).toFixed(1)}%
-                </td>
-                <td className="px-2 py-2 text-right tabular-nums">
+                </AdminDataTableCell>
+                <AdminDataTableCell className="px-2 text-right tabular-nums">
                   {(b.y2Share * 100).toFixed(1)}%
-                </td>
-                <td className="px-2 py-2 text-right tabular-nums">
+                </AdminDataTableCell>
+                <AdminDataTableCell className="px-2 text-right tabular-nums">
                   {b.publicVotes} ({(b.publicShare * 100).toFixed(1)}%)
-                </td>
-                <td className="px-2 py-2 text-right tabular-nums">
+                </AdminDataTableCell>
+                <AdminDataTableCell className="px-2 text-right tabular-nums">
                   {(b.internalAggregate * 100).toFixed(2)}%
-                </td>
-                <td className="px-2 py-2 text-right font-semibold tabular-nums">
+                </AdminDataTableCell>
+                <AdminDataTableCell className="px-2 text-right font-semibold tabular-nums">
                   {(b.finalScore * 100).toFixed(2)}%
-                </td>
-              </tr>
+                </AdminDataTableCell>
+              </AdminDataTableRow>
             );
           })}
         </tbody>
-      </table>
-    </div>
+    </AdminDataTable>
   );
 }

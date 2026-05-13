@@ -5,6 +5,13 @@ import { useMutation } from "convex/react";
 import { toast } from "sonner";
 import { AlertTriangle, ShieldAlert } from "lucide-react";
 
+import {
+  AdminDataTable,
+  AdminDataTableCell,
+  AdminDataTableHead,
+  AdminDataTableHeader,
+  AdminDataTableRow,
+} from "@/components/admin/data-table";
 import { useDialog } from "@/components/dialog/dialog-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -341,54 +348,52 @@ function EmergencyResultPanel({
           recorded.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-md border border-[var(--ink-line)] bg-[var(--paper)]">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-[var(--ink-line)] text-left">
-                <th className="px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
+        <AdminDataTable
+          caption={`Emergency audit log entries for ${result.target.email}.`}
+          tableClassName="min-w-[760px] text-xs"
+        >
+          <AdminDataTableHeader>
+              <AdminDataTableRow className="text-left">
+                <AdminDataTableHead>
                   When (MYT)
-                </th>
-                <th className="px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
+                </AdminDataTableHead>
+                <AdminDataTableHead>
                   Action
-                </th>
-                <th className="px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
+                </AdminDataTableHead>
+                <AdminDataTableHead>
                   Entity
-                </th>
-                <th className="px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] font-medium text-[var(--ink-muted)]">
+                </AdminDataTableHead>
+                <AdminDataTableHead>
                   Reason
-                </th>
-              </tr>
-            </thead>
+                </AdminDataTableHead>
+              </AdminDataTableRow>
+            </AdminDataTableHeader>
             <tbody>
               {result.auditEntries.map((a, i) => (
-                <tr
-                  key={i}
-                  className="border-b border-[var(--ink-line)] last:border-b-0"
-                >
-                  <td className="px-3 py-1.5 font-mono tabular-nums text-[var(--ink)]">
+                <AdminDataTableRow key={i}>
+                  <AdminDataTableCell className="py-1.5 font-mono tabular-nums text-[var(--ink)]">
                     {formatMYT(a.createdAt)}
-                  </td>
-                  <td className="px-3 py-1.5 font-mono text-[var(--ink)]">
+                  </AdminDataTableCell>
+                  <AdminDataTableCell className="py-1.5 font-mono text-[var(--ink)]">
                     {a.action}
-                  </td>
-                  <td className="px-3 py-1.5 font-mono text-[var(--ink-muted)]">
+                  </AdminDataTableCell>
+                  <AdminDataTableCell className="py-1.5 font-mono text-[var(--ink-muted)]">
                     {a.entityType}
                     {a.entityId
                       ? ` · ${a.entityId.slice(0, 8)}…`
                       : ""}
-                  </td>
-                  <td className="px-3 py-1.5 text-[var(--ink)]">
+                  </AdminDataTableCell>
+                  <AdminDataTableCell className="py-1.5 text-[var(--ink)]">
                     {a.reason || (
                       <span className="text-[var(--ink-muted)]">
                         (no reason)
                       </span>
                     )}
-                  </td>
-                </tr>
+                  </AdminDataTableCell>
+                </AdminDataTableRow>
               ))}
             </tbody>
-          </table>
-        </div>
+        </AdminDataTable>
       )}
 
       <div className="flex flex-wrap items-center justify-end gap-2">

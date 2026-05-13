@@ -3,6 +3,14 @@
 import type { useQuery } from "convex/react";
 import { Users } from "lucide-react";
 
+import {
+  AdminDataTable,
+  AdminDataTableCell,
+  AdminDataTableHead,
+  AdminDataTableHeader,
+  AdminDataTableRow,
+  AdminDataTableRowHead,
+} from "@/components/admin/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionMarker } from "@/components/ui/section-marker";
 import type { api } from "@/convex/_generated/api";
@@ -61,56 +69,48 @@ export function EvaluatorLedger({
           }
         />
       ) : (
-        <div className="max-h-[calc(100dvh-19rem)] overflow-auto">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead className="sticky top-0 z-10">
-              <tr className="border-b border-[var(--ink-line)] bg-[var(--paper-2)] text-left">
-                <th className="px-3 py-2 font-mono text-[10.5px] font-medium uppercase tracking-[0.18em] text-[var(--ink-muted)]">
-                  Evaluator
-                </th>
-                <th className="px-3 py-2 font-mono text-[10.5px] font-medium uppercase tracking-[0.18em] text-[var(--ink-muted)]">
-                  Class
-                </th>
-                <th className="px-3 py-2 font-mono text-[10.5px] font-medium uppercase tracking-[0.18em] text-[var(--ink-muted)]">
-                  Status
-                </th>
-                <th className="px-3 py-2 font-mono text-[10.5px] font-medium uppercase tracking-[0.18em] text-[var(--ink-muted)]">
-                  Last update (MYT)
-                </th>
-              </tr>
-            </thead>
+        <AdminDataTable
+          caption={`${title}. ${description}.`}
+          maxHeight="calc(100dvh - 19rem)"
+          tableClassName="min-w-[760px]"
+          className="rounded-none border-0"
+        >
+          <AdminDataTableHeader sticky>
+            <AdminDataTableRow className="bg-[var(--paper-2)] text-left">
+              <AdminDataTableHead>Evaluator</AdminDataTableHead>
+              <AdminDataTableHead>Class</AdminDataTableHead>
+              <AdminDataTableHead>Status</AdminDataTableHead>
+              <AdminDataTableHead>Last update (MYT)</AdminDataTableHead>
+            </AdminDataTableRow>
+          </AdminDataTableHeader>
             <tbody>
               {rows.map((row) => (
-                <tr
-                  key={row.email}
-                  className="border-b border-[var(--ink-line)] last:border-b-0"
-                >
-                  <td className="px-3 py-2">
+                <AdminDataTableRow key={row.email}>
+                  <AdminDataTableRowHead>
                     <div className="font-mono text-xs tabular-nums text-[var(--ink)]">
                       {row.email}
                     </div>
                     <div className="mt-1 text-xs text-[var(--ink-muted)]">
                       {row.fullName ?? "Not signed in"}
                     </div>
-                  </td>
-                  <td className="px-3 py-2">
+                  </AdminDataTableRowHead>
+                  <AdminDataTableCell>
                     <ClassLabel voterClass={row.voterClass} />
-                  </td>
-                  <td className="px-3 py-2">
+                  </AdminDataTableCell>
+                  <AdminDataTableCell>
                     <StatusBadge status={row.status} />
-                  </td>
-                  <td className="px-3 py-2 font-mono text-xs tabular-nums text-[var(--ink-muted)]">
+                  </AdminDataTableCell>
+                  <AdminDataTableCell className="font-mono text-xs tabular-nums text-[var(--ink-muted)]">
                     {row.submittedAt
                       ? `Submitted ${formatMYT(row.submittedAt)}`
                       : row.updatedAt
                         ? formatMYT(row.updatedAt)
                         : "Not yet"}
-                  </td>
-                </tr>
+                  </AdminDataTableCell>
+                </AdminDataTableRow>
               ))}
             </tbody>
-          </table>
-        </div>
+        </AdminDataTable>
       )}
     </section>
   );
