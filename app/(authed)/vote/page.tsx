@@ -5,7 +5,13 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
-import { ArrowRight, Check, CheckCircle2, Scale } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  Scale,
+  ShieldCheck,
+} from "lucide-react";
 
 import { AuthGate } from "@/components/auth/auth-gate";
 import { CandidatePhoto } from "@/components/candidate-photo";
@@ -237,7 +243,7 @@ function Ballot({ session }: { session: ActiveSession }) {
 
   return (
     <main className="h-[calc(100dvh-73px)] overflow-hidden">
-      <section className="mx-auto flex h-[calc(100%_-_4.75rem)] w-full max-w-[76rem] flex-col px-3 pb-3 pt-4 sm:h-[calc(100%_-_5rem)] sm:px-5 sm:pt-5 lg:px-6 lg:pb-4">
+      <section className="mx-auto flex h-[calc(100%_-_5.75rem)] w-full max-w-[94vw] flex-col px-3 pb-3 pt-3 sm:h-[calc(100%_-_6.25rem)] sm:px-5 sm:pt-4 lg:px-6 lg:pb-4">
         <header className="mx-auto shrink-0 text-center">
           <p className="font-mono text-[0.62rem] font-semibold uppercase tracking-[0.36em] text-[var(--copper)] sm:text-[0.68rem]">
             Public voting
@@ -261,11 +267,12 @@ function Ballot({ session }: { session: ActiveSession }) {
           </p>
         </header>
 
-        <div className="flex min-h-0 flex-1 items-center justify-center pt-3 sm:pt-4 lg:pt-5">
+
+        <div className="flex min-h-0 flex-1 items-center justify-center pt-0.5">
           <div
             role="radiogroup"
             aria-label={`Candidates for ${session.name}`}
-            className="grid w-full max-w-[72rem] justify-center gap-2.5 sm:gap-3 lg:gap-4 [grid-template-columns:repeat(auto-fit,minmax(15.75rem,16.85rem))]"
+            className="grid w-full justify-center gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(clamp(19rem,22vw,25rem),clamp(21rem,25vw,27rem)))]"
             key={session.positionId}
           >
             {session.candidates.map((candidate, idx) => (
@@ -284,12 +291,12 @@ function Ballot({ session }: { session: ActiveSession }) {
             ))}
           </div>
         </div>
+
       </section>
 
       <SelectionDock
         chosen={chosen}
         confirming={confirming}
-        positionName={session.name}
         submitting={submitting}
         onBack={() => setConfirming(false)}
         onContinue={() => setConfirming(true)}
@@ -329,13 +336,13 @@ function CandidateBallotCard({
       onClick={onSelect}
       style={{ ["--index" as never]: index }}
       className={cn(
-        "ticket-card tile-enter group relative grid min-h-[6.9rem] w-full grid-cols-[4.6rem_minmax(0,1fr)_2.25rem] items-center overflow-visible border-0 bg-transparent text-left",
-        "px-3.5 py-2 shadow-none transition-[filter,transform] duration-200",
+        "ticket-card tile-enter group relative grid min-h-[8.2rem] w-full grid-cols-[5.4rem_minmax(0,1fr)_2.8rem] items-center overflow-visible border-0 bg-transparent text-left",
+        "px-4 py-2 shadow-none transition-[filter,transform] duration-200",
         "[transition-timing-function:cubic-bezier(0.32,0.72,0,1)] active:scale-[0.995]",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--paper)]",
         "disabled:cursor-not-allowed disabled:opacity-75",
-        "sm:min-h-[8rem] sm:grid-cols-[5.7rem_minmax(0,1fr)_3rem] sm:px-4 sm:py-2.5",
-        "lg:flex lg:h-[25.4rem] lg:min-h-0 lg:flex-col lg:items-stretch lg:px-4 lg:pb-3.5 lg:pt-4",
+        "sm:min-h-[9rem] sm:grid-cols-[7rem_minmax(0,1fr)_3.25rem] sm:px-4 sm:py-2.5",
+        "lg:flex lg:h-[clamp(30rem,61vh,39rem)] lg:min-h-0 lg:flex-col lg:items-stretch lg:px-[1.3rem] lg:pb-4 lg:pt-[1.125rem]",
         isSelected
           ? "ticket-card-selected drop-shadow-[0_10px_20px_rgba(15,106,106,0.14)]"
           : "drop-shadow-[0_7px_16px_rgba(40,30,20,0.08)] hover:drop-shadow-[0_10px_18px_rgba(40,30,20,0.1)]",
@@ -348,15 +355,17 @@ function CandidateBallotCard({
         {ticketNumber}
       </span>
 
-      <div className="relative z-10 aspect-[3/4] h-[5.65rem] justify-self-start overflow-hidden bg-[var(--paper-2)] ring-1 ring-[var(--ink-line)] sm:h-[6.95rem] lg:mt-8 lg:h-auto lg:w-full">
+
+      <div className="relative z-10 aspect-[3/4] h-[6.6rem] justify-self-start overflow-hidden bg-[var(--paper-2)] ring-1 ring-[var(--ink-line)] sm:h-[8rem] lg:mt-[2.2rem] lg:h-auto lg:w-full">
         <CandidatePhoto
           src={candidate.photoUrl}
           alt={candidate.fullName}
-          className="h-full w-full object-cover object-top"
+          className="h-full w-full object-contain"
           iconClassName="mx-auto h-12 w-12"
           loading={index === 0 ? "eager" : "lazy"}
         />
       </div>
+
 
       <div className="relative z-10 min-w-0 self-start px-2 py-1 sm:px-4 sm:py-2 lg:px-0 lg:pb-2 lg:pt-2.5">
         <div className="mb-0.5 flex items-center gap-2 lg:hidden">
@@ -365,30 +374,20 @@ function CandidateBallotCard({
           </span>
           <span className="h-px flex-1 border-t border-dashed border-[var(--ink-line)]" />
         </div>
-        <h2 className="font-serif text-[0.78rem] font-semibold uppercase leading-[1.05] tracking-[0.01em] text-[var(--ink)] sm:text-[1rem] lg:text-[1.08rem]">
+        <h2 className="font-serif text-[0.78rem] font-semibold uppercase leading-[1.05] tracking-[0.01em] text-[var(--ink)] sm:text-[1rem] lg:text-[1.14rem]">
           {candidate.fullName}
         </h2>
         <div className="mt-1.5 max-w-[24.5rem] border-t border-dashed border-[var(--ink-line)]" />
-        <dl className="mt-1.5 grid gap-1 sm:mt-2">
+        <div className="mt-2 grid gap-1 sm:mt-2.5 sm:gap-1.5">
           {matric ? (
-            <div>
-              <dt className="font-mono text-[0.48rem] font-semibold uppercase tracking-[0.12em] text-[var(--copper)] sm:text-[0.54rem]">
-                Matric number
-              </dt>
-              <dd className="mt-0.5 font-serif text-[0.66rem] leading-tight text-[var(--ink)] sm:text-[0.78rem]">
-                {matric}
-              </dd>
-            </div>
+            <p className="truncate font-mono text-[0.72rem] font-semibold uppercase tracking-[0.045em] text-[var(--teal)] sm:text-[0.86rem] lg:text-[0.9rem]">
+              {matric}
+            </p>
           ) : null}
-          <div>
-            <dt className="font-mono text-[0.48rem] font-semibold uppercase tracking-[0.12em] text-[var(--copper)] sm:text-[0.54rem]">
-              Position contested
-            </dt>
-            <dd className="mt-0.5 line-clamp-2 font-serif text-[0.66rem] leading-tight text-[var(--ink)] sm:text-[0.78rem]">
-              {positionName}
-            </dd>
-          </div>
-        </dl>
+          <p className="line-clamp-2 font-serif text-[0.78rem] font-medium leading-[1.12] text-[var(--ink)] sm:text-[0.92rem] lg:text-[0.98rem]">
+            {positionName}
+          </p>
+        </div>
       </div>
 
       <RadioMark checked={isSelected} />
@@ -454,10 +453,12 @@ function SelectedStamp({ visible }: { visible: boolean }) {
     <span
       aria-hidden
       className={cn(
-        "pointer-events-none absolute right-2.5 top-2.5 z-30 hidden h-14 w-14 rotate-[-14deg] place-items-center rounded-full border border-dashed border-[var(--teal)]",
-        "bg-[color-mix(in_oklab,var(--paper)_74%,transparent)] font-mono text-[0.49rem] font-semibold uppercase tracking-[0.06em] text-[var(--teal)] shadow-[0_4px_12px_rgba(15,106,106,0.13)] backdrop-blur-[1px]",
+        "pointer-events-none absolute right-[0.65rem] top-2 z-30 hidden h-[4.5rem] w-[4.5rem] rotate-[-14deg] place-items-center rounded-full border border-dashed border-[var(--teal)]",
+        "bg-[color-mix(in_oklab,var(--paper)_74%,transparent)] font-mono text-[0.56rem] font-semibold uppercase tracking-[0.06em] text-[var(--teal)] shadow-[0_4px_12px_rgba(15,106,106,0.13)] backdrop-blur-[1px]",
         "before:absolute before:inset-[5px] before:rounded-full before:border before:border-[var(--teal)]",
         "after:absolute after:inset-[11px] after:rounded-full after:border after:border-dashed after:border-[color-mix(in_oklab,var(--teal)_68%,transparent)]",
+        "lg:right-[0.45rem] lg:top-[0.25rem] lg:h-[6.6rem] lg:w-[6.6rem] lg:text-[0.78rem]",
+        "lg:before:inset-[7px] lg:after:inset-[17px]",
         visible ? "grid" : null,
       )}
     >
@@ -471,16 +472,17 @@ function RadioMark({ checked }: { checked: boolean }) {
     <span
       aria-hidden
       className={cn(
-        "relative z-10 grid h-6 w-6 place-items-center justify-self-center rounded-full border bg-[var(--paper)] sm:h-8 sm:w-8 sm:justify-self-center lg:mt-auto lg:h-9 lg:w-9 lg:self-center",
+        "relative z-10 grid h-7 w-7 place-items-center justify-self-center rounded-full border sm:h-8 sm:w-8 sm:justify-self-center lg:mt-auto lg:h-10 lg:w-10 lg:self-center",
+        "transition-[border-color,box-shadow,background-color,color] duration-200",
         checked
-          ? "border-[var(--teal)] shadow-[inset_0_0_0_4px_var(--paper)]"
-          : "border-[color-mix(in_oklab,var(--ink)_65%,var(--paper))]",
+          ? "hidden border-[var(--teal)] bg-[var(--teal)] text-[var(--paper)] shadow-[0_2px_8px_rgba(15,106,106,0.18)] sm:grid"
+          : "border-[color-mix(in_oklab,var(--ink)_58%,var(--paper))] bg-[var(--paper)] text-transparent shadow-[inset_0_0_0_3px_var(--paper)]",
       )}
     >
-      <span
+      <Check
         className={cn(
-          "h-4 w-4 rounded-full bg-[var(--teal)] transition-transform duration-200 sm:h-5 sm:w-5 lg:h-5 lg:w-5",
-          checked ? "scale-100" : "scale-0",
+          "h-3.5 w-3.5 stroke-[2.4] transition-[opacity,transform] duration-200 sm:h-4 sm:w-4 lg:h-5 lg:w-5",
+          checked ? "scale-100 opacity-100" : "scale-75 opacity-0",
         )}
       />
     </span>
@@ -490,7 +492,6 @@ function RadioMark({ checked }: { checked: boolean }) {
 function SelectionDock({
   chosen,
   confirming,
-  positionName,
   submitting,
   onBack,
   onContinue,
@@ -498,97 +499,80 @@ function SelectionDock({
 }: {
   chosen: BallotCandidate | undefined;
   confirming: boolean;
-  positionName: string;
   submitting: boolean;
   onBack: () => void;
   onContinue: () => void;
   onSubmit: () => void;
 }) {
-  const matric = displayMatric(chosen?.matric);
-
   return (
     <div
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-[color-mix(in_oklab,var(--copper)_62%,var(--ink-line))] bg-[color-mix(in_oklab,var(--paper)_96%,transparent)] px-4 py-2 shadow-[0_-18px_45px_rgba(40,30,20,0.1)] backdrop-blur-sm"
+      className="fixed inset-x-0 bottom-2 z-30 px-3 sm:bottom-3"
       role="region"
       aria-label="Cast your vote"
     >
-      <div className="mx-auto flex max-w-[68rem] items-center gap-3 sm:gap-5">
-        <div
-          className={cn(
-            "grid h-10 w-10 shrink-0 place-items-center rounded-full sm:h-12 sm:w-12",
-            chosen
-              ? "bg-[var(--teal)] text-[var(--paper)]"
-              : "border border-[var(--ink-line)] text-[var(--ink-muted)]",
+      <div className="relative mx-auto grid min-h-[6.15rem] max-w-[46rem] grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 pl-3 pr-4 drop-shadow-[0_12px_28px_rgba(40,30,20,0.13)] sm:min-h-[6.4rem] sm:grid-cols-[2.35rem_minmax(0,1fr)_auto] sm:gap-4 sm:px-5 sm:py-3">
+        <LandscapeTicketBorder active={Boolean(chosen)} />
+
+        <div className="relative z-10 flex h-full items-center justify-center border-r border-dashed border-[var(--ink-line)] pr-2">
+          <span className="[writing-mode:vertical-rl] rotate-180 font-mono text-[0.52rem] font-semibold uppercase tracking-[0.2em] text-[var(--ink-muted)]">
+            Detach here
+          </span>
+        </div>
+
+        <div className="relative z-10 min-w-0">
+          {chosen ? (
+            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+              <div className="aspect-[3/4] h-[4.9rem] shrink-0 overflow-hidden rounded-[2px] border border-[var(--ink-line)] bg-[var(--paper-2)] shadow-[0_5px_12px_rgba(40,30,20,0.12)] sm:h-[5.2rem]">
+                <CandidatePhoto
+                  src={chosen.photoUrl}
+                  alt=""
+                  className="h-full w-full object-contain"
+                  iconClassName="mx-auto h-8 w-8"
+                />
+              </div>
+              <div className="min-w-0">
+                <p className="font-mono text-[0.5rem] font-semibold uppercase tracking-[0.18em] text-[var(--teal)] sm:text-[0.56rem]">
+                  Selected candidate
+                </p>
+                <p className="truncate font-serif text-[0.88rem] font-semibold uppercase leading-tight text-[var(--ink)] sm:text-[1.02rem]">
+                  {chosen.fullName}
+                </p>
+                <p className="mt-1 flex items-center gap-1.5 font-serif text-[0.72rem] leading-tight text-[var(--ink-muted)] sm:text-[0.8rem]">
+                  <ShieldCheck
+                    className="h-3.5 w-3.5 shrink-0 stroke-[1.8] text-[var(--ink-muted)] sm:h-4 sm:w-4"
+                    aria-hidden
+                  />
+                  This vote is final.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[var(--ink-line)] text-[var(--ink-muted)]">
+                <Check className="h-5 w-5" aria-hidden />
+              </div>
+              <p className="min-w-0 font-mono text-[0.66rem] uppercase tracking-[0.16em] text-[var(--ink-muted)]">
+                Pick a candidate above to continue
+              </p>
+            </div>
           )}
-          aria-hidden
-        >
-          <Check className="h-5 w-5 sm:h-7 sm:w-7" />
         </div>
 
-        <div className="hidden h-10 w-px bg-[var(--ink-line)] sm:block" />
-
-        <div className="hidden min-w-[9rem] sm:block">
-          <p className="font-mono text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[var(--ink)]">
-            Current selection
-          </p>
-        </div>
-
-        {chosen ? (
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <div className="hidden aspect-[3/4] h-[4rem] shrink-0 overflow-hidden rounded-[3px] border border-[var(--ink-line)] bg-[var(--paper-2)] sm:block">
-              <CandidatePhoto
-                src={chosen.photoUrl}
-                alt=""
-                className="h-full w-full object-cover object-top"
-                iconClassName="mx-auto h-8 w-8"
-              />
-            </div>
-            <div className="min-w-0">
-              {confirming ? (
-                <p className="mb-1 font-mono text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-[var(--teal)]">
-                  Selected
-                </p>
-              ) : null}
-              <p className="truncate font-serif text-[1rem] font-semibold uppercase leading-tight text-[var(--ink)] sm:text-[1.25rem]">
-                {chosen.fullName}
-              </p>
-              <p className="truncate font-serif text-[0.86rem] leading-tight text-[var(--ink)] sm:text-[0.95rem]">
-                {matric ? (
-                  <>
-                    {matric}
-                    <span className="mx-2 text-[var(--copper)]">.</span>
-                  </>
-                ) : null}
-                {positionName}
-              </p>
-              {confirming ? (
-                <p className="mt-1 hidden text-xs leading-relaxed text-[var(--ink-muted)] sm:block">
-                  This vote is final once submitted.
-                </p>
-              ) : null}
-            </div>
-          </div>
-        ) : (
-          <p className="min-w-0 flex-1 font-mono text-[0.7rem] uppercase tracking-[0.16em] text-[var(--ink-muted)]">
-            Pick a candidate above to continue
-          </p>
-        )}
-
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="relative z-10 flex shrink-0 items-center gap-2">
           {confirming ? (
             <>
               <Button
                 variant="outline"
                 onClick={onBack}
                 disabled={submitting}
-                className="h-10 rounded-[3px] border-[var(--ink-line)] bg-[var(--paper)] px-4 font-serif text-sm"
+                className="h-10 rounded-[3px] border-[var(--ink-line)] bg-[var(--paper)] px-3 font-serif text-sm sm:px-4"
               >
                 Back
               </Button>
               <Button
                 onClick={onSubmit}
                 loading={submitting}
-                className="h-10 rounded-[3px] bg-[var(--teal)] px-4 font-serif text-sm text-[var(--paper)] hover:bg-[color-mix(in_oklab,var(--teal)_88%,var(--ink))] sm:px-7"
+                className="h-10 rounded-[3px] bg-[var(--teal)] px-3 font-serif text-sm text-[var(--paper)] hover:bg-[color-mix(in_oklab,var(--teal)_88%,var(--ink))] sm:px-6"
               >
                 Submit
                 <ArrowRight className="h-5 w-5" aria-hidden />
@@ -598,7 +582,7 @@ function SelectionDock({
             <Button
               disabled={!chosen}
               onClick={onContinue}
-              className="h-10 rounded-[3px] bg-[var(--teal)] px-4 font-serif text-sm text-[var(--paper)] hover:bg-[color-mix(in_oklab,var(--teal)_88%,var(--ink))] sm:h-12 sm:px-8 sm:text-base"
+              className="h-10 rounded-[3px] bg-[var(--teal)] px-3 font-serif text-sm text-[var(--paper)] hover:bg-[color-mix(in_oklab,var(--teal)_88%,var(--ink))] sm:h-11 sm:px-7 sm:text-base"
             >
               Continue
               <ArrowRight className="h-5 w-5" aria-hidden />
@@ -609,6 +593,49 @@ function SelectionDock({
     </div>
   );
 }
+
+function LandscapeTicketBorder({ active }: { active: boolean }) {
+  const stroke = active ? "var(--teal)" : "var(--ink-line)";
+  const softStroke = active
+    ? "color-mix(in oklab, var(--teal) 36%, transparent)"
+    : "color-mix(in oklab, var(--ink-line) 58%, transparent)";
+
+  return (
+    <svg
+      aria-hidden
+      className="pointer-events-none absolute inset-0 z-0 h-full w-full overflow-visible"
+      preserveAspectRatio="none"
+      viewBox="0 0 220 70"
+    >
+      <path
+        d={LANDSCAPE_TICKET_PATH}
+        fill={
+          active
+            ? "color-mix(in oklab, var(--teal) 5%, var(--paper))"
+            : "var(--paper)"
+        }
+      />
+      <path
+        d={LANDSCAPE_TICKET_PATH}
+        fill="none"
+        stroke={softStroke}
+        strokeDasharray="1.4 2.8"
+        strokeWidth="0.6"
+        vectorEffect="non-scaling-stroke"
+      />
+      <path
+        d={LANDSCAPE_TICKET_PATH}
+        fill="none"
+        stroke={stroke}
+        strokeWidth={active ? "0.9" : "0.65"}
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
+const LANDSCAPE_TICKET_PATH =
+  "M 5 2 Q 7.5 4.2 10 2 Q 12.5 4.2 15 2 Q 17.5 4.2 20 2 Q 22.5 4.2 25 2 Q 27.5 4.2 30 2 Q 32.5 4.2 35 2 Q 37.5 4.2 40 2 Q 42.5 4.2 45 2 Q 47.5 4.2 50 2 Q 52.5 4.2 55 2 Q 57.5 4.2 60 2 Q 62.5 4.2 65 2 Q 67.5 4.2 70 2 Q 72.5 4.2 75 2 Q 77.5 4.2 80 2 Q 82.5 4.2 85 2 Q 87.5 4.2 90 2 Q 92.5 4.2 95 2 Q 97.5 4.2 100 2 Q 102.5 4.2 105 2 Q 107.5 4.2 110 2 Q 112.5 4.2 115 2 Q 117.5 4.2 120 2 Q 122.5 4.2 125 2 Q 127.5 4.2 130 2 Q 132.5 4.2 135 2 Q 137.5 4.2 140 2 Q 142.5 4.2 145 2 Q 147.5 4.2 150 2 Q 152.5 4.2 155 2 Q 157.5 4.2 160 2 Q 162.5 4.2 165 2 Q 167.5 4.2 170 2 Q 172.5 4.2 175 2 Q 177.5 4.2 180 2 Q 182.5 4.2 185 2 Q 187.5 4.2 190 2 Q 192.5 4.2 195 2 Q 197.5 4.2 200 2 Q 202.5 4.2 205 2 Q 207.5 4.2 210 2 Q 212.5 4.2 215 2 L 218 2 Q 215.8 4.5 218 7 Q 215.8 9.5 218 12 Q 215.8 14.5 218 17 Q 215.8 19.5 218 22 Q 215.8 24.5 218 27 Q 215.8 29.5 218 32 Q 215.8 34.5 218 37 Q 215.8 39.5 218 42 Q 215.8 44.5 218 47 Q 215.8 49.5 218 52 Q 215.8 54.5 218 57 Q 215.8 59.5 218 62 L 218 68 Q 215.5 65.8 213 68 Q 210.5 65.8 208 68 Q 205.5 65.8 203 68 Q 200.5 65.8 198 68 Q 195.5 65.8 193 68 Q 190.5 65.8 188 68 Q 185.5 65.8 183 68 Q 180.5 65.8 178 68 Q 175.5 65.8 173 68 Q 170.5 65.8 168 68 Q 165.5 65.8 163 68 Q 160.5 65.8 158 68 Q 155.5 65.8 153 68 Q 150.5 65.8 148 68 Q 145.5 65.8 143 68 Q 140.5 65.8 138 68 Q 135.5 65.8 133 68 Q 130.5 65.8 128 68 Q 125.5 65.8 123 68 Q 120.5 65.8 118 68 Q 115.5 65.8 113 68 Q 110.5 65.8 108 68 Q 105.5 65.8 103 68 Q 100.5 65.8 98 68 Q 95.5 65.8 93 68 Q 90.5 65.8 88 68 Q 85.5 65.8 83 68 Q 80.5 65.8 78 68 Q 75.5 65.8 73 68 Q 70.5 65.8 68 68 Q 65.5 65.8 63 68 Q 60.5 65.8 58 68 Q 55.5 65.8 53 68 Q 50.5 65.8 48 68 Q 45.5 65.8 43 68 Q 40.5 65.8 38 68 Q 35.5 65.8 33 68 Q 30.5 65.8 28 68 Q 25.5 65.8 23 68 Q 20.5 65.8 18 68 Q 15.5 65.8 13 68 Q 10.5 65.8 8 68 L 2 68 Q 4.2 65.5 2 63 Q 4.2 60.5 2 58 Q 4.2 55.5 2 53 Q 4.2 50.5 2 48 Q 4.2 45.5 2 43 Q 4.2 40.5 2 38 Q 4.2 35.5 2 33 Q 4.2 30.5 2 28 Q 4.2 25.5 2 23 Q 4.2 20.5 2 18 Q 4.2 15.5 2 13 Q 4.2 10.5 2 8 L 2 2 Z";
 
 function displayMatric(matric: string | null | undefined): string | null {
   if (!matric || matric.startsWith("auto-")) return null;
