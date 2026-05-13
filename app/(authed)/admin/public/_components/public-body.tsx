@@ -14,6 +14,7 @@ import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { PhaseMismatchNotice } from "./phase-mismatch-notice";
 import { PublicPageSkeleton } from "./public-skeleton";
 import type { SessionRow } from "./public-model";
+import { LiveRunMode } from "./live-run-mode";
 import { SessionRowItem } from "./session-row-item";
 import { TieResolverDialog } from "./tie-resolver-dialog";
 
@@ -117,20 +118,29 @@ export function PublicBody({ election }: { election: Doc<"elections"> }) {
           }
         />
       ) : (
-        <ol className="space-y-0" aria-label="Positions">
-          {ordered.map((row, index) => (
-            <li key={row.positionId}>
-              <SessionRowItem
-                row={row}
-                index={index}
-                electionId={election._id}
-                candidateNameById={candidateNameById}
-                phaseOk={phaseOk}
-                onResolveTie={() => setTieRow(row)}
-              />
-            </li>
-          ))}
-        </ol>
+        <>
+          <LiveRunMode
+            rows={ordered}
+            electionId={election._id}
+            candidateNameById={candidateNameById}
+            phaseOk={phaseOk}
+            onResolveTie={setTieRow}
+          />
+          <ol className="space-y-0" aria-label="Positions">
+            {ordered.map((row, index) => (
+              <li key={row.positionId}>
+                <SessionRowItem
+                  row={row}
+                  index={index}
+                  electionId={election._id}
+                  candidateNameById={candidateNameById}
+                  phaseOk={phaseOk}
+                  onResolveTie={() => setTieRow(row)}
+                />
+              </li>
+            ))}
+          </ol>
+        </>
       )}
 
       {tieRow ? (
