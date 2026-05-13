@@ -119,9 +119,82 @@ function ClassAggregateTable({
                 <span className="tabular-nums">{grandTotal}</span> total points
               </span>
             </div>
+            <ol className="space-y-3 md:hidden">
+              {candidateRows.map((row, index) => (
+                <li
+                  key={row.candidateId}
+                  className="space-y-3 rounded-md border border-[var(--ink-line)] bg-[var(--paper)] p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] tabular-nums text-[var(--ink-muted)]">
+                        Rank {String(index + 1).padStart(2, "0")}
+                      </p>
+                      <h4 className="mt-1 text-sm font-medium leading-tight text-[var(--ink)]">
+                        {row.fullName}
+                      </h4>
+                      {row.matric && !row.matric.startsWith("auto-") ? (
+                        <p className="mt-1 font-mono text-xs tabular-nums text-[var(--ink-muted)]">
+                          {row.matric}
+                        </p>
+                      ) : null}
+                    </div>
+                    <p className="font-mono text-sm font-medium tabular-nums text-[var(--ink)]">
+                      {(row.share * 100).toFixed(1)}%
+                    </p>
+                  </div>
+
+                  <dl className="grid grid-cols-2 gap-3 border-t border-[var(--ink-line)] pt-3">
+                    <div>
+                      <dt className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-[var(--ink-muted)]">
+                        Evaluators
+                      </dt>
+                      <dd className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
+                        {row.evaluatorCount}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-[var(--ink-muted)]">
+                        Sum
+                      </dt>
+                      <dd className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
+                        {row.totalSum}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  {aggregate.criteria.length > 0 ? (
+                    <dl className="grid gap-2 border-t border-[var(--ink-line)] pt-3">
+                      {aggregate.criteria.map((cr) => {
+                        const cell = row.perCriterion.find(
+                          (p) => p.criterionId === cr._id,
+                        );
+                        return (
+                          <div
+                            key={cr._id}
+                            className="flex items-baseline justify-between gap-3"
+                          >
+                            <dt className="text-xs text-[var(--ink-muted)]">
+                              {cr.name}
+                            </dt>
+                            <dd className="font-mono text-xs tabular-nums text-[var(--ink)]">
+                              {cell && cell.count > 0
+                                ? cell.average.toFixed(2)
+                                : "-"}
+                            </dd>
+                          </div>
+                        );
+                      })}
+                    </dl>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+
             <AdminDataTable
               caption={`${VOTER_CLASS_LABEL[cls]} aggregate scores, submitted evaluations only.`}
               tableClassName="min-w-[720px]"
+              className="hidden md:block"
             >
               <AdminDataTableHeader>
                 <AdminDataTableRow className="bg-[var(--paper-2)] text-left">

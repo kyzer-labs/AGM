@@ -69,20 +69,53 @@ export function EvaluatorLedger({
           }
         />
       ) : (
-        <AdminDataTable
-          caption={`${title}. ${description}.`}
-          maxHeight="calc(100dvh - 19rem)"
-          tableClassName="min-w-[760px]"
-          className="rounded-none border-0"
-        >
-          <AdminDataTableHeader sticky>
-            <AdminDataTableRow className="bg-[var(--paper-2)] text-left">
-              <AdminDataTableHead>Evaluator</AdminDataTableHead>
-              <AdminDataTableHead>Class</AdminDataTableHead>
-              <AdminDataTableHead>Status</AdminDataTableHead>
-              <AdminDataTableHead>Last update (MYT)</AdminDataTableHead>
-            </AdminDataTableRow>
-          </AdminDataTableHeader>
+        <>
+          <ul className="divide-y divide-[var(--ink-line)] md:hidden">
+            {rows.map((row) => {
+              const updated = row.submittedAt
+                ? `Submitted ${formatMYT(row.submittedAt)}`
+                : row.updatedAt
+                  ? formatMYT(row.updatedAt)
+                  : "Not yet";
+
+              return (
+                <li key={row.email} className="space-y-3 px-4 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-mono text-xs tabular-nums text-[var(--ink)]">
+                        {row.email}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--ink-muted)]">
+                        {row.fullName ?? "Not signed in"}
+                      </p>
+                    </div>
+                    <StatusBadge status={row.status} />
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <ClassLabel voterClass={row.voterClass} />
+                    <p className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] tabular-nums text-[var(--ink-muted)]">
+                      {updated}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          <AdminDataTable
+            caption={`${title}. ${description}.`}
+            maxHeight="calc(100dvh - 19rem)"
+            tableClassName="min-w-[760px]"
+            className="hidden rounded-none border-0 md:block"
+          >
+            <AdminDataTableHeader sticky>
+              <AdminDataTableRow className="bg-[var(--paper-2)] text-left">
+                <AdminDataTableHead>Evaluator</AdminDataTableHead>
+                <AdminDataTableHead>Class</AdminDataTableHead>
+                <AdminDataTableHead>Status</AdminDataTableHead>
+                <AdminDataTableHead>Last update (MYT)</AdminDataTableHead>
+              </AdminDataTableRow>
+            </AdminDataTableHeader>
             <tbody>
               {rows.map((row) => (
                 <AdminDataTableRow key={row.email}>
@@ -110,7 +143,8 @@ export function EvaluatorLedger({
                 </AdminDataTableRow>
               ))}
             </tbody>
-        </AdminDataTable>
+          </AdminDataTable>
+        </>
       )}
     </section>
   );
