@@ -19,7 +19,6 @@ export function PositionRow({
   isFirst,
   isLast,
   locked,
-  index,
   onEdit,
   onMove,
   onConfirmedRemove,
@@ -93,8 +92,7 @@ export function PositionRow({
 
   return (
     <li
-      className="tile-enter flex min-h-32 flex-col justify-between rounded-xl border bg-[var(--color-card)] p-4 text-sm text-[var(--color-card-foreground)] shadow-sm"
-      style={{ ["--index" as never]: index }}
+      className="flex min-h-32 flex-col justify-between rounded-md border bg-[var(--color-card)] p-4 text-sm text-[var(--color-card-foreground)] shadow-sm"
     >
       <div className="flex items-start gap-3">
         <span

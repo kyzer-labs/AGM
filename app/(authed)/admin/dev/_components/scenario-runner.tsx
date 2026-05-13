@@ -131,7 +131,7 @@ export function ScenarioRunner({
                           />
                           <span>{row.favorFirstWinner.fullName}</span>
                           {row.favorFirstWinner.isTest ? (
-                            <Badge tone="muted" className="text-[9px]">
+                            <Badge tone="muted" className="text-[0.6875rem]">
                               fixture
                             </Badge>
                           ) : null}

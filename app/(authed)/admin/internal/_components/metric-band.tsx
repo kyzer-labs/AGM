@@ -37,7 +37,7 @@ export function MetricBand({
           )}
         >
           <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--ink-muted)]">
+            <div className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-[var(--ink-muted)]">
               {label}
             </div>
             <div className="mt-1 font-display text-2xl font-medium tabular-nums text-[var(--ink)]">

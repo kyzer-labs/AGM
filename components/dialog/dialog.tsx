@@ -132,7 +132,7 @@ export function DialogShell({
     <div
       className={cn(
         "fixed inset-0 z-[9999] flex items-center justify-center p-4",
-        "bg-black/40 backdrop-blur-sm transition-opacity duration-150",
+        "bg-[color-mix(in_oklab,var(--ink)_42%,transparent)] transition-opacity duration-150 motion-reduce:transition-none",
         visible ? "opacity-100" : "opacity-0",
       )}
       onMouseDown={(event) => {
@@ -151,8 +151,10 @@ export function DialogShell({
           "w-full rounded-xl border bg-[var(--color-card)] text-[var(--color-card-foreground)] shadow-xl",
           "max-h-[calc(100vh-2rem)] overflow-y-auto",
           SIZE_CLASS[size],
-          "transition-all duration-150 outline-none",
-          visible ? "scale-100 opacity-100" : "scale-95 opacity-0",
+          "transition-[opacity,transform] duration-150 outline-none motion-reduce:transition-none",
+          visible
+            ? "scale-100 opacity-100"
+            : "scale-95 opacity-0 motion-reduce:scale-100",
         )}
         onMouseDown={(event) => event.stopPropagation()}
       >

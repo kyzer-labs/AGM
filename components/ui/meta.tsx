@@ -20,7 +20,7 @@ export interface MetaProps {
 export function Meta({ label, value }: MetaProps) {
   return (
     <div className="space-y-1.5">
-      <dt className="font-mono text-[10px] uppercase tracking-[0.24em] text-[var(--ink-muted)]">
+      <dt className="font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-[var(--ink-muted)]">
         {label}
       </dt>
       <dd className="font-mono text-sm tabular-nums text-[var(--ink)]">

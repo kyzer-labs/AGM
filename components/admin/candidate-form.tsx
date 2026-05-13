@@ -454,7 +454,7 @@ export function CandidateForm({
                         {idx + 1}
                       </span>
                       <span className="flex-1 text-sm">{p.name}</span>
-                      <Badge tone="muted" className="text-[10px]">
+                      <Badge tone="muted" className="text-[0.6875rem]">
                         Tier {p.tier}
                       </Badge>
                       <Button

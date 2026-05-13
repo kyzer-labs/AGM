@@ -136,7 +136,7 @@ export function WhitelistRow({
         </p>
       </div>
       {impact && impact.hasSignedIn && impact.submittedCount > 0 ? (
-        <Badge tone="brand" className="text-[10px]">
+        <Badge tone="brand" className="text-[0.6875rem]">
           <CheckCircle2 className="h-3 w-3" aria-hidden />
           <span className="font-mono tabular-nums">
             {impact.submittedCount}

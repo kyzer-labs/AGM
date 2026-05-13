@@ -13,7 +13,6 @@ export function CandidateCard({
   editable,
   onEdit,
   onRemove,
-  index,
 }: {
   c: CandidateRow;
   editable: boolean;
@@ -28,7 +27,7 @@ export function CandidateCard({
   );
 
   return (
-    <Card className="tile-enter" style={{ ["--index" as never]: index }}>
+    <Card className="rounded-md">
       <CardContent className="flex gap-4 p-4">
         <div className="grid h-28 w-20 shrink-0 place-items-center overflow-hidden rounded-lg bg-[var(--paper)] ring-1 ring-[var(--ink-line)]">
           <CandidatePhoto
@@ -94,7 +93,7 @@ export function CandidateCard({
             </ol>
           ) : (
             <p
-              className="mt-2 inline-flex items-center gap-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-[var(--copper)]"
+              className="mt-2 inline-flex items-center gap-1 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-[var(--copper)]"
               role="status"
             >
               <Users className="h-3 w-3" aria-hidden /> No positions

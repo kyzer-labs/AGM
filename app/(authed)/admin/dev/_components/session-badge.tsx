@@ -9,20 +9,20 @@ export function SessionBadge({
 }) {
   if (status === "active") {
     return (
-      <Badge tone="brand" className="text-[9px]">
+      <Badge tone="brand" className="text-[0.6875rem]">
         <PlayCircle className="h-2.5 w-2.5" aria-hidden /> Active
       </Badge>
     );
   }
   if (status === "closed") {
     return (
-      <Badge tone="success" className="text-[9px]">
+      <Badge tone="success" className="text-[0.6875rem]">
         <CheckCircle2 className="h-2.5 w-2.5" aria-hidden /> Closed
       </Badge>
     );
   }
   return (
-    <Badge tone="muted" className="text-[9px]">
+    <Badge tone="muted" className="text-[0.6875rem]">
       <Circle className="h-2.5 w-2.5" aria-hidden /> Pending
     </Badge>
   );
