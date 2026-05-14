@@ -3,18 +3,13 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import {
-  ArrowDown,
-  ArrowUp,
-  ImagePlus,
-  Link as LinkIcon,
-  X,
-} from "lucide-react";
+import { Check, ImagePlus, Link as LinkIcon, X } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
+import { CandidatePhoto } from "@/components/candidate-photo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,15 +38,49 @@ const candidateSchema = z.object({
     .max(500, "URL is too long")
     .optional()
     .refine(
-      (v) => !v || /^https?:\/\//i.test(v),
-      "Photo link must start with http:// or https://",
+      (v) => !v || /^https?:\/\//i.test(v) || isDrivePhotoProxyUrl(v),
+      "Photo link must start with http://, https://, or the saved Drive photo path",
     ),
 });
 export type CandidateFormValues = z.infer<typeof candidateSchema>;
 
+function normaliseCandidatePhotoPreview(input: string): string {
+  const trimmed = input.trim();
+  if (trimmed.length === 0) return trimmed;
+
+  try {
+    const url = new URL(trimmed);
+    if (url.hostname === "drive.google.com") {
+      const fileMatch = url.pathname.match(/^\/file\/d\/([a-zA-Z0-9_-]+)/);
+      const id =
+        fileMatch?.[1] ??
+        (["/open", "/uc", "/thumbnail"].includes(url.pathname)
+          ? url.searchParams.get("id")
+          : null);
+      if (id) return `/api/drive-photo?id=${id}`;
+    }
+  } catch {
+    return trimmed;
+  }
+
+  return trimmed;
+}
+
+function isDrivePhotoProxyUrl(input: string): boolean {
+  try {
+    const url = new URL(input, "https://agm.local");
+    return (
+      url.origin === "https://agm.local" &&
+      url.pathname === "/api/drive-photo" &&
+      /^[a-zA-Z0-9_-]{10,}$/.test(url.searchParams.get("id") ?? "")
+    );
+  } catch {
+    return false;
+  }
+}
+
 export interface PositionAssignment {
   positionId: Id<"positions">;
-  fallbackOrder: number;
 }
 
 interface CandidateFormProps {
@@ -98,14 +127,9 @@ export function CandidateForm({
     },
   });
 
-  const [orderedPositionIds, setOrderedPositionIds] = useState<
+  const [selectedPositionIds, setSelectedPositionIds] = useState<
     Id<"positions">[]
-  >(
-    initial?.assignments
-      .slice()
-      .sort((a, b) => a.fallbackOrder - b.fallbackOrder)
-      .map((a) => a.positionId) ?? [],
-  );
+  >(initial?.assignments.map((a) => a.positionId) ?? []);
   const [positionsError, setPositionsError] = useState<string | null>(null);
 
   const [photoStorageId, setPhotoStorageId] = useState<Id<"_storage"> | null>(
@@ -126,12 +150,13 @@ export function CandidateForm({
     };
   }, [photoPreview]);
 
-  const positionsById = new Map<Id<"positions">, Doc<"positions">>();
-  for (const p of positions) positionsById.set(p._id, p);
-
-  const availablePositions = positions
-    .filter((p) => !orderedPositionIds.includes(p._id))
-    .sort((a, b) => a.tier - b.tier || a.order - b.order);
+  const orderedPositions = positions
+    .slice()
+    .sort(
+      (a, b) =>
+        a.tier - b.tier || a.order - b.order || a.name.localeCompare(b.name),
+    );
+  const selectedPositionSet = new Set(selectedPositionIds);
 
   const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -182,7 +207,7 @@ export function CandidateForm({
   };
 
   const togglePosition = (id: Id<"positions">) => {
-    setOrderedPositionIds((prev) => {
+    setSelectedPositionIds((prev) => {
       const next = prev.includes(id)
         ? prev.filter((p) => p !== id)
         : [...prev, id];
@@ -191,22 +216,8 @@ export function CandidateForm({
     });
   };
 
-  const movePosition = (idx: number, direction: "up" | "down") => {
-    setOrderedPositionIds((prev) => {
-      const target = direction === "up" ? idx - 1 : idx + 1;
-      if (target < 0 || target >= prev.length) return prev;
-      const next = prev.slice();
-      const a = next[idx];
-      const b = next[target];
-      if (a === undefined || b === undefined) return prev;
-      next[idx] = b;
-      next[target] = a;
-      return next;
-    });
-  };
-
   const onSubmit = form.handleSubmit(async (values) => {
-    if (orderedPositionIds.length === 0) {
+    if (selectedPositionIds.length === 0) {
       setPositionsError(
         "Pick at least one contending position before saving.",
       );
@@ -238,9 +249,8 @@ export function CandidateForm({
             ? (photoStorageId ?? undefined)
             : undefined,
           photoUrl: usingLink ? photoUrlInput : undefined,
-          positionAssignments: orderedPositionIds.map((positionId, i) => ({
+          positionAssignments: selectedPositionIds.map((positionId) => ({
             positionId,
-            fallbackOrder: i,
           })),
         });
       }
@@ -248,9 +258,8 @@ export function CandidateForm({
       if (isEdit && candidateId) {
         await setAssignments({
           candidateId,
-          assignments: orderedPositionIds.map((positionId, i) => ({
+          assignments: selectedPositionIds.map((positionId) => ({
             positionId,
-            fallbackOrder: i,
           })),
         });
       }
@@ -267,20 +276,19 @@ export function CandidateForm({
 
   return (
     <form onSubmit={onSubmit} className="grid gap-5" noValidate>
-      <div className="grid gap-5 sm:grid-cols-[120px_1fr]">
+      <div className="grid gap-5 sm:grid-cols-[176px_1fr]">
         <div>
           <Label className="mb-1.5 block">Photo</Label>
           <div
             className={cn(
-              "grid aspect-square w-30 place-items-center overflow-hidden rounded-lg border bg-[var(--color-muted)]",
+              "grid aspect-[3/4] w-44 place-items-center overflow-hidden rounded-lg border bg-[var(--paper)]",
             )}
           >
             {photoPreview ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <CandidatePhoto
                 src={photoPreview}
-                alt=""
-                className="h-full w-full object-cover"
+                className="h-full w-full object-contain"
+                iconClassName="h-6 w-6"
               />
             ) : (
               <ImagePlus
@@ -288,44 +296,6 @@ export function CandidateForm({
                 aria-hidden
               />
             )}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              className="sr-only"
-              onChange={onPickFile}
-              aria-hidden="true"
-              tabIndex={-1}
-            />
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              loading={uploading}
-              onClick={() => fileRef.current?.click()}
-              aria-describedby={photoHintId}
-            >
-              {photoStorageId ? "Replace" : "Upload"}
-            </Button>
-            {photoStorageId || photoPreview ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setPhotoStorageId(null);
-                  if (photoPreview && photoPreview.startsWith("blob:")) {
-                    URL.revokeObjectURL(photoPreview);
-                  }
-                  setPhotoPreview(null);
-                  form.setValue("photoUrl", "", { shouldValidate: true });
-                }}
-              >
-                Remove
-              </Button>
-            ) : null}
           </div>
           <p
             id={photoHintId}
@@ -362,13 +332,53 @@ export function CandidateForm({
             ) : null}
           </div>
           <div className="grid gap-1.5">
-            <Label
-              htmlFor={photoUrlId}
-              className="flex items-center gap-1.5"
-            >
-              <LinkIcon className="h-3.5 w-3.5" aria-hidden /> Or paste a
-              photo link
-            </Label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label
+                htmlFor={photoUrlId}
+                className="flex items-center gap-1.5"
+              >
+                <LinkIcon className="h-3.5 w-3.5" aria-hidden /> Or paste a
+                photo link
+              </Label>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="sr-only"
+                  onChange={onPickFile}
+                  aria-hidden="true"
+                  tabIndex={-1}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  loading={uploading}
+                  onClick={() => fileRef.current?.click()}
+                  aria-describedby={photoHintId}
+                >
+                  {photoStorageId ? "Replace" : "Upload"}
+                </Button>
+                {photoStorageId || photoPreview ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setPhotoStorageId(null);
+                      if (photoPreview && photoPreview.startsWith("blob:")) {
+                        URL.revokeObjectURL(photoPreview);
+                      }
+                      setPhotoPreview(null);
+                      form.setValue("photoUrl", "", { shouldValidate: true });
+                    }}
+                  >
+                    Remove
+                  </Button>
+                ) : null}
+              </div>
+            </div>
             <Input
               id={photoUrlId}
               type="url"
@@ -389,7 +399,11 @@ export function CandidateForm({
                   setPhotoStorageId(null);
                 }
                 if (!photoStorageId) {
-                  setPhotoPreview(e.target.value || null);
+                  setPhotoPreview(
+                    e.target.value
+                      ? normaliseCandidatePhotoPreview(e.target.value)
+                      : null,
+                  );
                 }
               }}
             />
@@ -411,9 +425,7 @@ export function CandidateForm({
       </div>
 
       <div className="grid gap-3">
-        <Label htmlFor={positionsListId}>
-          Contending positions (in order of preference)
-        </Label>
+        <Label htmlFor={positionsListId}>Contending positions</Label>
         <div
           id={positionsListId}
           className="rounded-md border p-3"
@@ -421,79 +433,72 @@ export function CandidateForm({
           aria-invalid={positionsError ? "true" : undefined}
         >
           <p className="mb-2 text-xs text-[var(--color-muted-foreground)]">
-            Top of the list is the candidate&apos;s first choice. If they
-            win that, they are removed from the lower-preference ballots.
-            If they lose, they remain on the next one.
+            Select every position this candidate is competing for. The
+            precedence order is controlled on the Positions page.
           </p>
-          {orderedPositionIds.length === 0 ? (
+          {selectedPositionIds.length === 0 ? (
             <p className="rounded border border-dashed p-3 text-xs text-[var(--color-muted-foreground)]">
-              No positions selected yet. Pick from the list below.
+              No positions selected yet.
             </p>
           ) : (
             <ol className="divide-y">
-              {orderedPositionIds.map((id, idx) => {
-                const p = positionsById.get(id);
-                if (!p) return null;
-                return (
-                  <li key={id} className="flex items-center gap-2 py-2">
-                    <span
-                      className="grid h-6 w-6 place-items-center rounded-md bg-[var(--color-secondary)] font-mono text-xs tabular-nums"
-                      aria-hidden
-                    >
-                      {idx + 1}
-                    </span>
-                    <span className="flex-1 text-sm">{p.name}</span>
-                    <Badge tone="muted" className="text-[10px]">
-                      Tier {p.tier}
-                    </Badge>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      disabled={idx === 0}
-                      onClick={() => movePosition(idx, "up")}
-                      aria-label={`Move ${p.name} up in preference`}
-                    >
-                      <ArrowUp className="h-4 w-4" aria-hidden />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      disabled={idx === orderedPositionIds.length - 1}
-                      onClick={() => movePosition(idx, "down")}
-                      aria-label={`Move ${p.name} down in preference`}
-                    >
-                      <ArrowDown className="h-4 w-4" aria-hidden />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => togglePosition(id)}
-                      aria-label={`Remove ${p.name} from preferences`}
-                    >
-                      <X className="h-4 w-4" aria-hidden />
-                    </Button>
-                  </li>
-                );
-              })}
+              {orderedPositions
+                .filter((p) => selectedPositionSet.has(p._id))
+                .map((p, idx) => {
+                  return (
+                    <li key={p._id} className="flex items-center gap-2 py-2">
+                      <span
+                        className="grid h-6 w-6 place-items-center rounded-md bg-[var(--color-secondary)] font-mono text-xs tabular-nums"
+                        aria-hidden
+                      >
+                        {idx + 1}
+                      </span>
+                      <span className="flex-1 text-sm">{p.name}</span>
+                      <Badge tone="muted" className="text-[0.6875rem]">
+                        Tier {p.tier}
+                      </Badge>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => togglePosition(p._id)}
+                        aria-label={`Remove ${p.name} from contending positions`}
+                      >
+                        <X className="h-4 w-4" aria-hidden />
+                      </Button>
+                    </li>
+                  );
+                })}
             </ol>
           )}
 
-          {availablePositions.length > 0 ? (
+          {orderedPositions.length > 0 ? (
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {availablePositions.map((p) => (
-                <button
-                  key={p._id}
-                  type="button"
-                  onClick={() => togglePosition(p._id)}
-                  className="rounded-full border px-3 py-1 text-xs hover:bg-[var(--color-muted)]"
-                  aria-label={`Add ${p.name} to preferences`}
-                >
-                  + {p.name}
-                </button>
-              ))}
+              {orderedPositions.map((p) => {
+                const selected = selectedPositionSet.has(p._id);
+                return (
+                  <button
+                    key={p._id}
+                    type="button"
+                    onClick={() => togglePosition(p._id)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--paper)]",
+                      selected
+                        ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)] hover:bg-[color-mix(in_oklab,var(--ink)_92%,var(--paper)_8%)]"
+                        : "border-[var(--ink-line)] text-[var(--ink)] hover:bg-[var(--color-muted)]",
+                    )}
+                    aria-pressed={selected}
+                    aria-label={`${selected ? "Remove" : "Add"} ${p.name} ${selected ? "from" : "to"} contending positions`}
+                  >
+                    {selected ? (
+                      <Check className="h-3.5 w-3.5" aria-hidden />
+                    ) : (
+                      <span aria-hidden>+</span>
+                    )}
+                    {p.name}
+                  </button>
+                );
+              })}
             </div>
           ) : null}
         </div>

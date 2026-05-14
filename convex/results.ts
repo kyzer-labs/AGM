@@ -9,6 +9,7 @@ import {
   computeResultForPosition,
   getResolvedWinnerCandidateIds,
 } from "./lib/results";
+import { normalisePhotoUrl } from "./lib/photoUrl";
 import type { Doc, Id } from "./_generated/dataModel";
 
 interface BreakdownEnriched {
@@ -104,10 +105,12 @@ async function buildResultRows(
     const breakdown: BreakdownEnriched[] = await Promise.all(
       r.breakdown.map(async (b) => {
         const c = candidatesById.get(b.candidateId);
-        const photoUrl =
+        const storageUrl =
           c?.photoStorageId !== undefined
             ? await ctx.storage.getUrl(c.photoStorageId)
             : null;
+        const photoUrl =
+          storageUrl ?? (c?.photoUrl ? normalisePhotoUrl(c.photoUrl) : null);
         const tcShare = b.tcShare ?? b.internalShare ?? 0;
         const heShare = b.heShare ?? 0;
         const y2Share = b.y2Share ?? 0;

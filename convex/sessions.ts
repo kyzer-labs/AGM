@@ -9,6 +9,7 @@ import {
   getResolvedWinnerCandidateIds,
   getUnresolvedTiePositionIds,
 } from "./lib/results";
+import { normalisePhotoUrl } from "./lib/photoUrl";
 import type { Doc, Id } from "./_generated/dataModel";
 
 async function getPositionsOrdered(
@@ -110,8 +111,8 @@ export const getActiveSession = query({
             fullName: c.fullName,
             matric: c.matric ?? null,
             bio: c.bio ?? null,
-            photoUrl: storageUrl ?? c.photoUrl ?? null,
-            fallbackOrder: l.fallbackOrder,
+            photoUrl:
+              storageUrl ?? (c.photoUrl ? normalisePhotoUrl(c.photoUrl) : null),
           };
         }),
     );
@@ -123,7 +124,7 @@ export const getActiveSession = query({
       sessionStartedAt: active.sessionStartedAt ?? null,
       candidates: candidates
         .filter((c): c is NonNullable<typeof c> => c !== null)
-        .sort((a, b) => a.fallbackOrder - b.fallbackOrder),
+        .sort((a, b) => a.fullName.localeCompare(b.fullName)),
     };
   },
 });

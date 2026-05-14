@@ -3,9 +3,10 @@
 import { useId, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { ChevronDown, Trophy, UserCircle2 } from "lucide-react";
+import { ChevronDown, Trophy } from "lucide-react";
 
 import { AuthGate } from "@/components/auth/auth-gate";
+import { CandidatePhoto } from "@/components/candidate-photo";
 import { Button } from "@/components/ui/button";
 import { SectionMarker } from "@/components/ui/section-marker";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -181,30 +182,22 @@ function ResultBlock({ row, index }: { row: PublicRow; index: number }) {
 
       {winner ? (
         <div className="flex items-center gap-5">
-          <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--color-muted)] ring-1 ring-[var(--ink-line)]">
-            {winner.photoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={winner.photoUrl}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <UserCircle2
-                className="h-7 w-7 text-[var(--color-muted-foreground)]"
-                aria-hidden
-              />
-            )}
+          <div className="grid h-28 w-20 shrink-0 place-items-center overflow-hidden rounded-md bg-[var(--paper)] ring-1 ring-[var(--ink-line)]">
+            <CandidatePhoto
+              src={winner.photoUrl}
+              className="h-full w-full object-contain"
+              iconClassName="h-7 w-7"
+            />
           </div>
           <div className="min-w-0">
-            <p className="flex items-center gap-2.5 font-serif text-xl font-semibold leading-[1.15] text-[var(--ink)] sm:text-2xl">
+            <p className="flex items-center gap-2.5 font-serif text-[1.375rem] font-semibold leading-[1.12] text-[var(--ink)] sm:text-[1.625rem]">
               <Trophy
                 className="h-5 w-5 shrink-0 text-[var(--color-success)]"
                 aria-label="Winner"
               />
               <span className="truncate">{winner.fullName}</span>
             </p>
-            <p className="mt-1.5 font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--ink-muted)] tabular-nums">
+            <p className="mt-2 font-mono text-[0.6875rem] uppercase leading-[1.25] tracking-[0.18em] text-[var(--ink-muted)] tabular-nums">
               {winner.matric && !winner.matric.startsWith("auto-")
                 ? `${winner.matric} · `
                 : ""}
@@ -277,17 +270,16 @@ function ResultBlock({ row, index }: { row: PublicRow; index: number }) {
                       className="px-2 py-2 text-left font-normal"
                     >
                       <div className="flex items-center gap-2">
-                        {b.photoUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
+                        <span className="grid h-9 w-7 shrink-0 place-items-center overflow-hidden rounded bg-[var(--paper)] ring-1 ring-[var(--ink-line)]">
+                          <CandidatePhoto
                             src={b.photoUrl}
-                            alt=""
-                            className="h-6 w-6 rounded object-cover"
+                            className="h-full w-full object-contain"
+                            iconClassName="h-4 w-4"
                           />
-                        ) : (
-                          <div className="h-6 w-6 rounded bg-[var(--color-muted)]" />
-                        )}
-                        <span>{b.fullName}</span>
+                        </span>
+                        <span className="text-[0.9375rem] font-medium leading-[1.2] text-[var(--ink)]">
+                          {b.fullName}
+                        </span>
                         {isWinner ? (
                           <Trophy
                             className="h-3.5 w-3.5 text-[var(--color-success)]"
@@ -362,4 +354,3 @@ function Standby({
     />
   );
 }
-

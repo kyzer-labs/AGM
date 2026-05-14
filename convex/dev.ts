@@ -24,6 +24,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { requireAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
+import { normalisePhotoUrl } from "./lib/photoUrl";
 import { getElectionOrThrow } from "./lib/setup";
 import { VOTER_CLASSES, type VoterClass } from "./lib/cycle";
 
@@ -1155,6 +1156,7 @@ interface TestCandidateSpec {
   matric: string;
   positionTier: number;
   positionOrder: number;
+  photoUrl: string;
 }
 
 /**
@@ -1167,28 +1169,154 @@ interface TestCandidateSpec {
  */
 const TEST_CANDIDATES: ReadonlyArray<TestCandidateSpec> = [
   // Tier 1 - President (1 position)
-  { fullName: "Aiman Hakimi Bin Razak", matric: "FIXT0001A", positionTier: 1, positionOrder: 0 },
-  { fullName: "Beatrice Lim Wei Ling", matric: "FIXT0001B", positionTier: 1, positionOrder: 0 },
+  {
+    fullName: "Lim Pei Xuan",
+    matric: "FIXT0001A",
+    positionTier: 1,
+    positionOrder: 0,
+    photoUrl:
+      "https://drive.google.com/file/d/1QYwdEiiOpW6rpBMzACqvSG2oNVJUcRtg/view?usp=drive_link",
+  },
+  {
+    fullName: "Tan Chin Qian",
+    matric: "FIXT0001B",
+    positionTier: 1,
+    positionOrder: 0,
+    photoUrl:
+      "https://drive.google.com/file/d/1Zn5f3zBM5jbLG7ZDoXpLfcV6bUWfy6WT/view?usp=drive_link",
+  },
 
   // Tier 2 - Vice Presidents (2 positions)
-  { fullName: "Cheryl Tan Jia Hui", matric: "FIXT0002A", positionTier: 2, positionOrder: 0 },
-  { fullName: "Daniyal Bin Ismail", matric: "FIXT0002B", positionTier: 2, positionOrder: 0 },
-  { fullName: "Edmund Loh Chee Wei", matric: "FIXT0003A", positionTier: 2, positionOrder: 1 },
-  { fullName: "Farah Aziz Binti Hassan", matric: "FIXT0003B", positionTier: 2, positionOrder: 1 },
+  {
+    fullName: "Kyzer Phneh",
+    matric: "FIXT0002A",
+    positionTier: 2,
+    positionOrder: 0,
+    photoUrl:
+      "https://drive.google.com/file/d/1A9NqzhdPkoInA34oLF8jLSPWsAxypscI/view?usp=drive_link",
+  },
+  {
+    fullName: "Lim Jie Shen",
+    matric: "FIXT0002B",
+    positionTier: 2,
+    positionOrder: 0,
+    photoUrl:
+      "https://drive.google.com/file/d/1NINWvOT4sl72xyb9CuYzzjvpzRwkRxt2/view?usp=drive_link",
+  },
+  {
+    fullName: "Doris Yee Wai Lee",
+    matric: "FIXT0003A",
+    positionTier: 2,
+    positionOrder: 1,
+    photoUrl:
+      "https://drive.google.com/file/d/1Zn-f8pqm2aLFrFi3s2igTjLWjwi2XK9x/view?usp=drive_link",
+  },
+  {
+    fullName: "Auni Amira Binti Md Fauzi",
+    matric: "FIXT0003B",
+    positionTier: 2,
+    positionOrder: 1,
+    photoUrl:
+      "https://drive.google.com/file/d/16XVsA4PnCVqaUZ-o7qFmU5bcETSF3LxP/view?usp=drive_link",
+  },
 
   // Tier 3 - Directors (6 positions)
-  { fullName: "Gavin Wong Kar Mun", matric: "FIXT0004A", positionTier: 3, positionOrder: 0 },
-  { fullName: "Hannah Yeoh Sin Yee", matric: "FIXT0004B", positionTier: 3, positionOrder: 0 },
-  { fullName: "Iqbal Bin Mahmud", matric: "FIXT0005A", positionTier: 3, positionOrder: 1 },
-  { fullName: "Jacelyn Ng Pei Shan", matric: "FIXT0005B", positionTier: 3, positionOrder: 1 },
-  { fullName: "Khairul Anuar Bin Salleh", matric: "FIXT0006A", positionTier: 3, positionOrder: 2 },
-  { fullName: "Lily Chong Mei Lin", matric: "FIXT0006B", positionTier: 3, positionOrder: 2 },
-  { fullName: "Marcus Tan Boon Hwa", matric: "FIXT0007A", positionTier: 3, positionOrder: 3 },
-  { fullName: "Nadia Binti Razali", matric: "FIXT0007B", positionTier: 3, positionOrder: 3 },
-  { fullName: "Owen Lee Zhi Hao", matric: "FIXT0008A", positionTier: 3, positionOrder: 4 },
-  { fullName: "Priya Subramaniam", matric: "FIXT0008B", positionTier: 3, positionOrder: 4 },
-  { fullName: "Qaseh Aisyah Binti Hamid", matric: "FIXT0009A", positionTier: 3, positionOrder: 5 },
-  { fullName: "Rahman Bin Yusoff", matric: "FIXT0009B", positionTier: 3, positionOrder: 5 },
+  {
+    fullName: "Koay Phing Hong",
+    matric: "FIXT0004A",
+    positionTier: 3,
+    positionOrder: 0,
+    photoUrl:
+      "https://drive.google.com/file/d/1dzytCdjqpLlG-sbMKD3uLhWV5ipm-4Lk/view?usp=drive_link",
+  },
+  {
+    fullName: "Koay Ke Ying",
+    matric: "FIXT0004B",
+    positionTier: 3,
+    positionOrder: 0,
+    photoUrl:
+      "https://drive.google.com/file/d/1kHWUxjJgpt_2shk-VaqENSES6kPQweI2/view?usp=drive_link",
+  },
+  {
+    fullName: "Nurul Shafina Ashikin Binti Mohd Redda Udin",
+    matric: "FIXT0005A",
+    positionTier: 3,
+    positionOrder: 1,
+    photoUrl:
+      "https://drive.google.com/file/d/1P3-aO-mn87tbOoYb_oLDc89dfUIOohf7/view?usp=drive_link",
+  },
+  {
+    fullName: "Nurrul Shahiratulnazwa",
+    matric: "FIXT0005B",
+    positionTier: 3,
+    positionOrder: 1,
+    photoUrl:
+      "https://drive.google.com/file/d/1vUOiBwynrATpCAYwEXe_wo_iFXClYtHV/view?usp=drive_link",
+  },
+  {
+    fullName: "Loh Wei Chuen",
+    matric: "FIXT0006A",
+    positionTier: 3,
+    positionOrder: 2,
+    photoUrl:
+      "https://drive.google.com/file/d/1ALveRb-PZryydA6bf9KujPQepB2AaF5b/view?usp=drive_link",
+  },
+  {
+    fullName: "Chong Han Zheng",
+    matric: "FIXT0006B",
+    positionTier: 3,
+    positionOrder: 2,
+    photoUrl:
+      "https://drive.google.com/file/d/1HbvB2aEEnNsLTSFMGUXHjbXBlGXEnrvs/view?usp=drive_link",
+  },
+  {
+    fullName: "Lau Jun Hao",
+    matric: "FIXT0007A",
+    positionTier: 3,
+    positionOrder: 3,
+    photoUrl:
+      "https://drive.google.com/file/d/13X2_35uXBZXBUdXhbViCLiD6R1WN5cuM/view?usp=drive_link",
+  },
+  {
+    fullName: "Mohamad Nazrul Hakim Bin Noor Hamzah",
+    matric: "FIXT0007B",
+    positionTier: 3,
+    positionOrder: 3,
+    photoUrl:
+      "https://drive.google.com/file/d/1hi_577Vvj_Hf3_V3nbBop2T48WeVhbXm/view?usp=drive_link",
+  },
+  {
+    fullName: "Cheng Xin Yi",
+    matric: "FIXT0008A",
+    positionTier: 3,
+    positionOrder: 4,
+    photoUrl:
+      "https://drive.google.com/file/d/10O11lBj7NOXk9wJXKK74AfEwveLLZO-9/view?usp=drive_link",
+  },
+  {
+    fullName: "Yap Han Lim",
+    matric: "FIXT0008B",
+    positionTier: 3,
+    positionOrder: 4,
+    photoUrl:
+      "https://drive.google.com/file/d/1QJzVBM59e157E9XEcr7kSWaN3YJ5EPkM/view?usp=drive_link",
+  },
+  {
+    fullName: "Muhammad Adam Zayani Bin Mohd Huzainy",
+    matric: "FIXT0009A",
+    positionTier: 3,
+    positionOrder: 5,
+    photoUrl:
+      "https://drive.google.com/file/d/1CD0fz1NGKt0FC2H7rT8Yptesmw0FJHTE/view?usp=drive_link",
+  },
+  {
+    fullName: "Calvin Khoo Zhen Chen",
+    matric: "FIXT0009B",
+    positionTier: 3,
+    positionOrder: 5,
+    photoUrl:
+      "https://drive.google.com/file/d/1U2XM0jBrfP6ZV4Xg0Qf8LVyUvpxeuNNj/view?usp=drive_link",
+  },
 ];
 
 export const loadTestCandidates = mutation({
@@ -1222,14 +1350,21 @@ export const loadTestCandidates = mutation({
       .query("candidates")
       .withIndex("by_election", (q) => q.eq("electionId", args.electionId))
       .collect();
-    const existingTestNames = new Set(
-      existingCandidates
-        .filter((c) => isTestBio(c.bio))
-        .map((c) => c.fullName),
+    const existingTestCandidates = existingCandidates.filter((c) =>
+      isTestBio(c.bio),
+    );
+    const existingTestByName = new Map(
+      existingTestCandidates.map((c) => [c.fullName, c]),
+    );
+    const existingTestByMatric = new Map(
+      existingTestCandidates
+        .filter((c) => typeof c.matric === "string")
+        .map((c) => [c.matric as string, c]),
     );
 
     let inserted = 0;
     let skipped = 0;
+    let updated = 0;
     const missingPositions: string[] = [];
 
     for (const spec of TEST_CANDIDATES) {
@@ -1242,8 +1377,38 @@ export const loadTestCandidates = mutation({
         );
         continue;
       }
-      if (existingTestNames.has(spec.fullName)) {
-        skipped += 1;
+      const photoUrl = normalisePhotoUrl(spec.photoUrl);
+      const bio = `${TEST_BIO_PREFIX} Auto-loaded fixture for ${position.name} (tier ${spec.positionTier}, order ${spec.positionOrder}).`;
+      const existing =
+        existingTestByMatric.get(spec.matric) ??
+        existingTestByName.get(spec.fullName);
+      if (existing) {
+        const patch: Partial<Doc<"candidates">> = {};
+        if (existing.fullName !== spec.fullName) patch.fullName = spec.fullName;
+        if (existing.matric !== spec.matric) patch.matric = spec.matric;
+        if (existing.photoUrl !== photoUrl) patch.photoUrl = photoUrl;
+        if (existing.bio !== bio) patch.bio = bio;
+        if (Object.keys(patch).length > 0) {
+          await ctx.db.patch(existing._id, patch);
+          updated += 1;
+        } else {
+          skipped += 1;
+        }
+
+        const existingLink = await ctx.db
+          .query("candidatePositions")
+          .withIndex("by_position_candidate", (q) =>
+            q.eq("positionId", position._id).eq("candidateId", existing._id),
+          )
+          .first();
+        if (!existingLink) {
+          await ctx.db.insert("candidatePositions", {
+            candidateId: existing._id,
+            positionId: position._id,
+            fallbackOrder: 0,
+          });
+          updated += 1;
+        }
         continue;
       }
 
@@ -1251,7 +1416,8 @@ export const loadTestCandidates = mutation({
         electionId: args.electionId,
         fullName: spec.fullName,
         matric: spec.matric,
-        bio: `${TEST_BIO_PREFIX} Auto-loaded fixture for ${position.name} (tier ${spec.positionTier}, order ${spec.positionOrder}).`,
+        photoUrl,
+        bio,
         createdAt: Date.now(),
       });
       await ctx.db.insert("candidatePositions", {
@@ -1276,6 +1442,7 @@ export const loadTestCandidates = mutation({
       payload: {
         inserted,
         skipped,
+        updated,
         totalSpec: TEST_CANDIDATES.length,
       },
     });
@@ -1283,6 +1450,7 @@ export const loadTestCandidates = mutation({
     return {
       inserted,
       skipped,
+      updated,
       totalSpec: TEST_CANDIDATES.length,
     };
   },

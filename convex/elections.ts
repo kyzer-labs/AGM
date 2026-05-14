@@ -72,6 +72,15 @@ export const create = mutation({
       throw new ConvexError("Year must be a four-digit integer.");
     }
 
+    const active = (await ctx.db.query("elections").collect()).find(
+      (e) => e.phase !== "published",
+    );
+    if (active) {
+      throw new ConvexError(
+        `Publish or delete the active cycle ("${active.name}") before creating another one.`,
+      );
+    }
+
     const dup = await ctx.db
       .query("elections")
       .withIndex("by_year", (q) => q.eq("year", args.year))

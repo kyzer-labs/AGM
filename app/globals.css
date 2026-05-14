@@ -146,6 +146,12 @@
     padding-inline: 1.5rem;
   }
 
+  .container-workbench {
+    max-width: 96rem;
+    margin-inline: auto;
+    padding-inline: 1.5rem;
+  }
+
   .font-display {
     font-family: var(--font-display);
     letter-spacing: -0.02em;
@@ -468,8 +474,8 @@
 
 .internal-rail-h {
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.22em;
+  font-size: 0.6875rem;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ink-muted);
   padding-bottom: 8px;
@@ -507,8 +513,8 @@
 
 .internal-rail-num {
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.18em;
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
   color: var(--ink-muted);
 }
 
@@ -517,7 +523,9 @@
 }
 
 .internal-rail-name {
-  font-size: 13px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.2;
   color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -526,8 +534,8 @@
 
 .internal-rail-prog {
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
   color: var(--ink-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -607,39 +615,40 @@
 
 .internal-photo {
   width: 88px;
-  height: 88px;
+  height: 118px;
   border-radius: 4px;
-  background: var(--paper-2);
+  background: var(--paper);
+  border: 1px solid var(--ink-line);
   overflow: hidden;
 }
 
 @media (max-width: 640px) {
   .internal-photo {
     width: 64px;
-    height: 64px;
+    height: 86px;
   }
 }
 
 .internal-photo img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .internal-bio-step {
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.22em;
+  font-size: 0.6875rem;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ink-muted);
 }
 
 .internal-bio-name {
   font-family: var(--font-display);
-  font-size: clamp(28px, 3.6vw, 40px);
+  font-size: clamp(1.625rem, 3vw, 2.25rem);
   font-weight: 500;
-  letter-spacing: -0.02em;
-  line-height: 1.02;
+  letter-spacing: 0;
+  line-height: 1.08;
   color: var(--ink);
   margin-top: 6px;
   word-break: break-word;
@@ -647,8 +656,8 @@
 
 .internal-bio-pos {
   font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.05em;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
   color: var(--ink-muted);
   margin-top: 8px;
 }

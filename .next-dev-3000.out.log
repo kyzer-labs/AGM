@@ -1,0 +1,18 @@
+   ▲ Next.js 15.5.18 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://100.70.108.20:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1003ms
+ ○ Compiling /guide ...
+ ✓ Compiled /guide in 3.2s
+ GET /guide 200 in 3527ms
+ GET /guide 200 in 124ms
+ GET /guide 200 in 136ms
+ GET /guide 200 in 126ms
+ GET /guide 200 in 128ms
+ GET /guide 200 in 147ms
+ ✓ Compiled /icon.svg in 238ms
+ GET /icon.svg?icon.8528ff5f.svg 200 in 562ms
+ GET /guide 200 in 124ms

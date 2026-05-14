@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { ArrowLeft, CheckCircle2, Pencil } from "lucide-react";
 
 import { AuthGate } from "@/components/auth/auth-gate";
+import { CandidatePhoto } from "@/components/candidate-photo";
 import { useDialog } from "@/components/dialog/dialog-provider";
 import { Button } from "@/components/ui/button";
 import { SectionMarker } from "@/components/ui/section-marker";
@@ -135,7 +136,7 @@ function Body({ election }: { election: Doc<"elections"> }) {
 
 function PageSkeleton() {
   return (
-    <main className="container-wide space-y-6 py-12">
+    <main className="container-workbench space-y-6 py-12">
       <Skeleton className="h-3 w-48" />
       <Skeleton className="h-10 w-2/3" />
       <Skeleton className="h-3 w-1/2" />
@@ -552,7 +553,7 @@ function ActiveEvaluation({
   );
 
   const renderSurface = (surfaceClassName = "") => (
-    <main className={cn("container-wide", surfaceClassName)}>
+    <main className={cn("container-workbench", surfaceClassName)}>
       {view === "score" ? (
         <>
           <div className="internal-strip internal-strip-distill-v1">
@@ -599,10 +600,7 @@ function ActiveEvaluation({
             >
               <div className="internal-card-head">
                 <div className="internal-photo" aria-hidden>
-                  {activeCand?.photoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={activeCand.photoUrl} alt="" />
-                  ) : null}
+                  <CandidatePhoto src={activeCand?.photoUrl} />
                 </div>
                 <div>
                   <p className="internal-bio-step">
@@ -817,7 +815,7 @@ function ActiveEvaluation({
     </main>
   );
 
-  return renderSurface("internal-wide-v4");
+  return renderSurface();
 }
 
 function ReviewView({

@@ -42,7 +42,12 @@ export function getConvexErrorMessage(
       .replace(/\s*Called by client\.?\s*$/, "")
       .trim();
 
-    if (cleaned.length > 0 && cleaned !== "Server Error") {
+    if (
+      cleaned.length > 0 &&
+      cleaned !== "Server Error" &&
+      !cleaned.includes("ArgumentValidationError") &&
+      !cleaned.includes("Server Error")
+    ) {
       return cleaned;
     }
   }
