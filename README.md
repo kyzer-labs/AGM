@@ -15,10 +15,11 @@ weighting.
 
 ## Documents
 
-- Spec & user stories — [docs/AGM_USER_STORIES.md](docs/AGM_USER_STORIES.md)
-- **Setup guide (start here)** — [docs/SETUP.md](docs/SETUP.md)
-- **Operations runbook (during AGM)** — [docs/RUNBOOK.md](docs/RUNBOOK.md)
-- **Testing playbook (dev seeder + 2-account smoke test)** — [docs/TESTING.md](docs/TESTING.md)
+- Spec and user stories: [docs/AGM_USER_STORIES.md](docs/AGM_USER_STORIES.md)
+- **Setup guide (start here)**: [docs/SETUP.md](docs/SETUP.md)
+- **Operations runbook (during AGM)**: [docs/RUNBOOK.md](docs/RUNBOOK.md)
+- **Testing playbook (dev seeder + 2-account smoke test)**: [docs/TESTING.md](docs/TESTING.md)
+- **Production checklist**: [docs/PROD_CHECKLIST.md](docs/PROD_CHECKLIST.md)
 
 ## Status
 
@@ -27,10 +28,10 @@ All seven implementation phases are complete:
 | Phase | Surface |
 | --- | --- |
 | 0 | Bootstrap (Bun, Next.js, Tailwind, design tokens) |
-| 1 | Identity & profile (Microsoft OAuth, USM domain lock, voter profile) |
-| 2 | Admin allowlist + super-admin bootstrap |
-| 3 | Election cycle, positions, candidates (with photo upload), Year-2 whitelist (CSV import) |
-| 4 | Internal rubric evaluation (5 categories × N candidates), draft + submit, admin completion + aggregate dashboards |
+| 1 | Identity and profile (Microsoft OAuth, USM domain lock, voter profile) |
+| 2 | Admin allowlist and super-admin bootstrap |
+| 3 | Election cycle, positions, candidates with photo upload, Year-2 whitelist CSV import |
+| 4 | Internal rubric evaluation (5 categories x N candidates), draft + submit, admin completion + aggregate dashboards |
 | 5 | Live AGM voting (per-position session machine, cascade rules, manual tie resolution) |
 | 6 | Weighted results preview, super-admin recompute, public results page |
 | 7 | CSV exports, audit log download, super-admin emergency voter audit |
@@ -51,4 +52,10 @@ bun install
 # create the Convex project, and fill in .env.local
 bunx convex dev   # terminal 1
 bun dev           # terminal 2
+```
+
+Before deploying or opening a pull request, run:
+
+```bash
+bun run verify
 ```

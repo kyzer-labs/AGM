@@ -213,7 +213,7 @@ cycle, an admin must move the cycle back to `setup` (allowed only from
 
 Header row is required. Duplicate `matric` values across the CSV (or already in the database) are skipped — not overwritten — and reported in the toast summary as "skipped".
 
-A working sample lives at [docs/sample-candidates.csv](sample-candidates.csv). It uses the 15 candidates from the AGM 2025 selection sheet and lines up with the names produced by the **Seed default 9 positions** button on `/admin/positions`. Workflow:
+A working sample lives at [docs/sample-candidates.csv](sample-candidates.csv). It uses sanitized sample candidate rows and lines up with the names produced by the **Seed default 9 positions** button on `/admin/positions`. Workflow:
 
 1. `/admin/election` → create cycle.
 2. `/admin/positions` → click "Seed default 9 positions".

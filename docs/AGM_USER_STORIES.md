@@ -4,8 +4,7 @@ This document describes the intended user-facing behavior for a new AGM voting w
 
 > **Implementation note (May 2026):** the original "75/25 single-class
 > rubric" model below has been superseded by the **60/40
-> weighted-classes model** described in `Marking Sheet.xlsx` and
-> implemented in this repo. See `docs/RUNBOOK.md` → "Scoring model" for
+> weighted-classes model** implemented in this repo. See `docs/RUNBOOK.md` → "Scoring model" for
 > the current weights, normalisation, and tie-break ladder. The original
 > requirements below are kept as historical reference for the rest of
 > the system (roles, flows, candidate management, etc.) which still

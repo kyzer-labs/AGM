@@ -6,8 +6,9 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit",
+    "lint": "eslint app components lib --max-warnings=0",
+    "typecheck": "tsc --noEmit --incremental false",
+    "verify": "bun run lint && bun run build && bun run typecheck",
     "convex:dev": "convex dev",
     "convex:deploy": "convex deploy"
   },

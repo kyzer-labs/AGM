@@ -223,28 +223,24 @@ Open [http://localhost:3000](http://localhost:3000). You should see the landing 
 5. Paste the `SUPER_ADMIN_BOOTSTRAP_TOKEN` value, click **Become super admin**.
 6. The page reloads — you now have super-admin access. The bootstrap card disappears forever.
 
-From this point on, additional admins are added by you via the (forthcoming) `/admin/admins` page using `grantAdmin`/`revokeAdmin` Convex mutations — no shared password needed.
+From this point on, additional admins are added by you via `/admin/admins` using the admin allowlist UI — no shared password needed.
 
 ---
 
-## 7. What's implemented today vs. coming next
+## 7. What's implemented today
 
-This first slice (Phases 0–2 from the plan) is in place:
+The full AGM election flow is implemented:
 
 - USM-domain-locked Microsoft sign-in.
 - Convex/Firebase auth bridge.
-- `voters` profile flow with full validation server-side.
-- `admins` allowlist with super-admin bootstrap.
-- `auditLog` populated by every privileged mutation.
-- Landing, dashboard, profile, admin landing, and placeholders for internal/vote/results.
+- Voter profile completion with server-side validation.
+- Super-admin bootstrap and admin allowlist management.
+- Election cycle setup, scheduled/internal/public phase controls, positions, candidates with photos, and internal whitelist CSV import.
+- Internal rubric evaluation with draft/submit states and admin aggregate dashboards.
+- Live public voting with per-position session controls, cascade eligibility, live counts, and manual tie resolution.
+- Weighted results preview, super-admin recompute, publishing, public results, CSV exports, audit log download, and emergency voter audit.
 
-Everything below is scaffolded in the schema and will be wired up next:
-
-- Phase 3: election cycle config, position hierarchy, candidate CRUD with photos, internal whitelist CSV import.
-- Phase 4: rubric evaluation grid + window controls.
-- Phase 5: live AGM voting with cascade rules and live admin counts.
-- Phase 6: 75/25 normalization, ties, publishing.
-- Phase 7: CSV exports, restricted emergency audit, error states, runbook.
+For production deployment, use `docs/PROD_CHECKLIST.md` before connecting the org repo to the hosting pipeline.
 
 ---
 
@@ -260,4 +256,5 @@ Everything below is scaffolded in the schema and will be wired up next:
 - **Firebase says `auth/operation-not-allowed`** — Microsoft sign-in isn't enabled in Firebase console → Authentication → Sign-in method.
 - **Convex says `Provider not found` or `aud mismatch`** — check `FIREBASE_PROJECT_ID` matches exactly the project that issued the Firebase ID token. Decode the token at [https://jwt.io](https://jwt.io) and verify `iss` and `aud`.
 - **Type errors about `convex/_generated/api`** — run `bunx convex dev` once, the codegen creates these files.
+- **Type errors about missing `.next/types` after local route changes** — run `bun run build` once, then `bun run typecheck`. The recommended one-shot validation command is `bun run verify`.
 
